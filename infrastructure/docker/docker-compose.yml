@@ -1,0 +1,186 @@
+# ============================================
+# Docker Compose - 肾衰竭健康监测应用
+# ============================================
+# 用途: 本地开发/测试环境编排
+# 生产环境建议使用: docker-compose -f docker-compose.prod.yml up -d
+# ============================================
+
+version: '3.8'
+
+services:
+  # ----------------------------------------
+  # PostgreSQL 数据库
+  # ----------------------------------------
+  postgres:
+    image: postgres:14-alpine
+    container_name: health-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-health}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-health123}
+      POSTGRES_DB: ${POSTGRES_DB:-health_monitoring}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - health-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-health} -d ${POSTGRES_DB:-health_monitoring}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------
+  # Redis 缓存/队列
+  # ----------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: health-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis123}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - health-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------
+  # 后端 API 服务
+  # ----------------------------------------
+  backend:
+    build:
+      context: ../../src/backend
+      dockerfile: ../../infrastructure/docker/Dockerfile.backend
+    container_name: health-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-health}:${POSTGRES_PASSWORD:-health123}@postgres:5432/${POSTGRES_DB:-health_monitoring}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-min-32-chars}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-your-refresh-secret-key-min-32-chars}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-your-encryption-key-32-chars-long}
+      BAIDU_OCR_API_KEY: ${BAIDU_OCR_API_KEY:-}
+      BAIDU_OCR_SECRET_KEY: ${BAIDU_OCR_SECRET_KEY:-}
+      SMS_ACCESS_KEY: ${SMS_ACCESS_KEY:-}
+      SMS_SECRET_KEY: ${SMS_SECRET_KEY:-}
+      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID:-}
+      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET:-}
+      OSS_BUCKET: ${OSS_BUCKET:-}
+      OSS_REGION: ${OSS_REGION:-oss-cn-hangzhou}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "3001:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - health-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ----------------------------------------
+  # Worker 定时任务服务
+  # ----------------------------------------
+  worker:
+    build:
+      context: ../../src/backend
+      dockerfile: ../../infrastructure/docker/Dockerfile.worker
+    container_name: health-worker
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-health}:${POSTGRES_PASSWORD:-health123}@postgres:5432/${POSTGRES_DB:-health_monitoring}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis123}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-min-32-chars}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-your-encryption-key-32-chars-long}
+      SMS_ACCESS_KEY: ${SMS_ACCESS_KEY:-}
+      SMS_SECRET_KEY: ${SMS_SECRET_KEY:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ENABLE_REMINDER_WORKER: ${ENABLE_REMINDER_WORKER:-true}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    networks:
+      - health-network
+
+  # ----------------------------------------
+  # 前端 Web 服务
+  # ----------------------------------------
+  web:
+    build:
+      context: ../../src/frontend
+      dockerfile: ../../infrastructure/docker/Dockerfile.frontend
+    container_name: health-web
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - health-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ----------------------------------------
+  # Nginx 反向代理 (可选，生产环境使用)
+  # ----------------------------------------
+  nginx:
+    image: nginx:1.24-alpine
+    container_name: health-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../nginx/conf.d:/etc/nginx/conf.d:ro
+      - ../nginx/ssl:/etc/nginx/ssl:ro
+      - ../nginx/www:/var/www/certbot:ro
+    depends_on:
+      - web
+      - backend
+    networks:
+      - health-network
+
+# ----------------------------------------
+# 数据卷
+# ----------------------------------------
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# ----------------------------------------
+# 网络
+# ----------------------------------------
+networks:
+  health-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
