@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background-color: #F5F5F5;
+    color: #262626;
+    min-height: 100vh;
+  }
+
+  #root {
+    min-height: 100vh;
+    max-width: 480px;
+    margin: 0 auto;
+    background-color: #F5F5F5;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply h-12 px-4 bg-primary text-white rounded-button font-medium text-body;
+    @apply hover:bg-primary-dark transition-colors duration-150;
+    @apply disabled:bg-gray-disabled disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply h-12 px-4 bg-white text-primary border border-primary rounded-button font-medium text-body;
+    @apply hover:bg-primary-light transition-colors duration-150;
+  }
+
+  .btn-medication {
+    @apply h-12 px-4 bg-medication text-white rounded-button font-medium text-body;
+    @apply hover:opacity-90 transition-opacity duration-150;
+  }
+
+  .input-field {
+    @apply h-12 px-4 bg-white border border-gray-border rounded-input text-body;
+    @apply focus:outline-none focus:border-primary focus:shadow-input-focus;
+    @apply placeholder:text-gray-text-helper;
+  }
+
+  .card {
+    @apply bg-white rounded-card p-4 shadow-card;
+  }
+
+  .card-medication {
+    @apply bg-white rounded-card p-4 shadow-card border-l-4 border-medication;
+    @apply bg-gradient-to-r from-medication-light to-white;
+  }
+
+  .card-alert-critical {
+    @apply bg-white rounded-card p-4 shadow-card border-l-4 border-danger;
+    @apply bg-red-50;
+  }
+
+  .card-alert-warning {
+    @apply bg-white rounded-card p-4 shadow-card border-l-4 border-warning;
+    @apply bg-yellow-50;
+  }
+
+  .card-alert-info {
+    @apply bg-white rounded-card p-4 shadow-card border-l-4 border-primary;
+    @apply bg-blue-50;
+  }
+
+  .nav-item {
+    @apply flex flex-col items-center justify-center text-gray-text-helper;
+    @apply hover:text-primary transition-colors duration-150;
+  }
+
+  .nav-item.active {
+    @apply text-primary;
+  }
+}
+
+@layer utilities {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+}

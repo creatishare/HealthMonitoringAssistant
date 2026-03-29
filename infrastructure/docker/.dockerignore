@@ -1,0 +1,73 @@
+# ============================================
+# Docker Ignore - 构建时排除的文件
+# ============================================
+
+# 依赖
+node_modules
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+
+# 构建输出
+dist
+build
+coverage
+.nyc_output
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
+
+# 版本控制
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 日志
+logs
+*.log
+
+# 测试
+tests
+__tests__
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+
+# 文档
+docs
+*.md
+!README.md
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# 其他
+.eslintrc*
+.prettierrc*
+tsconfig.json
+jest.config.js
+vite.config.ts

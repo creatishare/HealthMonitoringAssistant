@@ -1,0 +1,256 @@
+/**
+ * 通知服务
+ * @description 集成阿里云短信服务，实现验证码、用药提醒等短信通知
+ */
+
+import { sendVerificationCode as sendSMSCode } from './notification.service';
+import logger from '../utils/logger';
+
+// 阿里云短信配置
+interface SMSConfig {
+  accessKeyId: string;
+  accessKeySecret: string;
+  signName: string;
+  endpoint: string;
+}
+
+// 短信模板类型
+export enum SMSTemplate {
+  VERIFICATION_CODE = 'VERIFICATION_CODE',    // 验证码
+  MEDICATION_REMINDER = 'MEDICATION_REMINDER', // 用药提醒
+  MISS_MEDICATION = 'MISS_MEDICATION',         // 漏服提醒
+  ABNORMAL_ALERT = 'ABNORMAL_ALERT',           // 异常指标提醒
+}
+
+// 短信配置映射
+const smsConfig: SMSConfig = {
+  accessKeyId: process.env.SMS_ACCESS_KEY || '',
+  accessKeySecret: process.env.SMS_SECRET_KEY || '',
+  signName: process.env.SMS_SIGN_NAME || '肾健康助手',
+  endpoint: 'https://dysmsapi.aliyuncs.com',
+};
+
+// 模板代码映射（需要在阿里云申请）
+const templateCodes: Record<SMSTemplate, string> = {
+  [SMSTemplate.VERIFICATION_CODE]: process.env.SMS_TEMPLATE_CODE_VERIFICATION || '',
+  [SMSTemplate.MEDICATION_REMINDER]: process.env.SMS_TEMPLATE_CODE_REMINDER || '',
+  [SMSTemplate.MISS_MEDICATION]: process.env.SMS_TEMPLATE_CODE_MISS || '',
+  [SMSTemplate.ABNORMAL_ALERT]: process.env.SMS_TEMPLATE_CODE_ALERT || '',
+};
+
+/**
+ * 发送短信
+ */
+async function sendSMS(
+  phone: string,
+  template: SMSTemplate,
+  templateParam: Record<string, string>
+): Promise<boolean> {
+  // 如果没有配置短信服务，使用模拟模式
+  if (!smsConfig.accessKeyId || !smsConfig.accessKeySecret) {
+    logger.info(`[SMS模拟] 发送到 ${phone}: 模板=${template}, 参数=${JSON.stringify(templateParam)}`);
+    return true;
+  }
+
+  try {
+    const templateCode = templateCodes[template];
+    if (!templateCode) {
+      logger.error(`短信模板未配置: ${template}`);
+      return false;
+    }
+
+    // 构建请求参数
+    const params = {
+      PhoneNumbers: phone,
+      SignName: smsConfig.signName,
+      TemplateCode: templateCode,
+      TemplateParam: JSON.stringify(templateParam),
+    };
+
+    // 调用阿里云短信API
+    const result = await callAliyunSMSAPI(params);
+
+    if (result.success) {
+      logger.info(`短信发送成功: ${phone}, 模板: ${template}`);
+      return true;
+    } else {
+      logger.error(`短信发送失败: ${phone}, 错误: ${result.error}`);
+      return false;
+    }
+  } catch (error) {
+    logger.error('发送短信异常', error);
+    return false;
+  }
+}
+
+/**
+ * 调用阿里云短信API
+ */
+async function callAliyunSMSAPI(params: Record<string, string>): Promise<{ success: boolean; error?: string }> {
+  // 这里需要实现阿里云签名算法
+  // 参考: https://help.aliyun.com/document_detail/101414.html
+
+  const timestamp = new Date().toISOString().replace(/[:-]/g, '').slice(0, 15) + 'Z';
+  const nonce = Math.random().toString(36).substring(2, 12);
+
+  // 构建待签名字符串
+  const commonParams = {
+    Format: 'JSON',
+    Version: '2017-05-25',
+    AccessKeyId: smsConfig.accessKeyId,
+    SignatureMethod: 'HMAC-SHA1',
+    Timestamp: timestamp,
+    SignatureVersion: '1.0',
+    SignatureNonce: nonce,
+    Action: 'SendSms',
+  };
+
+  const allParams = { ...commonParams, ...params };
+
+  // 按键排序
+  const sortedKeys = Object.keys(allParams).sort();
+  const canonicalQueryString = sortedKeys
+    .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(allParams[key as keyof typeof allParams])}`)
+    .join('&');
+
+  // 构建签名字符串
+  const stringToSign = `GET&${encodeURIComponent('/')}&${encodeURIComponent(canonicalQueryString)}`;
+
+  // 计算签名
+  const signature = calculateSignature(stringToSign, smsConfig.accessKeySecret + '&');
+
+  // 构建完整URL
+  const url = `${smsConfig.endpoint}/?Signature=${encodeURIComponent(signature)}&${canonicalQueryString}`;
+
+  try {
+    const response = await fetch(url, { method: 'GET' });
+    const data = await response.json() as { Code: string; Message: string };
+
+    if (data.Code === 'OK') {
+      return { success: true };
+    } else {
+      return { success: false, error: `${data.Code}: ${data.Message}` };
+    }
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * 计算阿里云签名
+ */
+function calculateSignature(stringToSign: string, key: string): string {
+  // 使用 HMAC-SHA1 算法
+  const crypto = require('crypto');
+  return crypto
+    .createHmac('sha1', key)
+    .update(stringToSign)
+    .digest('base64');
+}
+
+/**
+ * 发送验证码短信
+ */
+export async function sendVerificationCode(phone: string, code: string): Promise<boolean> {
+  return sendSMS(phone, SMSTemplate.VERIFICATION_CODE, {
+    code,
+  });
+}
+
+/**
+ * 发送用药提醒
+ */
+export async function sendMedicationReminder(
+  phone: string,
+  medicationName: string,
+  dosage: string,
+  time: string
+): Promise<boolean> {
+  return sendSMS(phone, SMSTemplate.MEDICATION_REMINDER, {
+    medication: medicationName,
+    dosage,
+    time,
+  });
+}
+
+/**
+ * 发送漏服提醒
+ */
+export async function sendMissedMedicationAlert(
+  phone: string,
+  medicationName: string,
+  scheduledTime: string
+): Promise<boolean> {
+  return sendSMS(phone, SMSTemplate.MISS_MEDICATION, {
+    medication: medicationName,
+    time: scheduledTime,
+  });
+}
+
+/**
+ * 发送异常指标提醒
+ */
+export async function sendAbnormalAlert(
+  phone: string,
+  metricName: string,
+  value: string,
+  threshold: string
+): Promise<boolean> {
+  return sendSMS(phone, SMSTemplate.ABNORMAL_ALERT, {
+    metric: metricName,
+    value,
+    threshold,
+  });
+}
+
+/**
+ * 检查短信服务是否可用
+ */
+export function isSMSServiceAvailable(): boolean {
+  return !!(
+    smsConfig.accessKeyId &&
+    smsConfig.accessKeySecret &&
+    smsConfig.signName
+  );
+}
+
+/**
+ * 批量发送用药提醒
+ */
+export async function sendBatchMedicationReminders(
+  reminders: Array<{
+    phone: string;
+    medicationName: string;
+    dosage: string;
+    time: string;
+  }>
+): Promise<{ success: number; failed: number }> {
+  let success = 0;
+  let failed = 0;
+
+  for (const reminder of reminders) {
+    const result = await sendMedicationReminder(
+      reminder.phone,
+      reminder.medicationName,
+      reminder.dosage,
+      reminder.time
+    );
+    if (result) {
+      success++;
+    } else {
+      failed++;
+    }
+  }
+
+  return { success, failed };
+}
+
+export default {
+  sendVerificationCode,
+  sendMedicationReminder,
+  sendMissedMedicationAlert,
+  sendAbnormalAlert,
+  isSMSServiceAvailable,
+  sendBatchMedicationReminders,
+  SMSTemplate,
+};

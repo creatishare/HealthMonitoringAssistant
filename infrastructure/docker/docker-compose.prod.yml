@@ -1,0 +1,216 @@
+# ============================================
+# Docker Compose - 生产环境配置
+# ============================================
+# 用途: 生产环境部署
+# 使用方法: docker-compose -f docker-compose.prod.yml up -d
+# ============================================
+
+version: '3.8'
+
+services:
+  # ----------------------------------------
+  # PostgreSQL 数据库
+  # ----------------------------------------
+  postgres:
+    image: postgres:14-alpine
+    container_name: health-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
+      - ./backups:/backups
+    networks:
+      - health-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # ----------------------------------------
+  # Redis 缓存/队列
+  # ----------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: health-redis
+    restart: always
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - health-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # ----------------------------------------
+  # 后端 API 服务
+  # ----------------------------------------
+  backend:
+    build:
+      context: ../../src/backend
+      dockerfile: ../../infrastructure/docker/Dockerfile.backend
+    container_name: health-backend
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      BAIDU_OCR_API_KEY: ${BAIDU_OCR_API_KEY}
+      BAIDU_OCR_SECRET_KEY: ${BAIDU_OCR_SECRET_KEY}
+      SMS_ACCESS_KEY: ${SMS_ACCESS_KEY}
+      SMS_SECRET_KEY: ${SMS_SECRET_KEY}
+      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID}
+      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET}
+      OSS_BUCKET: ${OSS_BUCKET}
+      OSS_REGION: ${OSS_REGION}
+      LOG_LEVEL: ${LOG_LEVEL:-warn}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - health-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # ----------------------------------------
+  # Worker 定时任务服务
+  # ----------------------------------------
+  worker:
+    build:
+      context: ../../src/backend
+      dockerfile: ../../infrastructure/docker/Dockerfile.worker
+    container_name: health-worker
+    restart: always
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      SMS_ACCESS_KEY: ${SMS_ACCESS_KEY}
+      SMS_SECRET_KEY: ${SMS_SECRET_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-warn}
+      ENABLE_REMINDER_WORKER: ${ENABLE_REMINDER_WORKER:-true}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - health-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+
+  # ----------------------------------------
+  # 前端 Web 服务 (Nginx)
+  # ----------------------------------------
+  web:
+    build:
+      context: ../../src/frontend
+      dockerfile: ../../infrastructure/docker/Dockerfile.frontend
+    container_name: health-web
+    restart: always
+    depends_on:
+      - backend
+    networks:
+      - health-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+
+  # ----------------------------------------
+  # Nginx 反向代理
+  # ----------------------------------------
+  nginx:
+    image: nginx:1.24-alpine
+    container_name: health-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../nginx/conf.d:/etc/nginx/conf.d:ro
+      - ../nginx/ssl:/etc/nginx/ssl:ro
+      - ../nginx/www:/var/www/certbot:ro
+    depends_on:
+      - web
+      - backend
+    networks:
+      - health-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# ----------------------------------------
+# 数据卷
+# ----------------------------------------
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# ----------------------------------------
+# 网络
+# ----------------------------------------
+networks:
+  health-network:
+    driver: bridge

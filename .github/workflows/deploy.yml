@@ -1,0 +1,188 @@
+name: Deploy Pipeline
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ----------------------------------------
+  # 构建阶段
+  # ----------------------------------------
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 构建后端镜像
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./src/backend
+          file: ./infrastructure/docker/Dockerfile.backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 构建 Worker 镜像
+      - name: Build and push worker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./src/backend
+          file: ./infrastructure/docker/Dockerfile.worker
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/worker:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/worker:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 构建前端镜像
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./src/frontend
+          file: ./infrastructure/docker/Dockerfile.frontend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ----------------------------------------
+  # 部署阶段
+  # ----------------------------------------
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 部署到生产服务器
+      - name: Deploy to production server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+
+            echo "=== 开始部署 ==="
+            cd /opt/health-monitoring
+
+            # 拉取最新代码
+            echo "拉取最新代码..."
+            git pull origin main
+
+            # 更新环境变量文件
+            echo "更新环境变量..."
+            cat > .env << 'ENVFILE'
+            NODE_ENV=production
+            POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+            REDIS_URL=${{ secrets.REDIS_URL }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
+            JWT_EXPIRES_IN=24h
+            JWT_REFRESH_EXPIRES_IN=7d
+            ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
+            BAIDU_OCR_API_KEY=${{ secrets.BAIDU_OCR_API_KEY }}
+            BAIDU_OCR_SECRET_KEY=${{ secrets.BAIDU_OCR_SECRET_KEY }}
+            SMS_ACCESS_KEY=${{ secrets.SMS_ACCESS_KEY }}
+            SMS_SECRET_KEY=${{ secrets.SMS_SECRET_KEY }}
+            OSS_ACCESS_KEY_ID=${{ secrets.OSS_ACCESS_KEY_ID }}
+            OSS_ACCESS_KEY_SECRET=${{ secrets.OSS_ACCESS_KEY_SECRET }}
+            OSS_BUCKET=${{ secrets.OSS_BUCKET }}
+            OSS_REGION=${{ secrets.OSS_REGION }}
+            LOG_LEVEL=warn
+            ENABLE_REMINDER_WORKER=true
+            ENVFILE
+
+            # 登录到 GitHub Container Registry
+            echo "登录到容器仓库..."
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+            # 拉取最新镜像
+            echo "拉取最新镜像..."
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:latest
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/worker:latest
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:latest
+
+            # 停止并重新启动服务
+            echo "重启服务..."
+            docker-compose -f infrastructure/docker/docker-compose.prod.yml down
+            docker-compose -f infrastructure/docker/docker-compose.prod.yml up -d
+
+            # 运行数据库迁移
+            echo "运行数据库迁移..."
+            docker-compose -f infrastructure/docker/docker-compose.prod.yml exec -T backend npx prisma migrate deploy || true
+
+            # 清理旧镜像
+            echo "清理旧镜像..."
+            docker image prune -af --filter "until=168h"
+
+            # 健康检查
+            echo "执行健康检查..."
+            sleep 10
+            if curl -sf http://localhost:3001/health > /dev/null; then
+              echo "后端服务健康检查通过"
+            else
+              echo "后端服务健康检查失败"
+              exit 1
+            fi
+
+            if curl -sf http://localhost:3000/ > /dev/null; then
+              echo "前端服务健康检查通过"
+            else
+              echo "前端服务健康检查失败"
+              exit 1
+            fi
+
+            echo "=== 部署完成 ==="
+
+      # 部署通知
+      - name: Notify deployment status
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#deployments'
+          text: |
+            部署状态: ${{ job.status }}
+            项目: ${{ github.repository }}
+            分支: ${{ github.ref }}
+            提交: ${{ github.sha }}
+            作者: ${{ github.actor }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true
