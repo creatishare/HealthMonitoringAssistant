@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Pill, Clock, ChevronRight, Pause, Play } from 'lucide-react'
+import { Plus, Pill, Clock, ChevronRight, Pause, Play, CheckCircle, Calendar } from 'lucide-react'
 import { medicationApi } from '../services/api'
 import toast from 'react-hot-toast'
 
@@ -15,6 +15,16 @@ interface Medication {
   status: string
 }
 
+interface TodayMedication {
+  medicationId: string
+  name: string
+  dosage: number
+  dosageUnit: string
+  scheduledTime: string
+  status: 'pending' | 'taken' | 'missed' | 'skipped'
+  logId?: string
+}
+
 const frequencyText: Record<string, string> = {
   once_daily: '每日1次',
   twice_daily: '每日2次',
@@ -26,10 +36,13 @@ const frequencyText: Record<string, string> = {
 export default function Medications() {
   const navigate = useNavigate()
   const [medications, setMedications] = useState<Medication[]>([])
+  const [todayMeds, setTodayMeds] = useState<TodayMedication[]>([])
   const [loading, setLoading] = useState(false)
+  const [todayLoading, setTodayLoading] = useState(false)
 
   useEffect(() => {
     fetchMedications()
+    fetchTodayMedications()
   }, [])
 
   const fetchMedications = async () => {
@@ -41,6 +54,33 @@ export default function Medications() {
       toast.error('获取用药列表失败')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchTodayMedications = async () => {
+    setTodayLoading(true)
+    try {
+      const response: any = await medicationApi.getToday()
+      setTodayMeds(response.data.medications)
+    } catch (error) {
+      console.error('获取今日用药失败', error)
+    } finally {
+      setTodayLoading(false)
+    }
+  }
+
+  const handleMarkTaken = async (med: TodayMedication) => {
+    try {
+      await medicationApi.recordLog({
+        medicationId: med.medicationId,
+        scheduledTime: new Date(`${new Date().toISOString().split('T')[0]}T${med.scheduledTime}:00`).toISOString(),
+        status: 'taken',
+        actualTime: new Date().toISOString(),
+      })
+      toast.success(`已记录 ${med.name} ${med.scheduledTime} 服用`)
+      fetchTodayMedications() // 刷新今日用药状态
+    } catch (error) {
+      toast.error('标记失败，请重试')
     }
   }
 
@@ -66,6 +106,57 @@ export default function Medications() {
 
   return (
     <div className="space-y-4">
+      {/* 今日用药区域 */}
+      <div className="card-medication">
+        <div className="flex items-center gap-2 mb-3">
+          <Calendar size={18} className="text-medication" />
+          <h2 className="text-card-title font-medium text-medication">今日用药</h2>
+        </div>
+        {todayLoading ? (
+          <div className="flex justify-center py-4">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-medication"></div>
+          </div>
+        ) : todayMeds.length === 0 ? (
+          <p className="text-small text-gray-secondary py-2">今日暂无用药安排</p>
+        ) : (
+          <div className="space-y-2">
+            {todayMeds.map((med, index) => (
+              <div
+                key={`${med.medicationId}-${med.scheduledTime}-${index}`}
+                className="flex items-center justify-between py-2"
+              >
+                <div className="flex items-center gap-3">
+                  {med.status === 'taken' ? (
+                    <CheckCircle size={18} className="text-success" />
+                  ) : (
+                    <Clock size={18} className="text-medication" />
+                  )}
+                  <div>
+                    <p className="text-body text-gray-text-primary">{med.name}</p>
+                    <p className="text-small text-gray-secondary">
+                      {med.dosage}{med.dosageUnit} · {med.scheduledTime}
+                    </p>
+                  </div>
+                </div>
+                {med.status === 'taken' ? (
+                  <span className="text-small px-2 py-1 rounded bg-green-100 text-success">
+                    已服
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => handleMarkTaken(med)}
+                    className="text-small px-3 py-1.5 rounded bg-medication text-white hover:bg-medication/90 transition-colors"
+                  >
+                    已服用
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 用药列表标题 */}
       <div className="flex items-center justify-between">
         <h1 className="text-page-title font-semibold text-gray-text-primary">用药管理</h1>
         <button
@@ -117,20 +208,31 @@ export default function Medications() {
                 <div className="flex items-center gap-2">
                   {med.status === 'active' ? (
                     <button
-                      onClick={() => handlePause(med.id)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handlePause(med.id)
+                      }}
                       className="p-2 text-gray-secondary hover:text-warning"
                     >
                       <Pause size={18} />
                     </button>
                   ) : (
                     <button
-                      onClick={() => handleResume(med.id)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleResume(med.id)
+                      }}
                       className="p-2 text-gray-secondary hover:text-success"
                     >
                       <Play size={18} />
                     </button>
                   )}
-                  <ChevronRight size={20} className="text-gray-secondary" />
+                  <button
+                    onClick={() => navigate(`/medications/${med.id}/edit`)}
+                    className="p-2 text-gray-secondary hover:text-primary"
+                  >
+                    <ChevronRight size={20} />
+                  </button>
                 </div>
               </div>
               <div className="mt-3 pt-3 border-t border-gray-border">

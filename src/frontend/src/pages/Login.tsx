@@ -24,7 +24,7 @@ export default function Login() {
       toast.success('登录成功')
       navigate('/')
     } catch (error: any) {
-      toast.error(error.response?.data?.message || '登录失败')
+      toast.error(error.message || error.response?.data?.message || '登录失败')
     } finally {
       setLoading(false)
     }

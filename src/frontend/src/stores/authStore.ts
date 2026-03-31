@@ -29,7 +29,7 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (phone: string, password: string) => {
         const response: any = await authApi.login(phone, password)
-        const { userId, accessToken, refreshToken } = response.data
+        const { userId, accessToken, refreshToken } = response.data || response
 
         localStorage.setItem('accessToken', accessToken)
         localStorage.setItem('refreshToken', refreshToken)
@@ -44,7 +44,7 @@ export const useAuthStore = create<AuthState>()(
 
       register: async (phone: string, password: string, verificationCode: string) => {
         const response: any = await authApi.register(phone, password, verificationCode)
-        const { userId, accessToken, refreshToken } = response.data
+        const { userId, accessToken, refreshToken } = response.data || response
 
         localStorage.setItem('accessToken', accessToken)
         localStorage.setItem('refreshToken', refreshToken)

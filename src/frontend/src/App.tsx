@@ -5,7 +5,9 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import Records from './pages/Records'
+import RecordDetail from './pages/RecordDetail'
 import RecordForm from './pages/RecordForm'
+import OCRUpload from './pages/OCRUpload'
 import Charts from './pages/Charts'
 import Medications from './pages/Medications'
 import MedicationForm from './pages/MedicationForm'
@@ -26,9 +28,12 @@ function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/records" element={<Records />} />
         <Route path="/records/new" element={<RecordForm />} />
+        <Route path="/records/ocr" element={<OCRUpload />} />
+        <Route path="/records/:id" element={<RecordDetail />} />
         <Route path="/charts" element={<Charts />} />
         <Route path="/medications" element={<Medications />} />
         <Route path="/medications/new" element={<MedicationForm />} />
+        <Route path="/medications/:id/edit" element={<MedicationForm />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/profile" element={<Profile />} />
       </Route>

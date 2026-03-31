@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft, Plus, X } from 'lucide-react'
 import { medicationApi } from '../services/api'
 import toast from 'react-hot-toast'
@@ -14,7 +14,10 @@ const frequencies = [
 
 export default function MedicationForm() {
   const navigate = useNavigate()
+  const { id } = useParams()
+  const isEdit = !!id
   const [loading, setLoading] = useState(false)
+  const [fetchLoading, setFetchLoading] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     specification: '',
@@ -24,6 +27,40 @@ export default function MedicationForm() {
     reminderTimes: ['08:00'],
     reminderMinutesBefore: 5,
   })
+
+  // 编辑模式时加载药物数据
+  useEffect(() => {
+    if (isEdit && id) {
+      fetchMedication(id)
+    }
+  }, [isEdit, id])
+
+  const fetchMedication = async (medicationId: string) => {
+    setFetchLoading(true)
+    try {
+      const response: any = await medicationApi.getList()
+      const medication = response.data.list.find((m: any) => m.id === medicationId)
+      if (medication) {
+        setFormData({
+          name: medication.name || '',
+          specification: medication.specification || '',
+          dosage: String(medication.dosage) || '',
+          dosageUnit: medication.dosageUnit || '片',
+          frequency: medication.frequency || 'once_daily',
+          reminderTimes: medication.reminderTimes || ['08:00'],
+          reminderMinutesBefore: medication.reminderMinutesBefore || 5,
+        })
+      } else {
+        toast.error('药物不存在')
+        navigate('/medications')
+      }
+    } catch (error) {
+      toast.error('获取药物信息失败')
+      navigate('/medications')
+    } finally {
+      setFetchLoading(false)
+    }
+  }
 
   const handleChange = (field: string, value: string | number) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -55,14 +92,21 @@ export default function MedicationForm() {
     setLoading(true)
 
     try {
-      await medicationApi.create({
+      const data = {
         ...formData,
         dosage: parseFloat(formData.dosage),
-      })
-      toast.success('添加成功')
+      }
+
+      if (isEdit && id) {
+        await medicationApi.update(id, data)
+        toast.success('修改成功')
+      } else {
+        await medicationApi.create(data)
+        toast.success('添加成功')
+      }
       navigate('/medications')
     } catch (error: any) {
-      toast.error(error.response?.data?.message || '添加失败')
+      toast.error(error.response?.data?.message || (isEdit ? '修改失败' : '添加失败'))
     } finally {
       setLoading(false)
     }
@@ -74,10 +118,17 @@ export default function MedicationForm() {
         <button onClick={() => navigate(-1)} className="p-2 -ml-2">
           <ChevronLeft size={24} className="text-gray-text-primary" />
         </button>
-        <h1 className="text-page-title font-semibold text-gray-text-primary">添加用药</h1>
+        <h1 className="text-page-title font-semibold text-gray-text-primary">
+          {isEdit ? '编辑用药' : '添加用药'}
+        </h1>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      {fetchLoading ? (
+        <div className="flex justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-medication"></div>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
         <div className="card">
           <h2 className="text-card-title font-medium text-gray-text-primary mb-4">药品信息</h2>
           <div className="space-y-4">
@@ -209,6 +260,7 @@ export default function MedicationForm() {
           {loading ? '保存中...' : '保存'}
         </button>
       </form>
+      )}
     </div>
   )
 }

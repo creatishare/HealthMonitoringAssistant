@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, Camera } from 'lucide-react'
 import { healthRecordApi } from '../services/api'
 import toast from 'react-hot-toast'
 
@@ -77,11 +77,20 @@ export default function RecordForm() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-4">
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2">
-          <ChevronLeft size={24} className="text-gray-text-primary" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button onClick={() => navigate(-1)} className="p-2 -ml-2">
+            <ChevronLeft size={24} className="text-gray-text-primary" />
+          </button>
+          <h1 className="text-page-title font-semibold text-gray-text-primary">录入指标</h1>
+        </div>
+        <button
+          onClick={() => navigate('/records/ocr')}
+          className="btn-primary flex items-center gap-1 px-4 py-2"
+        >
+          <Camera size={18} />
+          拍照识别
         </button>
-        <h1 className="text-page-title font-semibold text-gray-text-primary">录入指标</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">

@@ -102,7 +102,11 @@ export const dashboardApi = {
 
 // OCR相关API
 export const ocrApi = {
-  upload: (formData: FormData) => api.post('/ocr/upload', formData),
+  upload: (formData: FormData) => api.post('/ocr/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  }),
   recognize: (imageId: string) => api.post('/ocr/recognize', { imageId }),
   confirm: (data: any) => api.post('/ocr/confirm', data),
   getResult: (id: string) => api.get(`/ocr/${id}`),

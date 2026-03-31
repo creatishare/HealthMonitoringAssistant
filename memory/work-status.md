@@ -70,11 +70,17 @@
 | 定时任务 Worker | ✅ 完成 | Bull Queue |
 | 前端页面 | ✅ 完成 | 10+ 页面 |
 
-**最近更新**: 2026-03-29 22:00
+**最近更新**: 2026-03-31
+
+**今日完成**:
+- Dashboard 用药提醒添加"已服用"按钮
+- 用药提醒按优先级排序（未服用优先，已服用隐藏）
+- Medications 页面添加"今日用药"区域
+- 实现用药编辑功能
 
 **代码统计**:
 - 后端代码: ~8,000 行
-- 前端代码: ~6,000 行
+- 前端代码: ~6,200 行
 - 数据库模型: 10 个表
 
 ---
@@ -216,9 +222,9 @@
 
 | Agent | 日志文件 | 最后更新 | 状态 |
 |-------|----------|----------|------|
-| 产品设计师 | [logs/product-designer.md](./logs/product-designer.md) | 2026-03-29 15:30 | ✅ 完成 |
+| 产品设计师 | [logs/product-designer.md](./logs/product-designer.md) | 2026-03-31 | ✅ 完成 |
 | 技术架构师 | [logs/architect.md](./logs/architect.md) | 2026-03-29 12:00 | ✅ 完成 |
-| 全栈工程师 | [logs/fullstack-dev.md](./logs/fullstack-dev.md) | 2026-03-29 22:00 | ✅ 完成 |
+| 全栈工程师 | [logs/fullstack-dev.md](./logs/fullstack-dev.md) | 2026-03-31 | ✅ 完成 |
 | AI工程师 | [logs/ai-engineer.md](./logs/ai-engineer.md) | 2026-03-29 20:00 | ✅ 完成 |
 | DevOps工程师 | [logs/devops.md](./logs/devops.md) | 2026-03-29 12:00 | ✅ 完成 |
 
@@ -233,12 +239,38 @@
 
 ---
 
-*最后更新: 2026-03-30 10:30*
-*会话状态: 已结束，待办事项下次继续*
+*最后更新: 2026-03-31*
+*会话状态: 功能开发完成，等待部署和第三方服务配置*
 
 ---
 
 ## 📋 更新记录
+
+### 2026-03-31 - 用药管理功能完善
+
+**Dashboard 用药提醒优化**:
+- 添加"已服用"按钮，点击后记录服药状态
+- 按优先级排序：未服用的按时间排序，已服用的排后面
+- 过滤已服用的药物，首页只展示待服用的
+- 全部服用后自动隐藏用药提醒区域
+
+**Medications 页面增强**:
+- 新增"今日用药"区域，展示今天所有时间点
+- 每个时间点都有"已服用"按钮
+- 右侧箭头改为可点击，跳转到编辑页面
+
+**用药编辑功能**:
+- 新增路由 `/medications/:id/edit`
+- 复用添加用药表单组件
+- 编辑模式自动加载药物数据
+
+相关文件:
+- src/frontend/src/pages/Dashboard.tsx
+- src/frontend/src/pages/Medications.tsx
+- src/frontend/src/pages/MedicationForm.tsx
+- src/frontend/src/App.tsx
+
+---
 
 ### 2026-03-30 - 第三方服务配置完成
 

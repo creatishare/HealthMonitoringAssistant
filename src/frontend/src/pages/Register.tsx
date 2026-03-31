@@ -34,7 +34,7 @@ export default function Register() {
         })
       }, 1000)
     } catch (error: any) {
-      toast.error(error.response?.data?.message || '发送失败')
+      toast.error(error.message || error.response?.data?.message || '发送失败')
     }
   }
 
@@ -57,7 +57,7 @@ export default function Register() {
       toast.success('注册成功')
       navigate('/')
     } catch (error: any) {
-      toast.error(error.response?.data?.message || '注册失败')
+      toast.error(error.message || error.response?.data?.message || '注册失败')
     } finally {
       setLoading(false)
     }

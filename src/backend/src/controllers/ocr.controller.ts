@@ -11,18 +11,22 @@ export async function uploadImage(req: Request, res: Response, next: NextFunctio
       throw new ApiError('未登录', 401, '01007');
     }
 
-    // TODO: 实际项目中需要处理文件上传
-    // const imageUrl = await uploadToOSS(req.file);
-    const imageUrl = 'https://example.com/mock-image.jpg';
+    // 检查是否有文件上传
+    if (!req.file) {
+      throw new ApiError('请选择要上传的图片文件', 400, '00002');
+    }
 
-    const imageId = await ocrService.saveImage(userId, imageUrl);
+    // 保存本地文件路径
+    const filePath = req.file.path;
 
-    res.status(200).json({
-      code: 200,
-      message: 'success',
+    const imageId = await ocrService.saveImage(userId, filePath);
+
+    res.status(201).json({
+      code: 201,
+      message: '上传成功',
       data: {
         imageId,
-        imageUrl,
+        filePath,
         status: 'uploaded',
       },
     });

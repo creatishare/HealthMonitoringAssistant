@@ -18,9 +18,12 @@ export async function getMedications(userId: string, status?: string) {
   return {
     list: medications.map((med) => ({
       ...med,
-      reminderTimes: med.reminderTimes.map((t) =>
-        t.toISOString().split('T')[1].substring(0, 5)
-      ),
+      // 使用UTC方法获取时间，避免时区偏移
+      reminderTimes: med.reminderTimes.map((t) => {
+        const hours = t.getUTCHours().toString().padStart(2, '0');
+        const minutes = t.getUTCMinutes().toString().padStart(2, '0');
+        return `${hours}:${minutes}`;
+      }),
     })),
   };
 }
@@ -38,11 +41,11 @@ export async function createMedication(
     reminderMinutesBefore?: number;
   }
 ) {
-  // 转换时间字符串为Date对象
+  // 转换时间字符串为Date对象 - 使用UTC时间存储，避免时区问题
   const reminderTimes = data.reminderTimes.map((time) => {
     const [hours, minutes] = time.split(':').map(Number);
-    const date = new Date();
-    date.setHours(hours, minutes, 0, 0);
+    // 使用固定的基准日期 1970-01-01 存储纯时间
+    const date = new Date(Date.UTC(1970, 0, 1, hours, minutes, 0, 0));
     return date;
   });
 
@@ -64,9 +67,12 @@ export async function createMedication(
 
   return {
     ...medication,
-    reminderTimes: medication.reminderTimes.map((t) =>
-      t.toISOString().split('T')[1].substring(0, 5)
-    ),
+    // 使用UTC方法获取时间，避免时区偏移
+    reminderTimes: medication.reminderTimes.map((t) => {
+      const hours = t.getUTCHours().toString().padStart(2, '0');
+      const minutes = t.getUTCMinutes().toString().padStart(2, '0');
+      return `${hours}:${minutes}`;
+    }),
   };
 }
 
@@ -95,12 +101,12 @@ export async function updateMedication(
 
   const updateData: any = { ...data };
 
-  // 转换时间字符串
+  // 转换时间字符串 - 使用UTC时间存储，避免时区问题
   if (data.reminderTimes) {
     updateData.reminderTimes = data.reminderTimes.map((time) => {
       const [hours, minutes] = time.split(':').map(Number);
-      const date = new Date();
-      date.setHours(hours, minutes, 0, 0);
+      // 使用固定的基准日期 1970-01-01 存储纯时间
+      const date = new Date(Date.UTC(1970, 0, 1, hours, minutes, 0, 0));
       return date;
     });
   }
@@ -114,9 +120,12 @@ export async function updateMedication(
 
   return {
     ...medication,
-    reminderTimes: medication.reminderTimes.map((t) =>
-      t.toISOString().split('T')[1].substring(0, 5)
-    ),
+    // 使用UTC方法获取时间，避免时区偏移
+    reminderTimes: medication.reminderTimes.map((t) => {
+      const hours = t.getUTCHours().toString().padStart(2, '0');
+      const minutes = t.getUTCMinutes().toString().padStart(2, '0');
+      return `${hours}:${minutes}`;
+    }),
   };
 }
 
@@ -198,7 +207,8 @@ export async function getTodayMedications(userId: string) {
 
     for (const time of med.reminderTimes) {
       const scheduledTime = new Date(today);
-      scheduledTime.setHours(time.getHours(), time.getMinutes(), 0, 0);
+      // 使用UTC小时和分钟
+      scheduledTime.setHours(time.getUTCHours(), time.getUTCMinutes(), 0, 0);
 
       // 查找是否已有记录
       const existingLog = await prisma.medicationLog.findFirst({
@@ -212,12 +222,15 @@ export async function getTodayMedications(userId: string) {
         },
       });
 
+      // 使用UTC方法格式化时间
+      const hours = time.getUTCHours().toString().padStart(2, '0');
+      const minutes = time.getUTCMinutes().toString().padStart(2, '0');
       todayMedications.push({
         medicationId: med.id,
         name: med.name,
         dosage: med.dosage,
         dosageUnit: med.dosageUnit,
-        scheduledTime: time.toISOString().split('T')[1].substring(0, 5),
+        scheduledTime: `${hours}:${minutes}`,
         status: existingLog?.status || 'pending',
         logId: existingLog?.id,
       });

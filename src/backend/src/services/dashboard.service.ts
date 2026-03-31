@@ -58,7 +58,7 @@ export async function getDashboardData(userId: string) {
       greeting,
     },
     today: {
-      date: today.toISOString().split('T')[0],
+      date: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }),
       checkIn: {
         weight: {
           recorded: todayRecord?.weight !== null && todayRecord?.weight !== undefined,
