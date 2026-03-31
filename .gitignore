@@ -10,11 +10,16 @@ yarn.lock
 dist/
 build/
 
-# Environment variables
+# Environment variables - DO NOT commit files with real secrets
 .env
 .env.*
 !.env.example
 !.env.*.example
+
+# Explicitly untracked env files (previously committed before gitignore)
+src/backend/.env.test
+infrastructure/.env.production
+backend.log
 
 # Sensitive directories
 uploads/
