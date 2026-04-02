@@ -72,7 +72,11 @@ export default function RecordForm() {
     { key: 'uricAcid', label: '尿酸', unit: 'μmol/L', placeholder: '男150-416/女89-357' },
     { key: 'hemoglobin', label: '血红蛋白', unit: 'g/L', placeholder: '120-160' },
     { key: 'bloodSugar', label: '血糖', unit: 'mmol/L', placeholder: '3.9-6.1' },
+  ]
+
+  const basicFields = [
     { key: 'weight', label: '体重', unit: 'kg', placeholder: '' },
+    { key: 'urineVolume', label: '24小时尿量', unit: 'ml', placeholder: '1000-2000' },
   ]
 
   return (
@@ -116,6 +120,27 @@ export default function RecordForm() {
                 <input
                   type="number"
                   step="0.01"
+                  value={(formData as any)[key]}
+                  onChange={(e) => handleChange(key, e.target.value)}
+                  placeholder={placeholder}
+                  className="input-field w-full"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="card">
+          <h2 className="text-card-title font-medium text-gray-text-primary mb-4">基本信息</h2>
+          <div className="grid grid-cols-2 gap-4">
+            {basicFields.map(({ key, label, unit, placeholder }) => (
+              <div key={key}>
+                <label className="block text-small text-gray-secondary mb-1">
+                  {label} ({unit})
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
                   value={(formData as any)[key]}
                   onChange={(e) => handleChange(key, e.target.value)}
                   placeholder={placeholder}

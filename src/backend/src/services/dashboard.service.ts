@@ -71,8 +71,9 @@ export async function getDashboardData(userId: string) {
           systolic: todayRecord?.bloodPressureSystolic,
           diastolic: todayRecord?.bloodPressureDiastolic,
         },
-        waterIntake: {
-          recorded: false, // TODO: 实现饮水记录
+        urineVolume: {
+          recorded: todayRecord?.urineVolume !== null && todayRecord?.urineVolume !== undefined,
+          value: todayRecord?.urineVolume,
         },
       },
     },
