@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ChevronLeft, Plus, X } from 'lucide-react'
+import { ChevronLeft, Plus, X, Trash2 } from 'lucide-react'
 import { medicationApi } from '../services/api'
 import toast from 'react-hot-toast'
 
@@ -87,6 +87,21 @@ export default function MedicationForm() {
     }))
   }
 
+  const handleDelete = async () => {
+    if (!id) return
+    if (window.confirm('确定要删除该用药提醒吗？此操作不可恢复。')) {
+      setLoading(true)
+      try {
+        await medicationApi.delete(id)
+        toast.success('已删除用药提醒')
+        navigate('/medications')
+      } catch (error: any) {
+        toast.error(error.response?.data?.message || '删除失败')
+        setLoading(false)
+      }
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -114,13 +129,25 @@ export default function MedicationForm() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-4">
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2">
-          <ChevronLeft size={24} className="text-gray-text-primary" />
-        </button>
-        <h1 className="text-page-title font-semibold text-gray-text-primary">
-          {isEdit ? '编辑用药' : '添加用药'}
-        </h1>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button onClick={() => navigate(-1)} className="p-2 -ml-2">
+            <ChevronLeft size={24} className="text-gray-text-primary" />
+          </button>
+          <h1 className="text-page-title font-semibold text-gray-text-primary">
+            {isEdit ? '编辑用药' : '添加用药'}
+          </h1>
+        </div>
+        {isEdit && (
+          <button
+            onClick={handleDelete}
+            disabled={loading}
+            className="p-2 text-gray-secondary hover:text-danger flex items-center gap-1"
+          >
+            <Trash2 size={18} />
+            <span className="text-sm">删除</span>
+          </button>
+        )}
       </div>
 
       {fetchLoading ? (

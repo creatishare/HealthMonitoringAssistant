@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Pill, Clock, ChevronRight, Pause, Play, CheckCircle, Calendar } from 'lucide-react'
+import { Plus, Pill, Clock, ChevronRight, Pause, Play, CheckCircle, Calendar, Trash2 } from 'lucide-react'
 import { medicationApi } from '../services/api'
 import toast from 'react-hot-toast'
 
@@ -101,6 +101,19 @@ export default function Medications() {
       fetchMedications()
     } catch (error) {
       toast.error('操作失败')
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('确定要删除该用药提醒吗？此操作不可恢复。')) {
+      try {
+        await medicationApi.delete(id)
+        toast.success('已删除用药提醒')
+        fetchMedications()
+        fetchTodayMedications() // 刷新今日用药
+      } catch (error) {
+        toast.error('删除失败，请重试')
+      }
     }
   }
 
@@ -233,9 +246,18 @@ export default function Medications() {
                   >
                     <ChevronRight size={20} />
                   </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDelete(med.id)
+                    }}
+                    className="p-2 text-gray-secondary hover:text-danger"
+                  >
+                    <Trash2 size={18} />
+                  </button>
                 </div>
               </div>
-              <div className="mt-3 pt-3 border-t border-gray-border">
+              <div className="mt-3 pt-3 border-t border-gray-border flex justify-between items-center">
                 <span
                   className={`text-small px-2 py-1 rounded ${
                     med.status === 'active'

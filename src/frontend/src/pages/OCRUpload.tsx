@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Camera, Upload, X, CheckCircle } from 'lucide-react'
+import { ChevronLeft, Camera, X, CheckCircle } from 'lucide-react'
 import { ocrApi, healthRecordApi } from '../services/api'
 import toast from 'react-hot-toast'
 
