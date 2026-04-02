@@ -11,7 +11,7 @@ interface DashboardData {
     checkIn: {
       weight: { recorded: boolean; value?: number }
       bloodPressure: { recorded: boolean; systolic?: number; diastolic?: number }
-      waterIntake: { recorded: boolean; value?: number }
+      urineVolume: { recorded: boolean; value?: number }
     }
   }
   medications: Array<{
