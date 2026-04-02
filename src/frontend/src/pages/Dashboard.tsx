@@ -12,6 +12,7 @@ interface TrendData {
   urea?: number
   potassium?: number
   uricAcid?: number
+  tacrolimus?: number
 }
 
 const trendMetrics = [
@@ -50,7 +51,8 @@ export default function Dashboard() {
       })
 
       // 后端返回 { code, message, data }, axios 拦截器解包后得到 { code, message, data }
-      setTrendData(response.data?.data || [])
+      // The data we want is inside data.data
+      setTrendData(response.data?.data || response.data || [])
     } catch (error) {
       console.error('获取趋势数据失败', error)
     } finally {
@@ -106,7 +108,7 @@ export default function Dashboard() {
 
   // 检查是否有趋势数据
   const hasTrendData = trendData.length > 0 && selectedMetrics.some(m =>
-    trendData.some(d => d[m as keyof TrendData] !== undefined)
+    trendData.some(d => d[m as keyof TrendData] !== undefined && d[m as keyof TrendData] !== null)
   )
 
   return (
