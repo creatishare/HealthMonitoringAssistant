@@ -164,14 +164,14 @@ export default function Dashboard() {
           <div
             onClick={() => navigate('/records/new')}
             className={`p-4 rounded-lg text-center cursor-pointer transition-colors ${
-              today.checkIn.urineVolume.recorded
+              today?.checkIn?.urineVolume?.recorded
                 ? 'bg-green-50 text-success'
                 : 'bg-gray-100 text-gray-secondary'
             }`}
           >
             <p className="text-small">尿量</p>
             <p className="text-metric mt-1">
-              {today.checkIn.urineVolume.recorded ? today.checkIn.urineVolume.value : '--'}
+              {today?.checkIn?.urineVolume?.recorded ? today.checkIn.urineVolume.value : '--'}
             </p>
           </div>
         </div>
