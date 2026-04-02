@@ -76,6 +76,7 @@ export async function createHealthRecord(req: Request, res: Response, next: Next
       bloodPressureSystolic,
       bloodPressureDiastolic,
       urineVolume,
+      tacrolimus,
       notes,
     } = req.body;
 
@@ -97,6 +98,7 @@ export async function createHealthRecord(req: Request, res: Response, next: Next
       bloodPressureSystolic,
       bloodPressureDiastolic,
       urineVolume,
+      tacrolimus,
       notes,
     });
 

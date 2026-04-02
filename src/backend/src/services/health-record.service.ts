@@ -85,6 +85,7 @@ export async function createHealthRecord(
     bloodPressureSystolic?: number;
     bloodPressureDiastolic?: number;
     urineVolume?: number;
+    tacrolimus?: number;
     notes?: string;
     source?: RecordSource;
   }
@@ -105,6 +106,7 @@ export async function createHealthRecord(
       bloodPressureSystolic: data.bloodPressureSystolic,
       bloodPressureDiastolic: data.bloodPressureDiastolic,
       urineVolume: data.urineVolume,
+      tacrolimus: data.tacrolimus,
       notes: data.notes,
       source: data.source || 'manual',
     },
@@ -136,6 +138,7 @@ export async function updateHealthRecord(
     bloodPressureSystolic: number;
     bloodPressureDiastolic: number;
     urineVolume: number;
+    tacrolimus: number;
     notes: string;
   }>
 ) {
@@ -231,6 +234,7 @@ export async function getRecentMetrics(userId: string, limit: number = 4) {
     { key: 'urea', name: '尿素氮', unit: 'mmol/L' },
     { key: 'potassium', name: '血钾', unit: 'mmol/L' },
     { key: 'uricAcid', name: '尿酸', unit: 'μmol/L' },
+    { key: 'tacrolimus', name: '他克莫司', unit: 'ng/mL' },
     { key: 'hemoglobin', name: '血红蛋白', unit: 'g/L' },
     { key: 'weight', name: '体重', unit: 'kg' },
   ];

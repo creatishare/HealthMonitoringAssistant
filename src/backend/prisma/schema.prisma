@@ -105,6 +105,9 @@ model HealthRecord {
   bloodPressureDiastolic Int?     // 舒张压 (mmHg)，正常: <90
   urineVolume            Int?     // 尿量 (ml/24h)
 
+  // 免疫抑制剂浓度
+  tacrolimus             Float?   // 他克莫司浓度 (ng/mL)
+
   // 元数据
   notes                  String?
   source                 RecordSource @default(manual)

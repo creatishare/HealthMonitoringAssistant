@@ -44,6 +44,9 @@ const metricNameMap: Record<string, string> = {
   '血糖': 'bloodSugar',
   'GLU': 'bloodSugar',
   '葡萄糖': 'bloodSugar',
+  '他克莫司': 'tacrolimus',
+  'FK506': 'tacrolimus',
+  'Tac': 'tacrolimus',
 };
 
 // 单位映射
@@ -56,6 +59,8 @@ const unitMap: Record<string, string> = {
   'kg': 'kg',
   'mmHg': 'mmHg',
   'ml': 'ml',
+  'ng/mL': 'ng/mL',
+  'ng/ml': 'ng/mL',
 };
 
 // 保存上传的图片
@@ -209,6 +214,7 @@ export async function confirmOCRResult(
       sodium: data.extractedData.sodium,
       phosphorus: data.extractedData.phosphorus,
       uricAcid: data.extractedData.uricAcid,
+      tacrolimus: data.extractedData.tacrolimus,
       hemoglobin: data.extractedData.hemoglobin,
       bloodSugar: data.extractedData.bloodSugar,
       notes: data.notes,
@@ -265,6 +271,7 @@ const defaultUnits: Record<string, string> = {
   uricAcid: 'μmol/L',
   hemoglobin: 'g/L',
   bloodSugar: 'mmol/L',
+  tacrolimus: 'ng/mL',
 };
 
 // 从OCR结果中提取健康指标
@@ -322,6 +329,11 @@ function extractHealthMetrics(
       names: ['血糖', 'GLU', '葡萄糖'],
       valueRange: { min: 1, max: 35 },
     },
+    {
+      key: 'tacrolimus',
+      names: ['他克莫司', 'FK506', 'Tac', 'TAC'],
+      valueRange: { min: 0.1, max: 50 },
+    },
   ];
 
   // 第一阶段：尝试在同一行匹配带单位的完整格式
@@ -334,6 +346,7 @@ function extractHealthMetrics(
     { key: 'uricAcid', pattern: /(?:尿酸|UA)[^\d]*(\d+\.?\d*)\s*(μmol\/L|umol\/L)/i },
     { key: 'hemoglobin', pattern: /(?:血红蛋白|Hb)[^\d]*(\d+\.?\d*)\s*(g\/L)/i },
     { key: 'bloodSugar', pattern: /(?:血糖|GLU|葡萄糖)[^\d]*(\d+\.?\d*)\s*(mmol\/L)/i },
+    { key: 'tacrolimus', pattern: /(?:他克莫司|FK506|Tac|TAC)[^\d]*(\d+\.?\d*)\s*(ng\/mL|ng\/ml)/i },
   ];
 
   lines.forEach((line, index) => {
