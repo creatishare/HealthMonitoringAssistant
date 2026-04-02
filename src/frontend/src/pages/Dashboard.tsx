@@ -19,6 +19,7 @@ const trendMetrics = [
   { key: 'urea', name: '尿素氮', unit: 'mmol/L', color: '#52C41A' },
   { key: 'potassium', name: '血钾', unit: 'mmol/L', color: '#FAAD14' },
   { key: 'uricAcid', name: '尿酸', unit: 'μmol/L', color: '#722ED1' },
+  { key: 'tacrolimus', name: '他克莫司', unit: 'ng/mL', color: '#F5222D' },
 ]
 
 export default function Dashboard() {
@@ -43,7 +44,7 @@ export default function Dashboard() {
         .split('T')[0]
 
       const response: any = await healthRecordApi.getTrends({
-        metrics: 'creatinine,urea,potassium,uricAcid',
+        metrics: 'creatinine,urea,potassium,uricAcid,tacrolimus',
         startDate,
         endDate,
       })

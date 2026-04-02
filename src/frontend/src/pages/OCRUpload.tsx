@@ -31,6 +31,7 @@ export default function OCRUpload() {
     sodium: '',
     phosphorus: '',
     uricAcid: '',
+    tacrolimus: '',
     hemoglobin: '',
     bloodSugar: '',
   })
@@ -111,6 +112,7 @@ export default function OCRUpload() {
         sodium: formData.sodium ? parseFloat(formData.sodium) : undefined,
         phosphorus: formData.phosphorus ? parseFloat(formData.phosphorus) : undefined,
         uricAcid: formData.uricAcid ? parseFloat(formData.uricAcid) : undefined,
+        tacrolimus: formData.tacrolimus ? parseFloat(formData.tacrolimus) : undefined,
         hemoglobin: formData.hemoglobin ? parseFloat(formData.hemoglobin) : undefined,
         bloodSugar: formData.bloodSugar ? parseFloat(formData.bloodSugar) : undefined,
       }
@@ -132,6 +134,7 @@ export default function OCRUpload() {
     sodium: '血钠',
     phosphorus: '血磷',
     uricAcid: '尿酸',
+    tacrolimus: '他克莫司',
     hemoglobin: '血红蛋白',
     bloodSugar: '血糖',
   }

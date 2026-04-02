@@ -15,6 +15,7 @@ export default function RecordForm() {
     sodium: '',
     phosphorus: '',
     uricAcid: '',
+    tacrolimus: '',
     hemoglobin: '',
     bloodSugar: '',
     weight: '',
@@ -41,6 +42,7 @@ export default function RecordForm() {
         sodium: formData.sodium ? parseFloat(formData.sodium) : undefined,
         phosphorus: formData.phosphorus ? parseFloat(formData.phosphorus) : undefined,
         uricAcid: formData.uricAcid ? parseFloat(formData.uricAcid) : undefined,
+        tacrolimus: formData.tacrolimus ? parseFloat(formData.tacrolimus) : undefined,
         hemoglobin: formData.hemoglobin ? parseFloat(formData.hemoglobin) : undefined,
         bloodSugar: formData.bloodSugar ? parseFloat(formData.bloodSugar) : undefined,
         weight: formData.weight ? parseFloat(formData.weight) : undefined,
@@ -70,6 +72,7 @@ export default function RecordForm() {
     { key: 'sodium', label: '血钠', unit: 'mmol/L', placeholder: '136-145' },
     { key: 'phosphorus', label: '血磷', unit: 'mmol/L', placeholder: '0.87-1.45' },
     { key: 'uricAcid', label: '尿酸', unit: 'μmol/L', placeholder: '男150-416/女89-357' },
+    { key: 'tacrolimus', label: '他克莫司', unit: 'ng/mL', placeholder: '5-15' },
     { key: 'hemoglobin', label: '血红蛋白', unit: 'g/L', placeholder: '120-160' },
     { key: 'bloodSugar', label: '血糖', unit: 'mmol/L', placeholder: '3.9-6.1' },
   ]

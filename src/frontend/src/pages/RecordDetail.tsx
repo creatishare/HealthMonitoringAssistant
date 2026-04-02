@@ -13,6 +13,7 @@ interface HealthRecord {
   sodium?: number
   phosphorus?: number
   uricAcid?: number
+  tacrolimus?: number
   hemoglobin?: number
   bloodSugar?: number
   weight?: number
@@ -29,6 +30,7 @@ const metrics = [
   { key: 'sodium', name: '血钠', unit: 'mmol/L', min: 136, max: 145 },
   { key: 'phosphorus', name: '血磷', unit: 'mmol/L', min: 0.87, max: 1.45 },
   { key: 'uricAcid', name: '尿酸', unit: 'μmol/L', min: 150, max: 420 },
+  { key: 'tacrolimus', name: '他克莫司', unit: 'ng/mL', min: 5, max: 15 },
   { key: 'hemoglobin', name: '血红蛋白', unit: 'g/L', min: 120, max: 160 },
   { key: 'bloodSugar', name: '血糖', unit: 'mmol/L', min: 3.9, max: 6.1 },
   { key: 'weight', name: '体重', unit: 'kg' },
