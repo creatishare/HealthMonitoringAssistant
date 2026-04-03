@@ -9,9 +9,9 @@ interface DashboardData {
   today: {
     date: string
     checkIn: {
-      weight: { recorded: boolean; value?: number }
-      bloodPressure: { recorded: boolean; systolic?: number; diastolic?: number }
-      urineVolume: { recorded: boolean; value?: number }
+      weight: { recorded: boolean; value?: number; status?: 'normal' | 'warning' | 'critical' }
+      bloodPressure: { recorded: boolean; systolic?: number; diastolic?: number; status?: 'normal' | 'warning' | 'critical' }
+      urineVolume: { recorded: boolean; value?: number; status?: 'normal' | 'warning' | 'critical' }
     }
   }
   medications: Array<{
@@ -40,20 +40,21 @@ interface DashboardData {
 interface DashboardState {
   data: DashboardData | null
   loading: boolean
-  fetchDashboard: () => Promise<void>
+  fetchDashboard: (config?: any) => Promise<void>
 }
 
 export const useDashboardStore = create<DashboardState>((set) => ({
   data: null,
   loading: false,
 
-  fetchDashboard: async () => {
+  fetchDashboard: async (config?: any) => {
     set({ loading: true })
     try {
-      const response: any = await dashboardApi.getData()
+      const response: any = await dashboardApi.getData(config)
       set({ data: response.data, loading: false })
-    } catch (error) {
+    } catch (error: any) {
       set({ loading: false })
+      if (error.name === 'CanceledError' || error.name === 'AbortError') return
       throw error
     }
   },

@@ -27,10 +27,10 @@ api.interceptors.response.use(
   (response) => response.data,
   (error) => {
     if (error.response?.status === 401) {
-      // Token过期，清除本地存储并跳转登录
+      // Token过期，清除本地存储并触发全局未认证事件
       localStorage.removeItem('accessToken')
       localStorage.removeItem('refreshToken')
-      window.location.href = '/login'
+      window.dispatchEvent(new CustomEvent('unauthorized'))
     }
     return Promise.reject(error)
   }
@@ -49,12 +49,6 @@ export const authApi = {
     api.post('/auth/refresh', {}, { headers: { Authorization: `Bearer ${refreshToken}` } }),
 }
 
-// 用户相关API
-export const userApi = {
-  getProfile: () => api.get('/users/profile'),
-  updateProfile: (data: any) => api.put('/users/profile', data),
-}
-
 // 健康记录相关API
 export const healthRecordApi = {
   getList: (params?: any) => api.get('/health-records', { params }),
@@ -62,14 +56,7 @@ export const healthRecordApi = {
   create: (data: any) => api.post('/health-records', data),
   update: (id: string, data: any) => api.put(`/health-records/${id}`, data),
   delete: (id: string) => api.delete(`/health-records/${id}`),
-  getTrends: (params: any) => api.get('/health-records/trends', { params }),
-}
-
-// 血药浓度相关API
-export const drugConcentrationApi = {
-  getList: (params?: any) => api.get('/drug-concentrations', { params }),
-  create: (data: any) => api.post('/drug-concentrations', data),
-  getTrends: (params: any) => api.get('/drug-concentrations/trends', { params }),
+  getTrends: (params: any, config?: any) => api.get('/health-records/trends', { params, ...config }),
 }
 
 // 用药管理相关API
@@ -97,7 +84,7 @@ export const alertApi = {
 
 // 仪表盘相关API
 export const dashboardApi = {
-  getData: () => api.get('/dashboard'),
+  getData: (config?: any) => api.get('/dashboard', config),
 }
 
 // OCR相关API
@@ -112,4 +99,3 @@ export const ocrApi = {
   getResult: (id: string) => api.get(`/ocr/${id}`),
 }
 
-export default api

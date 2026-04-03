@@ -3,6 +3,34 @@ import { getRecentMetrics } from './health-record.service';
 import { getTodayMedications } from './medication.service';
 import { getUnreadAlertCount, getAlerts } from './alert.service';
 
+function getBloodPressureStatus(
+  systolic?: number | null,
+  diastolic?: number | null
+): 'normal' | 'warning' | 'critical' | undefined {
+  if (systolic == null && diastolic == null) return undefined;
+
+  if (systolic != null && (systolic > 180 || systolic < 60)) return 'critical';
+  if (diastolic != null && (diastolic > 120 || diastolic < 40)) return 'critical';
+
+  if (systolic != null && (systolic > 140 || systolic < 90)) return 'warning';
+  if (diastolic != null && (diastolic > 90 || diastolic < 60)) return 'warning';
+
+  return 'normal';
+}
+
+function getUrineVolumeStatus(volume?: number | null): 'normal' | 'warning' | 'critical' | undefined {
+  if (volume == null) return undefined;
+  if (volume < 100) return 'critical';
+  if (volume < 400 || volume > 5000) return 'warning';
+  return 'normal';
+}
+
+function getWeightStatus(weight?: number | null, dryWeight?: number | null): 'normal' | 'warning' | 'critical' | undefined {
+  if (weight == null) return undefined;
+  if (dryWeight != null && Math.abs(weight - dryWeight) > 3) return 'warning';
+  return 'normal';
+}
+
 // 获取仪表盘数据
 export async function getDashboardData(userId: string) {
   // 获取用户信息
@@ -24,9 +52,9 @@ export async function getDashboardData(userId: string) {
     greeting = '晚上好';
   }
 
-  // 获取今日打卡状态
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // 获取今日打卡状态（使用UTC日期避免时区偏移导致查不到当天记录）
+  const todayStr = new Date().toISOString().split('T')[0];
+  const today = new Date(todayStr);
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
@@ -63,6 +91,7 @@ export async function getDashboardData(userId: string) {
         weight: {
           recorded: todayRecord?.weight !== null && todayRecord?.weight !== undefined,
           value: todayRecord?.weight,
+          status: getWeightStatus(todayRecord?.weight, user.profile?.dryWeight),
         },
         bloodPressure: {
           recorded:
@@ -70,10 +99,12 @@ export async function getDashboardData(userId: string) {
             todayRecord?.bloodPressureSystolic !== undefined,
           systolic: todayRecord?.bloodPressureSystolic,
           diastolic: todayRecord?.bloodPressureDiastolic,
+          status: getBloodPressureStatus(todayRecord?.bloodPressureSystolic, todayRecord?.bloodPressureDiastolic),
         },
         urineVolume: {
           recorded: todayRecord?.urineVolume !== null && todayRecord?.urineVolume !== undefined,
           value: todayRecord?.urineVolume,
+          status: getUrineVolumeStatus(todayRecord?.urineVolume),
         },
       },
     },

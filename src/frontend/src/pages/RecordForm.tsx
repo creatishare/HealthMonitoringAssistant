@@ -1,11 +1,13 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft, Camera } from 'lucide-react'
 import { healthRecordApi } from '../services/api'
 import toast from 'react-hot-toast'
 
 export default function RecordForm() {
   const navigate = useNavigate()
+  const { id } = useParams<{ id: string }>()
+  const isEdit = Boolean(id)
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     recordDate: new Date().toISOString().split('T')[0],
@@ -24,6 +26,42 @@ export default function RecordForm() {
     urineVolume: '',
     notes: '',
   })
+
+  useEffect(() => {
+    if (isEdit && id) {
+      loadRecord(id)
+    }
+  }, [isEdit, id])
+
+  const loadRecord = async (recordId: string) => {
+    setLoading(true)
+    try {
+      const response: any = await healthRecordApi.getById(recordId)
+      const record = response.data || response
+      setFormData({
+        recordDate: record.recordDate || new Date().toISOString().split('T')[0],
+        creatinine: record.creatinine != null ? String(record.creatinine) : '',
+        urea: record.urea != null ? String(record.urea) : '',
+        potassium: record.potassium != null ? String(record.potassium) : '',
+        sodium: record.sodium != null ? String(record.sodium) : '',
+        phosphorus: record.phosphorus != null ? String(record.phosphorus) : '',
+        uricAcid: record.uricAcid != null ? String(record.uricAcid) : '',
+        tacrolimus: record.tacrolimus != null ? String(record.tacrolimus) : '',
+        hemoglobin: record.hemoglobin != null ? String(record.hemoglobin) : '',
+        bloodSugar: record.bloodSugar != null ? String(record.bloodSugar) : '',
+        weight: record.weight != null ? String(record.weight) : '',
+        bloodPressureSystolic: record.bloodPressureSystolic != null ? String(record.bloodPressureSystolic) : '',
+        bloodPressureDiastolic: record.bloodPressureDiastolic != null ? String(record.bloodPressureDiastolic) : '',
+        urineVolume: record.urineVolume != null ? String(record.urineVolume) : '',
+        notes: record.notes || '',
+      })
+    } catch (error) {
+      toast.error('获取记录失败')
+      navigate('/records')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -55,9 +93,15 @@ export default function RecordForm() {
         urineVolume: formData.urineVolume ? parseInt(formData.urineVolume) : undefined,
       }
 
-      await healthRecordApi.create(data)
-      toast.success('保存成功')
-      navigate('/records')
+      if (isEdit && id) {
+        await healthRecordApi.update(id, data)
+        toast.success('更新成功')
+        navigate(`/records/${id}`)
+      } else {
+        await healthRecordApi.create(data)
+        toast.success('保存成功')
+        navigate('/')
+      }
     } catch (error: any) {
       toast.error(error.response?.data?.message || '保存失败')
     } finally {
@@ -89,15 +133,19 @@ export default function RecordForm() {
           <button onClick={() => navigate(-1)} className="p-2 -ml-2">
             <ChevronLeft size={24} className="text-gray-text-primary" />
           </button>
-          <h1 className="text-page-title font-semibold text-gray-text-primary">录入指标</h1>
+          <h1 className="text-page-title font-semibold text-gray-text-primary">
+            {isEdit ? '编辑指标' : '录入指标'}
+          </h1>
         </div>
-        <button
-          onClick={() => navigate('/records/ocr')}
-          className="btn-primary flex items-center gap-1 px-4 py-2"
-        >
-          <Camera size={18} />
-          拍照识别
-        </button>
+        {!isEdit && (
+          <button
+            onClick={() => navigate('/records/ocr')}
+            className="btn-primary flex items-center gap-1 px-4 py-2"
+          >
+            <Camera size={18} />
+            拍照识别
+          </button>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">

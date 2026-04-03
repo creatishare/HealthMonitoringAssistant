@@ -7,6 +7,32 @@
 ## [Unreleased]
 
 ### Added
+- **一键重启后端脚本**: `restart-backend.sh` - 快速重启后端服务并自动健康检查
+- **记录编辑功能**: 支持修改已录入的健康记录
+  - `RecordForm.tsx` 同时支持新增和编辑模式
+  - 编辑时自动回填已有数据
+  - 新增 `/records/:id/edit` 路由
+- **首页打卡健康状态提示**: 今日打卡根据指标健康程度显示不同颜色
+  - 血压异常显示黄/红色（收缩压 > 140 或 < 90；> 180 或 < 60 标红）
+  - 尿量异常显示黄/红色（< 400 或 > 5000 标黄；< 100 标红）
+  - 体重与干体重相差 > 3kg 标黄
+
+### Fixed
+- **Dashboard 请求报错刷屏**: 修复 console 不断输出 `Request aborted` 和 `Failed to fetch`
+  - 401 拦截器改为事件派发，避免 `window.location.href` 导致整页刷新
+  - `Dashboard` 增加 `AbortController`，忽略请求取消类错误
+- **今日打卡不更新**: 修复录入体重/血压/尿量后首页仍显示旧数据
+  - 修复后端 `dashboard.service.ts` UTC 日期查询时区偏移问题
+  - `RecordForm` 保存后返回首页
+  - `Dashboard` 增加 `location.pathname` 依赖，确保返回时刷新数据
+- **记录详情白屏**: 修复点击修改按钮后页面变白
+  - 补全 `App.tsx` 缺失的 `/records/:id/edit` 路由
+- **死代码清理**: 移除未使用的 legacy 文件和依赖
+  - 删除 `backend/controllers/`、`backend/services/` 下的旧重复文件
+  - 删除 `redis.ts`、`webpush.service.ts`、SQLite schema、测试种子脚本
+  - 清理 `frontend/package.json` 和 `backend/package.json` 中未使用的依赖
+
+### Changed
 - **本地开发一键启动脚本**: 简化本地测试流程
   - 新增 `start-dev.sh` - 本地开发一键启动工具
     - `./start-dev.sh start` - 启动所有服务（PostgreSQL、Redis、后端、前端）

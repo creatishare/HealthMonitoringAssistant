@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Plus, Bell, AlertTriangle, ChevronRight, Clock, TrendingUp } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
 import { useDashboardStore } from '../stores/dashboardStore'
@@ -25,18 +25,29 @@ const trendMetrics = [
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { data, loading, fetchDashboard } = useDashboardStore()
   const [trendData, setTrendData] = useState<TrendData[]>([])
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>(['creatinine'])
   const [trendLoading, setTrendLoading] = useState(false)
 
   useEffect(() => {
-    fetchDashboard().catch(() => toast.error('加载数据失败'))
-    fetchTrendData()
-  }, [])
+    const controller = new AbortController()
+
+    fetchDashboard(controller.signal).catch((err) => {
+      if (err?.name !== 'CanceledError' && err?.name !== 'AbortError') {
+        toast.error('加载数据失败')
+      }
+    })
+    fetchTrendData(controller.signal)
+
+    return () => {
+      controller.abort()
+    }
+  }, [location.pathname])
 
   // 获取趋势数据
-  const fetchTrendData = async () => {
+  const fetchTrendData = async (signal?: AbortSignal) => {
     setTrendLoading(true)
     try {
       const endDate = new Date().toISOString().split('T')[0]
@@ -44,16 +55,20 @@ export default function Dashboard() {
         .toISOString()
         .split('T')[0]
 
-      const response: any = await healthRecordApi.getTrends({
-        metrics: 'creatinine,urea,potassium,uricAcid,tacrolimus',
-        startDate,
-        endDate,
-      })
+      const response: any = await healthRecordApi.getTrends(
+        {
+          metrics: 'creatinine,urea,potassium,uricAcid,tacrolimus',
+          startDate,
+          endDate,
+        },
+        { signal }
+      )
 
       // 后端返回 { code, message, data }, axios 拦截器解包后得到 { code, message, data }
       // The data we want is inside data.data
       setTrendData(response.data?.data || response.data || [])
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === 'CanceledError' || error.name === 'AbortError') return
       console.error('获取趋势数据失败', error)
     } finally {
       setTrendLoading(false)
@@ -111,6 +126,19 @@ export default function Dashboard() {
     trendData.some(d => d[m as keyof TrendData] !== undefined && d[m as keyof TrendData] !== null)
   )
 
+  const getCheckInClasses = (status?: 'normal' | 'warning' | 'critical') => {
+    switch (status) {
+      case 'critical':
+        return 'bg-red-50 text-danger'
+      case 'warning':
+        return 'bg-yellow-50 text-warning'
+      case 'normal':
+        return 'bg-green-50 text-success'
+      default:
+        return 'bg-gray-100 text-gray-secondary'
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* 头部问候 */}
@@ -138,11 +166,9 @@ export default function Dashboard() {
         <div className="grid grid-cols-3 gap-4">
           <div
             onClick={() => navigate('/records/new')}
-            className={`p-4 rounded-lg text-center cursor-pointer transition-colors ${
-              today.checkIn.weight.recorded
-                ? 'bg-green-50 text-success'
-                : 'bg-gray-100 text-gray-secondary'
-            }`}
+            className={`p-4 rounded-lg text-center cursor-pointer transition-colors ${getCheckInClasses(
+              today.checkIn.weight.status
+            )}`}
           >
             <p className="text-small">体重</p>
             <p className="text-metric mt-1">
@@ -151,11 +177,9 @@ export default function Dashboard() {
           </div>
           <div
             onClick={() => navigate('/records/new')}
-            className={`p-4 rounded-lg text-center cursor-pointer transition-colors ${
-              today.checkIn.bloodPressure.recorded
-                ? 'bg-green-50 text-success'
-                : 'bg-gray-100 text-gray-secondary'
-            }`}
+            className={`p-4 rounded-lg text-center cursor-pointer transition-colors ${getCheckInClasses(
+              today.checkIn.bloodPressure.status
+            )}`}
           >
             <p className="text-small">血压</p>
             <p className="text-metric mt-1">
@@ -166,11 +190,9 @@ export default function Dashboard() {
           </div>
           <div
             onClick={() => navigate('/records/new')}
-            className={`p-4 rounded-lg text-center cursor-pointer transition-colors ${
-              today?.checkIn?.urineVolume?.recorded
-                ? 'bg-green-50 text-success'
-                : 'bg-gray-100 text-gray-secondary'
-            }`}
+            className={`p-4 rounded-lg text-center cursor-pointer transition-colors ${getCheckInClasses(
+              today?.checkIn?.urineVolume?.status
+            )}`}
           >
             <p className="text-small">尿量</p>
             <p className="text-metric mt-1">

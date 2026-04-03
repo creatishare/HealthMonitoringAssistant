@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './stores/authStore'
 import Layout from './components/common/Layout'
@@ -15,7 +16,13 @@ import Alerts from './pages/Alerts'
 import Profile from './pages/Profile'
 
 function App() {
-  const { isAuthenticated } = useAuthStore()
+  const { isAuthenticated, logout } = useAuthStore()
+
+  useEffect(() => {
+    const handleUnauthorized = () => logout()
+    window.addEventListener('unauthorized', handleUnauthorized)
+    return () => window.removeEventListener('unauthorized', handleUnauthorized)
+  }, [logout])
 
   return (
     <Routes>
@@ -30,6 +37,7 @@ function App() {
         <Route path="/records/new" element={<RecordForm />} />
         <Route path="/records/ocr" element={<OCRUpload />} />
         <Route path="/records/:id" element={<RecordDetail />} />
+        <Route path="/records/:id/edit" element={<RecordForm />} />
         <Route path="/charts" element={<Charts />} />
         <Route path="/medications" element={<Medications />} />
         <Route path="/medications/new" element={<MedicationForm />} />
