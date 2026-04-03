@@ -78,6 +78,13 @@ check_status() {
         echo -e "${RED}✗ 后端 API${NC}    未运行"
     fi
 
+    # Worker
+    if pgrep -f "reminderWorker" >/dev/null 2>&1; then
+        echo -e "${GREEN}✓ Worker${NC}       运行中 (用药提醒)"
+    else
+        echo -e "${RED}✗ Worker${NC}       未运行"
+    fi
+
     # 前端
     if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
         echo -e "${GREEN}✓ 前端 Web${NC}    运行中 (http://localhost:3000)"
@@ -134,6 +141,21 @@ start_services() {
         fi
     fi
 
+    # 3.5 启动用药提醒 Worker
+    echo -e "${YELLOW}[3.5/5] 启动用药提醒 Worker...${NC}"
+    if pgrep -f "reminderWorker" >/dev/null 2>&1; then
+        echo -e "${GREEN}  Worker 已在运行${NC}"
+    else
+        cd "$BACKEND_DIR"
+        nohup npx tsx src/workers/reminderWorker.ts > "$PROJECT_ROOT/worker.log" 2>&1 &
+        sleep 2
+        if pgrep -f "reminderWorker" >/dev/null 2>&1; then
+            echo -e "${GREEN}  Worker 启动成功${NC}"
+        else
+            echo -e "${YELLOW}  Worker 启动失败，查看日志: $PROJECT_ROOT/worker.log${NC}"
+        fi
+    fi
+
     # 4. 启动前端
     echo -e "${YELLOW}[4/5] 启动前端服务...${NC}"
     if pgrep -f "vite" >/dev/null 2>&1; then
@@ -178,6 +200,12 @@ stop_services() {
     if pgrep -f "tsx src/server.ts" >/dev/null 2>&1; then
         pkill -f "tsx src/server.ts"
         echo -e "${GREEN}✓ 后端已停止${NC}"
+    fi
+
+    # 停止 Worker
+    if pgrep -f "reminderWorker" >/dev/null 2>&1; then
+        pkill -f "reminderWorker"
+        echo -e "${GREEN}✓ Worker 已停止${NC}"
     fi
 
     # 停止 cpolar

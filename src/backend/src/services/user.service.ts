@@ -27,6 +27,8 @@ export async function getUserProfile(userId: string) {
     baselineCreatinine: user.profile?.baselineCreatinine,
     diagnosisDate: user.profile?.diagnosisDate?.toISOString().split('T')[0],
     primaryDisease: user.profile?.primaryDisease,
+    hasTransplant: user.profile?.hasTransplant,
+    transplantDate: user.profile?.transplantDate?.toISOString().split('T')[0],
     createdAt: user.createdAt,
     updatedAt: user.profile?.updatedAt,
   };
@@ -46,6 +48,8 @@ export async function updateUserProfile(
     baselineCreatinine?: number;
     diagnosisDate?: string;
     primaryDisease?: PrimaryDisease;
+    hasTransplant?: boolean;
+    transplantDate?: string;
   }
 ) {
   const user = await prisma.user.findUnique({
@@ -61,6 +65,7 @@ export async function updateUserProfile(
     ...data,
     birthDate: data.birthDate ? new Date(data.birthDate) : undefined,
     diagnosisDate: data.diagnosisDate ? new Date(data.diagnosisDate) : undefined,
+    transplantDate: data.transplantDate ? new Date(data.transplantDate) : undefined,
   };
 
   // 移除undefined字段

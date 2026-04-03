@@ -53,6 +53,8 @@ model UserProfile {
   baselineCreatinine Float?        // 基线肌酐值(μmol/L)
   diagnosisDate      DateTime?
   primaryDisease     PrimaryDisease?
+  hasTransplant      Boolean       @default(false)  // 是否经过移植手术
+  transplantDate     DateTime?                       // 移植时间
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 

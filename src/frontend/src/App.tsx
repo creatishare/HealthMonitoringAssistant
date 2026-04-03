@@ -14,6 +14,8 @@ import Medications from './pages/Medications'
 import MedicationForm from './pages/MedicationForm'
 import Alerts from './pages/Alerts'
 import Profile from './pages/Profile'
+import ProfileEdit from './pages/ProfileEdit'
+import Settings from './pages/Settings'
 
 function App() {
   const { isAuthenticated, logout } = useAuthStore()
@@ -44,6 +46,8 @@ function App() {
         <Route path="/medications/:id/edit" element={<MedicationForm />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/profile/edit" element={<ProfileEdit />} />
+        <Route path="/settings" element={<Settings />} />
       </Route>
     </Routes>
   )

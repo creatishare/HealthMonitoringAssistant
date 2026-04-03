@@ -7,6 +7,13 @@
 ## [Unreleased]
 
 ### Added
+- **个人档案新增移植手术信息**: 支持记录是否经过移植手术及移植时间
+  - 后端: 数据库新增 `hasTransplant` 和 `transplantDate` 字段
+  - 前端: ProfileEdit 页面新增移植手术选择和日期输入
+- **系统设置页面**: 新增 `/settings` 路由和 Settings 组件
+  - 包含深色模式、消息通知开关（UI占位）
+  - 隐私政策、关于我们入口
+  - 清除缓存并退出功能
 - **一键重启后端脚本**: `restart-backend.sh` - 快速重启后端服务并自动健康检查
 - **记录编辑功能**: 支持修改已录入的健康记录
   - `RecordForm.tsx` 同时支持新增和编辑模式
