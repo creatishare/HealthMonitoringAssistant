@@ -51,7 +51,16 @@ export default function Login() {
         </div>
 
         <div>
-          <label className="block text-helper text-gray-secondary mb-2">密码</label>
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-helper text-gray-secondary">密码</label>
+            <button
+              type="button"
+              onClick={() => navigate('/forgot-password')}
+              className="text-helper text-primary"
+            >
+              忘记密码？
+            </button>
+          </div>
           <input
             type="password"
             value={password}

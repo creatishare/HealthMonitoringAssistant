@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -20,15 +21,15 @@ export default {
           light: '#F9F0FF',
         },
         gray: {
-          bg: '#F5F5F5',
-          card: '#FFFFFF',
+          bg: 'var(--color-bg)',
+          card: 'var(--color-card)',
           text: {
-            primary: '#262626',
-            secondary: '#595959',
-            helper: '#8C8C8C',
+            primary: 'var(--color-text-primary)',
+            secondary: 'var(--color-text-secondary)',
+            helper: 'var(--color-text-helper)',
           },
-          border: '#D9D9D9',
-          disabled: '#BFBFBF',
+          border: 'var(--color-border)',
+          disabled: 'var(--color-disabled)',
         },
       },
       fontFamily: {

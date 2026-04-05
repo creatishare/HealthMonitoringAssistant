@@ -325,6 +325,45 @@ Authorization: Bearer <access_token>
 
 ---
 
+#### POST /auth/reset-password
+重置密码（忘记密码）
+
+**请求参数**:
+```json
+{
+  "phone": "13800138000",
+  "verificationCode": "123456",
+  "newPassword": "newPass123"
+}
+```
+
+**参数说明**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| phone | string | 是 | 手机号，11位数字 |
+| verificationCode | string | 是 | 短信验证码，6位数字 |
+| newPassword | string | 是 | 新密码，6-20位，必须包含字母和数字 |
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "密码重置成功，请使用新密码登录",
+  "data": null
+}
+```
+
+**错误码**:
+| 错误码 | 错误信息 | 场景 |
+|--------|----------|------|
+| 00002 | 请求参数错误 | 缺少必要参数 |
+| 01001 | 手机号格式不正确 | 手机号格式错误 |
+| 01002 | 验证码错误或已过期 | 验证码无效 |
+| 01003 | 密码格式不正确 | 新密码不符合要求 |
+| 01005 | 手机号未注册 | 该手机号未注册 |
+
+---
+
 ### 3.2 用户模块
 
 #### GET /users/profile
@@ -347,6 +386,8 @@ Authorization: Bearer <access_token>
     "baselineCreatinine": 150,
     "diagnosisDate": "2020-03-15",
     "primaryDisease": "diabetic_nephropathy",
+    "hasTransplant": true,
+    "transplantDate": "2022-06-10",
     "createdAt": "2024-01-15T08:30:00.000Z",
     "updatedAt": "2024-03-20T10:15:00.000Z"
   }
@@ -370,7 +411,9 @@ Authorization: Bearer <access_token>
   "dryWeight": 62.0,
   "baselineCreatinine": 150,
   "diagnosisDate": "2020-03-15",
-  "primaryDisease": "diabetic_nephropathy"
+  "primaryDisease": "diabetic_nephropathy",
+  "hasTransplant": true,
+  "transplantDate": "2022-06-10"
 }
 ```
 
@@ -387,6 +430,8 @@ Authorization: Bearer <access_token>
 | baselineCreatinine | number | 否 | 基线肌酐值 |
 | diagnosisDate | string | 否 | 诊断日期 |
 | primaryDisease | string | 否 | 原发疾病 |
+| hasTransplant | boolean | 否 | 是否经过移植手术 |
+| transplantDate | string | 否 | 移植手术日期 |
 
 ---
 

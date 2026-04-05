@@ -2,6 +2,14 @@
 
 本文档说明如何配置项目所需的第三方服务：百度AI OCR、阿里云短信服务。
 
+## 配置状态总览
+
+| 服务 | 状态 | 说明 |
+|------|------|------|
+| 百度AI OCR | ✅ 已集成 | 已实现真实的OCR调用，支持8项健康指标提取 |
+| 阿里云短信 | ⏳ 待配置 | 需要申请签名和模板（生产环境使用） |
+| Web Push | ✅ 已完成 | 浏览器原生推送，支持用药提醒 |
+
 ---
 
 ## 1. 百度AI OCR 配置
@@ -48,9 +56,22 @@ BAIDU_OCR_API_KEY="你的API Key"
 BAIDU_OCR_SECRET_KEY="你的Secret Key"
 ```
 
-### 1.5 获取Access Token（后端自动处理）
+### 1.5 实现说明（v1.2.0已集成）
 
-百度OCR使用Access Token进行API调用，token有效期为30天。后端服务会自动获取和刷新token。
+后端已实现完整的百度OCR集成：
+
+- **Token管理**：`src/utils/baiduOcr.ts` 自动获取和缓存Access Token（有效期30天，提前5分钟刷新）
+- **OCR服务**：`src/services/ocr.service.ts` 集成真实百度OCR调用
+- **智能提取**：支持8项健康指标自动提取（肌酐、尿素氮、钾、钠、磷、尿酸、血红蛋白、血糖）
+- **多阶段匹配**：
+  - 第一阶段：匹配带单位的完整格式（如"肌酐 171 μmol/L"）
+  - 第二阶段：匹配表格格式（如"肌酐    171"，自动使用默认单位）
+  - 第三阶段：通用数值提取（根据数值范围推断指标类型）
+
+**支持的化验单格式：**
+- 医院标准化验单
+- 体检机构报告（爱康国宾/美年大健康等）
+- 手写/打印化验单
 
 **手动获取token测试：**
 
@@ -62,7 +83,19 @@ curl -X POST "https://aip.baidubce.com/oauth/2.0/token" \
 
 ---
 
-## 2. 阿里云短信服务配置
+## 2. 阿里云短信服务配置（待配置）
+
+> **注意**：当前版本短信功能默认禁用，使用应用内通知替代。如需启用短信，请完成以下配置。
+
+### 禁用短信的配置
+
+编辑 `.env` 文件：
+
+```bash
+# 禁用短信功能
+SMS_ENABLED=false
+ENABLE_SMS_NOTIFICATION=false
+```
 
 ### 2.1 注册阿里云账号
 
@@ -262,11 +295,24 @@ curl -X POST http://localhost:3001/api/auth/send-verification-code \
 
 ## 6. 相关文件
 
-- `src/backend/src/services/notification.service.ts` - 短信服务实现
-- `src/backend/src/services/ocr.service.ts` - OCR服务实现
-- `src/backend/.env.example` - 环境变量模板
-- `infrastructure/.env.production` - 生产环境配置
+| 文件路径 | 说明 |
+|---------|------|
+| `src/backend/src/utils/baiduOcr.ts` | 百度OCR客户端模块 |
+| `src/backend/src/services/ocr.service.ts` | OCR服务实现 |
+| `src/backend/src/services/notification.service.ts` | 通知服务（含短信/Web Push） |
+| `src/backend/src/workers/notification.worker.ts` | 通知任务Worker |
+| `src/backend/.env.example` | 后端环境变量模板 |
+| `infrastructure/.env.production` | 生产环境配置 |
 
 ---
 
-*最后更新: 2026-03-30*
+## 7. 版本历史
+
+| 版本 | 日期 | 更新内容 |
+|------|------|----------|
+| v1.0.0 | 2026-03-30 | 初始文档 |
+| v1.2.0 | 2026-04-05 | 更新OCR集成状态，添加短信禁用说明 |
+
+---
+
+*最后更新: 2026-04-05*

@@ -16,6 +16,7 @@ import Alerts from './pages/Alerts'
 import Profile from './pages/Profile'
 import ProfileEdit from './pages/ProfileEdit'
 import Settings from './pages/Settings'
+import ForgotPassword from './pages/ForgotPassword'
 
 function App() {
   const { isAuthenticated, logout } = useAuthStore()
@@ -31,6 +32,7 @@ function App() {
       {/* 公开路由 */}
       <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/" />} />
       <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to="/" />} />
+      <Route path="/forgot-password" element={!isAuthenticated ? <ForgotPassword /> : <Navigate to="/" />} />
 
       {/* 需要认证的路由 */}
       <Route element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}>

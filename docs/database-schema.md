@@ -122,18 +122,23 @@ CREATE TABLE user_profiles (
     baseline_creatinine DECIMAL(6,2), -- 基线肌酐值(μmol/L)
     diagnosis_date DATE,
     primary_disease VARCHAR(50) CHECK (primary_disease IN ('diabetic_nephropathy', 'hypertensive_nephropathy', 'chronic_glomerulonephritis', 'other')),
+    has_transplant BOOLEAN NOT NULL DEFAULT FALSE, -- 是否经过移植手术
+    transplant_date DATE, -- 移植手术日期
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- 索引
 CREATE INDEX idx_user_profiles_dialysis_type ON user_profiles(dialysis_type);
+CREATE INDEX idx_user_profiles_has_transplant ON user_profiles(has_transplant);
 
 -- 注释
 COMMENT ON TABLE user_profiles IS '用户医疗档案表';
 COMMENT ON COLUMN user_profiles.dialysis_type IS '透析类型: none-无, hemodialysis-血液透析, peritoneal-腹膜透析';
 COMMENT ON COLUMN user_profiles.dry_weight IS '干体重(kg)，透析患者目标体重';
 COMMENT ON COLUMN user_profiles.baseline_creatinine IS '基线肌酐值，用于趋势对比';
+COMMENT ON COLUMN user_profiles.has_transplant IS '是否经过肾移植手术';
+COMMENT ON COLUMN user_profiles.transplant_date IS '肾移植手术日期';
 ```
 
 ---

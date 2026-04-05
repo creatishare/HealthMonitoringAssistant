@@ -266,3 +266,53 @@ export async function changePassword(
 
   logger.info(`用户修改密码: ${userId}`);
 }
+
+// 重置密码（忘记密码）
+export async function resetPassword(
+  phone: string,
+  verificationCode: string,
+  newPassword: string
+) {
+  // 验证手机号格式
+  if (!isValidPhone(phone)) {
+    throw new Error('手机号格式不正确');
+  }
+
+  // 验证密码强度
+  const passwordCheck = validatePasswordStrength(newPassword);
+  if (!passwordCheck.valid) {
+    throw new Error(passwordCheck.message);
+  }
+
+  // 验证验证码
+  const codeData = verificationCodes.get(phone);
+  if (!codeData || codeData.code !== verificationCode || Date.now() > codeData.expiresAt) {
+    throw new Error('验证码错误或已过期');
+  }
+
+  // 查找用户
+  const user = await prisma.user.findUnique({
+    where: { phone },
+  });
+
+  if (!user) {
+    throw new Error('手机号未注册');
+  }
+
+  // 哈希新密码
+  const newPasswordHash = await hashPassword(newPassword);
+
+  // 更新密码
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: newPasswordHash },
+  });
+
+  // 吊销所有刷新令牌（让用户重新登录）
+  await revokeAllUserRefreshTokens(user.id);
+
+  // 清除验证码
+  verificationCodes.delete(phone);
+
+  logger.info(`用户重置密码成功: ${phone}`);
+}

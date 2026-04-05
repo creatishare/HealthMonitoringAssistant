@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001',
+  baseURL: import.meta.env.VITE_API_URL || '/api',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -47,6 +47,8 @@ export const authApi = {
     api.post('/auth/verification-code', { phone, type }),
   refreshToken: (refreshToken: string) =>
     api.post('/auth/refresh', {}, { headers: { Authorization: `Bearer ${refreshToken}` } }),
+  resetPassword: (phone: string, verificationCode: string, newPassword: string) =>
+    api.post('/auth/reset-password', { phone, verificationCode, newPassword }),
 }
 
 // 健康记录相关API

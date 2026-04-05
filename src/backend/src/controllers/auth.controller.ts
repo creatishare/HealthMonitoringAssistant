@@ -140,3 +140,24 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
     next(error);
   }
 }
+
+// 重置密码（忘记密码）
+export async function resetPassword(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { phone, verificationCode, newPassword } = req.body;
+
+    if (!phone || !verificationCode || !newPassword) {
+      throw new ApiError('缺少必要参数', 400, '00002');
+    }
+
+    await authService.resetPassword(phone, verificationCode, newPassword);
+
+    res.status(200).json({
+      code: 200,
+      message: '密码重置成功，请使用新密码登录',
+      data: null,
+    });
+  } catch (error) {
+    next(error);
+  }
+}

@@ -206,7 +206,9 @@ export default function RecordForm() {
           <h2 className="text-card-title font-medium text-gray-text-primary mb-4">血压</h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-small text-gray-secondary mb-1">收缩压 (mmHg)</label>
+              <label className="block text-small text-gray-secondary mb-1">
+                收缩压/高压 <span className="text-gray-helper">(mmHg)</span>
+              </label>
               <input
                 type="number"
                 value={formData.bloodPressureSystolic}
@@ -216,7 +218,9 @@ export default function RecordForm() {
               />
             </div>
             <div>
-              <label className="block text-small text-gray-secondary mb-1">舒张压 (mmHg)</label>
+              <label className="block text-small text-gray-secondary mb-1">
+                舒张压/低压 <span className="text-gray-helper">(mmHg)</span>
+              </label>
               <input
                 type="number"
                 value={formData.bloodPressureDiastolic}

@@ -1,14 +1,32 @@
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Moon, Bell, Shield, Info } from 'lucide-react'
+import { ChevronLeft, Moon, Bell, Shield, Info, LucideIcon } from 'lucide-react'
+import { useThemeStore } from '../stores/themeStore'
+import { useNotificationStore } from '../stores/notificationStore'
+
+interface SettingItem {
+  icon: LucideIcon
+  label: string
+  type: 'toggle' | 'link'
+  value?: boolean
+  onToggle?: () => Promise<void> | void
+  onClick?: () => void
+}
 
 export default function Settings() {
   const navigate = useNavigate()
+  const { isDark, toggleTheme } = useThemeStore()
+  const { enabled: notificationEnabled, toggle: toggleNotification, init: initNotification } = useNotificationStore()
 
-  const settingItems = [
-    { icon: Moon, label: '深色模式', type: 'toggle', value: false },
-    { icon: Bell, label: '消息通知', type: 'toggle', value: true },
-    { icon: Shield, label: '隐私政策', type: 'link', path: '/privacy' },
-    { icon: Info, label: '关于我们', type: 'link', path: '/about' },
+  useEffect(() => {
+    initNotification()
+  }, [initNotification])
+
+  const settingItems: SettingItem[] = [
+    { icon: Moon, label: '深色模式', type: 'toggle', value: isDark, onToggle: toggleTheme },
+    { icon: Bell, label: '消息通知', type: 'toggle', value: notificationEnabled, onToggle: toggleNotification },
+    { icon: Shield, label: '隐私政策', type: 'link', onClick: () => alert('隐私政策功能开发中') },
+    { icon: Info, label: '关于我们', type: 'link', onClick: () => alert('健康监测助手 v1.2.0\n\n为肾衰竭患者提供便捷的健康管理服务') },
   ]
 
   return (
@@ -35,9 +53,10 @@ export default function Settings() {
               <span className="text-body text-gray-text-primary">{item.label}</span>
             </div>
             {item.type === 'toggle' ? (
-              <div
+              <button
+                onClick={item.onToggle || (() => {})}
                 className={`w-12 h-6 rounded-full transition-colors ${
-                  item.value ? 'bg-primary' : 'bg-gray-300'
+                  item.value ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'
                 }`}
               >
                 <div
@@ -45,9 +64,14 @@ export default function Settings() {
                     item.value ? 'translate-x-6' : 'translate-x-0'
                   }`}
                 />
-              </div>
+              </button>
             ) : (
-              <button className="text-small text-gray-secondary">查看</button>
+              <button
+                onClick={item.onClick}
+                className="text-small text-gray-secondary"
+              >
+                查看
+              </button>
             )}
           </div>
         ))}

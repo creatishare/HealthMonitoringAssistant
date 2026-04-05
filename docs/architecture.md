@@ -162,15 +162,18 @@ src/frontend/
 │   │   ├── TrendChart/
 │   │   └── DrugConcentrationChart/
 │   └── forms/                 # 表单组件
-│       ├── HealthRecordForm/
+│       ├── HealthRecordForm/  # 支持新增和编辑模式
 │       ├── DrugConcentrationForm/
 │       └── MedicationForm/
 ├── pages/                     # 页面组件
-│   ├── Dashboard/            # 首页仪表盘
+│   ├── Dashboard/            # 首页仪表盘（含今日打卡健康状态）
 │   ├── Records/              # 记录管理
+│   ├── RecordDetail/         # 记录详情（v1.2.0新增）
 │   ├── Medications/          # 用药管理
 │   ├── Charts/               # 趋势图表
 │   ├── Profile/              # 个人档案
+│   ├── ProfileEdit/          # 编辑档案（含移植手术信息）
+│   ├── Settings/             # 系统设置（v1.2.0新增）
 │   └── OCR/                  # 化验单识别
 ├── hooks/                     # 自定义Hooks
 │   ├── useAuth.ts
@@ -181,7 +184,8 @@ src/frontend/
 │   ├── authStore.ts
 │   ├── healthStore.ts
 │   ├── medicationStore.ts
-│   └── alertStore.ts
+│   ├── alertStore.ts
+│   └── dashboardStore.ts     # 仪表盘状态（v1.2.0新增）
 ├── services/                  # API服务
 │   ├── api.ts                # axios实例
 │   ├── auth.service.ts

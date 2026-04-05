@@ -3,6 +3,28 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* 浅色模式颜色变量 */
+    --color-bg: #F5F5F5;
+    --color-card: #FFFFFF;
+    --color-text-primary: #262626;
+    --color-text-secondary: #595959;
+    --color-text-helper: #8C8C8C;
+    --color-border: #D9D9D9;
+    --color-disabled: #BFBFBF;
+  }
+
+  .dark {
+    /* 深色模式颜色变量 */
+    --color-bg: #141414;
+    --color-card: #1F1F1F;
+    --color-text-primary: #E6E6E6;
+    --color-text-secondary: #B3B3B3;
+    --color-text-helper: #808080;
+    --color-border: #434343;
+    --color-disabled: #555555;
+  }
+
   * {
     box-sizing: border-box;
   }
@@ -15,8 +37,8 @@
 
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
-    background-color: #F5F5F5;
-    color: #262626;
+    background-color: var(--color-bg);
+    color: var(--color-text-primary);
     min-height: 100vh;
   }
 
@@ -24,7 +46,7 @@
     min-height: 100vh;
     max-width: 480px;
     margin: 0 auto;
-    background-color: #F5F5F5;
+    background-color: var(--color-bg);
   }
 }
 
@@ -36,7 +58,7 @@
   }
 
   .btn-secondary {
-    @apply h-12 px-4 bg-white text-primary border border-primary rounded-button font-medium text-body;
+    @apply h-12 px-4 bg-gray-card text-primary border border-primary rounded-button font-medium text-body;
     @apply hover:bg-primary-light transition-colors duration-150;
   }
 
@@ -46,33 +68,39 @@
   }
 
   .input-field {
-    @apply h-12 px-4 bg-white border border-gray-border rounded-input text-body;
+    @apply h-12 px-4 bg-gray-card border border-gray-border rounded-input text-body text-gray-text-primary;
     @apply focus:outline-none focus:border-primary focus:shadow-input-focus;
     @apply placeholder:text-gray-text-helper;
   }
 
   .card {
-    @apply bg-white rounded-card p-4 shadow-card;
+    @apply bg-gray-card rounded-card p-4 shadow-card;
   }
 
   .card-medication {
-    @apply bg-white rounded-card p-4 shadow-card border-l-4 border-medication;
-    @apply bg-gradient-to-r from-medication-light to-white;
+    @apply bg-gray-card rounded-card p-4 shadow-card border-l-4 border-medication;
+    @apply bg-gradient-to-r from-medication-light to-transparent;
+  }
+
+  .dark .card-medication {
+    --tw-gradient-from: rgba(114, 46, 209, 0.1) var(--tw-gradient-from-position);
+    --tw-gradient-to: rgba(114, 46, 209, 0) var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
   }
 
   .card-alert-critical {
-    @apply bg-white rounded-card p-4 shadow-card border-l-4 border-danger;
-    @apply bg-red-50;
+    @apply bg-gray-card rounded-card p-4 shadow-card border-l-4 border-danger;
+    @apply bg-red-50 dark:bg-red-900/20;
   }
 
   .card-alert-warning {
-    @apply bg-white rounded-card p-4 shadow-card border-l-4 border-warning;
-    @apply bg-yellow-50;
+    @apply bg-gray-card rounded-card p-4 shadow-card border-l-4 border-warning;
+    @apply bg-yellow-50 dark:bg-yellow-900/20;
   }
 
   .card-alert-info {
-    @apply bg-white rounded-card p-4 shadow-card border-l-4 border-primary;
-    @apply bg-blue-50;
+    @apply bg-gray-card rounded-card p-4 shadow-card border-l-4 border-primary;
+    @apply bg-blue-50 dark:bg-blue-900/20;
   }
 
   .nav-item {

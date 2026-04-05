@@ -179,7 +179,7 @@ start_services() {
     echo ""
     echo -e "  ${YELLOW}本地访问:${NC}  http://localhost:3000"
     echo -e "  ${YELLOW}后端 API:${NC}  http://localhost:3001"
-    echo -e "  ${YELLOW}测试账号:${NC}  13800138000 / Test123456"
+    echo -e "  ${YELLOW}测试账号:${NC}  13800138000 / 123456"
     echo ""
     echo -e "  ${YELLOW}查看后端日志:${NC} tail -f $BACKEND_LOG"
     echo -e "  ${YELLOW}启动内网穿透:${NC} ./start-dev.sh cpolar"

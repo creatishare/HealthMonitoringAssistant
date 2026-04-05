@@ -9,6 +9,7 @@ router.post('/register', authController.register);
 router.post('/login', authController.login);
 router.post('/refresh', authController.refresh);
 router.post('/verification-code', authController.sendVerificationCode);
+router.post('/reset-password', authController.resetPassword);
 
 // 需要认证的接口
 router.post('/logout', authenticate, authController.logout);
