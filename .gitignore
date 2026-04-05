@@ -21,6 +21,11 @@ src/backend/.env.test
 infrastructure/.env.production
 backend.log
 
+# Memory files (may contain sensitive info)
+memory/conversation-log.md
+memory/*.md
+!memory/MEMORY.md
+
 # Sensitive directories
 uploads/
 src/backend/uploads/
