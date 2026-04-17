@@ -9,23 +9,23 @@ datasource db {
 
 // 用户基础信息表
 model User {
-  id            String    @id @default(uuid())
-  phone         String    @unique
-  passwordHash  String
-  status        UserStatus @default(active)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime?
+  id           String     @id @default(uuid())
+  phone        String     @unique
+  passwordHash String
+  status       UserStatus @default(active)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
 
-  profile       UserProfile?
-  healthRecords HealthRecord[]
+  profile            UserProfile?
+  healthRecords      HealthRecord[]
   drugConcentrations DrugConcentrationRecord[]
-  medications   Medication[]
-  medicationLogs MedicationLog[]
-  alerts        Alert[]
-  labReports    LabReport[]
-  refreshTokens RefreshToken[]
-  auditLogs     AuditLog[]
+  medications        Medication[]
+  medicationLogs     MedicationLog[]
+  alerts             Alert[]
+  labReports         LabReport[]
+  refreshTokens      RefreshToken[]
+  auditLogs          AuditLog[]
 
   @@index([phone])
   @@index([status])
@@ -41,24 +41,27 @@ enum UserStatus {
 
 // 用户档案表
 model UserProfile {
-  userId             String        @id
-  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name               String?
-  gender             Gender?
-  birthDate          DateTime?
-  height             Float?        // cm
-  currentWeight      Float?        // kg
-  dialysisType       DialysisType  @default(none)
-  dryWeight          Float?        // 干体重(kg)，透析患者使用
-  baselineCreatinine Float?        // 基线肌酐值(μmol/L)
-  diagnosisDate      DateTime?
-  primaryDisease     PrimaryDisease?
-  hasTransplant      Boolean       @default(false)  // 是否经过移植手术
-  transplantDate     DateTime?                       // 移植时间
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  userId              String          @id
+  user                User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                String?
+  gender              Gender?
+  birthDate           DateTime?
+  height              Float? // cm
+  currentWeight       Float? // kg
+  userType            UserType?
+  onboardingCompleted Boolean         @default(false)
+  dialysisType        DialysisType    @default(none)
+  dryWeight           Float? // 干体重(kg)，透析患者使用
+  baselineCreatinine  Float? // 基线肌酐值(μmol/L)
+  diagnosisDate       DateTime?
+  primaryDisease      PrimaryDisease?
+  hasTransplant       Boolean         @default(false) // 是否经过移植手术
+  transplantDate      DateTime? // 移植时间
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 
   @@index([dialysisType])
+  @@index([userType])
   @@map("user_profiles")
 }
 
@@ -80,44 +83,50 @@ enum PrimaryDisease {
   other
 }
 
+enum UserType {
+  kidney_failure
+  kidney_transplant
+  other
+}
+
 // 健康记录表
 model HealthRecord {
-  id                     String   @id @default(uuid())
-  userId                 String
-  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  recordDate             DateTime @db.Date
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recordDate DateTime @db.Date
 
   // 肾功能指标
-  creatinine             Float?   // 血清肌酐 (μmol/L)，正常: 44-133
-  urea                   Float?   // 尿素氮 (mmol/L)，正常: 2.6-7.5
+  creatinine Float? // 血清肌酐 (μmol/L)，正常: 44-133
+  urea       Float? // 尿素氮 (mmol/L)，正常: 2.6-7.5
 
   // 电解质指标
-  potassium              Float?   // 血钾 (mmol/L)，正常: 3.5-5.3
-  sodium                 Float?   // 血钠 (mmol/L)，正常: 136-145
-  phosphorus             Float?   // 血磷 (mmol/L)，正常: 0.87-1.45
+  potassium  Float? // 血钾 (mmol/L)，正常: 3.5-5.3
+  sodium     Float? // 血钠 (mmol/L)，正常: 136-145
+  phosphorus Float? // 血磷 (mmol/L)，正常: 0.87-1.45
 
   // 其他血液指标
-  uricAcid               Float?   // 尿酸 (μmol/L)，男: 150-416, 女: 89-357
-  hemoglobin             Float?   // 血红蛋白 (g/L)，正常: 120-160
-  bloodSugar             Float?   // 血糖 (mmol/L)，正常: 3.9-6.1
+  uricAcid   Float? // 尿酸 (μmol/L)，男: 150-416, 女: 89-357
+  hemoglobin Float? // 血红蛋白 (g/L)，正常: 120-160
+  bloodSugar Float? // 血糖 (mmol/L)，正常: 3.9-6.1
 
   // 日常监测指标
-  weight                 Float?   // 体重 (kg)
-  bloodPressureSystolic  Int?     // 收缩压 (mmHg)，正常: <140
-  bloodPressureDiastolic Int?     // 舒张压 (mmHg)，正常: <90
-  urineVolume            Int?     // 尿量 (ml/24h)
+  weight                 Float? // 体重 (kg)
+  bloodPressureSystolic  Int? // 收缩压 (mmHg)，正常: <140
+  bloodPressureDiastolic Int? // 舒张压 (mmHg)，正常: <90
+  urineVolume            Int? // 尿量 (ml/24h)
 
   // 免疫抑制剂浓度
-  tacrolimus             Float?   // 他克莫司浓度 (ng/mL)
+  tacrolimus Float? // 他克莫司浓度 (ng/mL)
 
   // 元数据
-  notes                  String?
-  source                 RecordSource @default(manual)
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  notes     String?
+  source    RecordSource @default(manual)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
-  alerts                 Alert[]
-  labReports             LabReport[]
+  alerts     Alert[]
+  labReports LabReport[]
 
   @@index([userId])
   @@index([userId, recordDate])
@@ -134,31 +143,31 @@ enum RecordSource {
 
 // 血药浓度记录表
 model DrugConcentrationRecord {
-  id                 String       @id @default(uuid())
-  userId             String
-  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  recordDate         DateTime     @db.Date
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recordDate DateTime @db.Date
 
   // 药物信息
-  drugType           DrugType
-  drugName           String
+  drugType DrugType
+  drugName String
 
   // 浓度数据
-  concentration      Float        // ng/mL
-  samplingTime       SamplingTime // C0=服药前, C2=服药后2小时
+  concentration Float // ng/mL
+  samplingTime  SamplingTime // C0=服药前, C2=服药后2小时
 
   // 时间信息
-  lastDoseTime       DateTime
-  bloodDrawTime      DateTime
+  lastDoseTime  DateTime
+  bloodDrawTime DateTime
 
   // 参考范围
-  referenceRangeMin  Float
-  referenceRangeMax  Float
-  isInRange          Boolean
+  referenceRangeMin Float
+  referenceRangeMax Float
+  isInRange         Boolean
 
   // 元数据
-  notes              String?
-  createdAt          DateTime     @default(now())
+  notes     String?
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([userId, recordDate])
@@ -181,31 +190,31 @@ enum SamplingTime {
 
 // 用药表
 model Medication {
-  id                    String           @id @default(uuid())
-  userId                String
-  user                  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // 药品信息
-  name                  String
-  specification         String?          // 规格，如 "25mg/粒"
+  name          String
+  specification String? // 规格，如 "25mg/粒"
 
   // 用法用量
-  dosage                Float            // 每次剂量
-  dosageUnit            String           // 剂量单位: 片、粒、mg等
-  frequency             MedicationFrequency
+  dosage     Float // 每次剂量
+  dosageUnit String // 剂量单位: 片、粒、mg等
+  frequency  MedicationFrequency
 
   // 提醒设置
-  reminderTimes         DateTime[]       @db.Time()
-  reminderMinutesBefore Int              @default(5)
+  reminderTimes         DateTime[] @db.Time()
+  reminderMinutesBefore Int        @default(5)
 
   // 状态
-  status                MedicationStatus @default(active)
+  status MedicationStatus @default(active)
 
   // 元数据
-  createdAt             DateTime         @default(now())
-  updatedAt             DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  logs                  MedicationLog[]
+  logs MedicationLog[]
 
   @@index([userId])
   @@index([userId, status])
@@ -229,27 +238,27 @@ enum MedicationStatus {
 
 // 服药记录表
 model MedicationLog {
-  id             String            @id @default(uuid())
-  userId         String
-  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  medicationId   String
-  medication     Medication        @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+  id           String     @id @default(uuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  medicationId String
+  medication   Medication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
 
   // 时间信息
-  scheduledTime  DateTime
-  actualTime     DateTime?
+  scheduledTime DateTime
+  actualTime    DateTime?
 
   // 状态
-  status         MedicationLogStatus
+  status MedicationLogStatus
 
   // 跳过原因
-  skipReason     String?
+  skipReason String?
 
   // 元数据
-  notes          String?
-  createdAt      DateTime          @default(now())
+  notes     String?
+  createdAt DateTime @default(now())
 
-  alerts         Alert[]
+  alerts Alert[]
 
   @@index([userId])
   @@index([medicationId])
@@ -268,32 +277,32 @@ enum MedicationLogStatus {
 
 // 预警表
 model Alert {
-  id                String    @id @default(uuid())
-  userId            String
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // 分类
-  level             AlertLevel
-  type              AlertType @default(metric)
+  level AlertLevel
+  type  AlertType  @default(metric)
 
   // 关联数据
-  recordId          String?
-  record            HealthRecord? @relation(fields: [recordId], references: [id], onDelete: SetNull)
-  metric            String?
-  medicationId      String?
-  medicationLogId   String?
-  medicationLog     MedicationLog? @relation(fields: [medicationLogId], references: [id], onDelete: SetNull)
+  recordId        String?
+  record          HealthRecord?  @relation(fields: [recordId], references: [id], onDelete: SetNull)
+  metric          String?
+  medicationId    String?
+  medicationLogId String?
+  medicationLog   MedicationLog? @relation(fields: [medicationLogId], references: [id], onDelete: SetNull)
 
   // 内容
-  message           String
-  suggestion        String?
+  message    String
+  suggestion String?
 
   // 状态
-  isRead            Boolean   @default(false)
-  readAt            DateTime?
+  isRead Boolean   @default(false)
+  readAt DateTime?
 
   // 元数据
-  createdAt         DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([userId, level])
@@ -318,13 +327,13 @@ enum AlertType {
 
 // 化验单记录表
 model LabReport {
-  id               String         @id @default(uuid())
-  userId           String
-  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // 图片信息
-  imageUrl         String
-  imageHash        String?
+  imageUrl  String
+  imageHash String?
 
   // OCR结果
   ocrRawText       String?
@@ -333,17 +342,17 @@ model LabReport {
   confidenceScores Json?
 
   // 状态
-  status           LabReportStatus @default(pending)
+  status LabReportStatus @default(pending)
 
   // 关联记录
-  healthRecordId   String?
-  healthRecord     HealthRecord?   @relation(fields: [healthRecordId], references: [id], onDelete: SetNull)
+  healthRecordId String?
+  healthRecord   HealthRecord? @relation(fields: [healthRecordId], references: [id], onDelete: SetNull)
 
   // 元数据
-  reportDate       DateTime?
-  hospital         String?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  reportDate DateTime?
+  hospital   String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([userId])
   @@index([userId, reportDate])
@@ -361,16 +370,16 @@ enum LabReportStatus {
 
 // 刷新令牌表
 model RefreshToken {
-  id         String    @id @default(uuid())
-  userId     String
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenJti   String    @unique
-  expiresAt  DateTime
-  isRevoked  Boolean   @default(false)
-  revokedAt  DateTime?
-  createdAt  DateTime  @default(now())
-  ipAddress  String?
-  userAgent  String?
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenJti  String    @unique
+  expiresAt DateTime
+  isRevoked Boolean   @default(false)
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  ipAddress String?
+  userAgent String?
 
   @@index([userId])
   @@index([tokenJti])
@@ -380,21 +389,21 @@ model RefreshToken {
 
 // 审计日志表
 model AuditLog {
-  id            String   @id @default(uuid())
-  userId        String?
-  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id     String  @id @default(uuid())
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  action        String
-  resourceType  String
-  resourceId    String?
+  action       String
+  resourceType String
+  resourceId   String?
 
-  oldValues     Json?
-  newValues     Json?
+  oldValues Json?
+  newValues Json?
 
-  ipAddress     String?
-  userAgent     String?
+  ipAddress String?
+  userAgent String?
 
-  createdAt     DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([action])

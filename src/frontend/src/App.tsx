@@ -17,9 +17,12 @@ import Profile from './pages/Profile'
 import ProfileEdit from './pages/ProfileEdit'
 import Settings from './pages/Settings'
 import ForgotPassword from './pages/ForgotPassword'
+import Onboarding from './pages/Onboarding'
 
 function App() {
-  const { isAuthenticated, logout } = useAuthStore()
+  const { isAuthenticated, logout, user } = useAuthStore()
+  const onboardingCompleted = user?.onboardingCompleted ?? false
+  const needsOnboarding = isAuthenticated && !onboardingCompleted
 
   useEffect(() => {
     const handleUnauthorized = () => logout()
@@ -29,13 +32,12 @@ function App() {
 
   return (
     <Routes>
-      {/* 公开路由 */}
-      <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/" />} />
-      <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to="/" />} />
-      <Route path="/forgot-password" element={!isAuthenticated ? <ForgotPassword /> : <Navigate to="/" />} />
+      <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to={needsOnboarding ? '/onboarding' : '/'} />} />
+      <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to={needsOnboarding ? '/onboarding' : '/'} />} />
+      <Route path="/forgot-password" element={!isAuthenticated ? <ForgotPassword /> : <Navigate to={needsOnboarding ? '/onboarding' : '/'} />} />
+      <Route path="/onboarding" element={isAuthenticated ? (needsOnboarding ? <Onboarding /> : <Navigate to="/" />) : <Navigate to="/login" />} />
 
-      {/* 需要认证的路由 */}
-      <Route element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}>
+      <Route element={isAuthenticated ? (needsOnboarding ? <Navigate to="/onboarding" /> : <Layout />) : <Navigate to="/login" />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/records" element={<Records />} />
         <Route path="/records/new" element={<RecordForm />} />

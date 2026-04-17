@@ -1,4 +1,5 @@
 import prisma from '../config/database';
+import { AppError } from '../utils/errors';
 import logger from '../utils/logger';
 import { recognizeText, imageFileToBase64, isOCRConfigValid } from '../utils/baiduOcr';
 import path from 'path';
@@ -80,7 +81,7 @@ export async function saveImage(userId: string, imageUrl: string): Promise<strin
 export async function recognizeImage(imageId: string): Promise<OCRResult> {
   // 检查OCR配置
   if (!isOCRConfigValid()) {
-    throw new Error('百度OCR配置不完整，请检查环境变量');
+    throw new AppError('百度OCR配置不完整，请检查环境变量', 500, '00001');
   }
 
   const report = await prisma.labReport.findUnique({
@@ -88,7 +89,7 @@ export async function recognizeImage(imageId: string): Promise<OCRResult> {
   });
 
   if (!report) {
-    throw new Error('图片不存在');
+    throw new AppError('图片不存在', 404, '00003');
   }
 
   // 更新状态为处理中
@@ -103,7 +104,7 @@ export async function recognizeImage(imageId: string): Promise<OCRResult> {
     let imagePath: string;
     if (report.imageUrl.startsWith('http')) {
       // 外部URL，暂时不支持，需要下载
-      throw new Error('不支持外部URL图片，请重新上传');
+      throw new AppError('不支持外部URL图片，请重新上传', 400, '00002');
     } else if (report.imageUrl.startsWith('uploads/') || report.imageUrl.startsWith('./uploads/')) {
       // 相对路径
       imagePath = report.imageUrl.startsWith('./') ? report.imageUrl : `./${report.imageUrl}`;
@@ -113,7 +114,7 @@ export async function recognizeImage(imageId: string): Promise<OCRResult> {
     }
 
     if (!fs.existsSync(imagePath)) {
-      throw new Error(`图片文件不存在: ${imagePath}`);
+      throw new AppError(`图片文件不存在: ${imagePath}`, 404, '00003');
     }
 
     const imageBase64 = imageFileToBase64(imagePath);
@@ -200,7 +201,7 @@ export async function confirmOCRResult(
   });
 
   if (!report) {
-    throw new Error('图片不存在');
+    throw new AppError('图片不存在', 404, '00003');
   }
 
   // 创建健康记录
@@ -246,7 +247,7 @@ export async function getOCRResult(userId: string, imageId: string) {
   });
 
   if (!report) {
-    throw new Error('图片不存在');
+    throw new AppError('图片不存在', 404, '00003');
   }
 
   return {

@@ -9,7 +9,7 @@ interface UserProfile {
   gender?: 'male' | 'female'
   birthDate?: string
   height?: number
-  weight?: number
+  currentWeight?: number
   dialysisType?: 'none' | 'hemodialysis' | 'peritoneal'
   dryWeight?: number
   baselineCreatinine?: number
@@ -21,7 +21,7 @@ interface UserProfile {
 
 export default function ProfileEdit() {
   const navigate = useNavigate()
-  const { user } = useAuthStore()
+  useAuthStore()
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState<UserProfile>({
@@ -29,7 +29,7 @@ export default function ProfileEdit() {
     gender: undefined,
     birthDate: '',
     height: undefined,
-    weight: undefined,
+    currentWeight: undefined,
     dialysisType: 'none',
     dryWeight: undefined,
     baselineCreatinine: undefined,
@@ -189,8 +189,8 @@ export default function ProfileEdit() {
               <label className="block text-small text-gray-secondary mb-1">当前体重 (kg)</label>
               <input
                 type="number"
-                value={formData.weight || ''}
-                onChange={(e) => handleChange('weight', e.target.value ? parseFloat(e.target.value) : undefined)}
+                value={formData.currentWeight || ''}
+                onChange={(e) => handleChange('currentWeight', e.target.value ? parseFloat(e.target.value) : undefined)}
                 placeholder="60"
                 className="input-field w-full"
               />

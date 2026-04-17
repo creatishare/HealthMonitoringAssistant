@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 
 export default function Login() {
   const navigate = useNavigate()
-  const { login } = useAuthStore()
+  const { login, user } = useAuthStore()
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -21,8 +21,9 @@ export default function Login() {
     setLoading(true)
     try {
       await login(phone, password)
+      const nextUser = useAuthStore.getState().user ?? user
       toast.success('登录成功')
-      navigate('/')
+      navigate(nextUser?.onboardingCompleted ? '/' : '/onboarding')
     } catch (error: any) {
       toast.error(error.message || error.response?.data?.message || '登录失败')
     } finally {

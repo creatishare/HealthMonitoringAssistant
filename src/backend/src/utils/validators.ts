@@ -3,9 +3,13 @@ export function isValidPhone(phone: string): boolean {
   return /^1[3-9]\d{9}$/.test(phone);
 }
 
-// 验证码验证（6位数字）
-export function isValidVerificationCode(code: string): boolean {
-  return /^\d{6}$/.test(code);
+// 验证码验证（默认6位数字，长度可配置）
+export function isValidVerificationCode(code: string, length: number = 6): boolean {
+  if (!Number.isInteger(length) || length < 4 || length > 8) {
+    length = 6;
+  }
+  const regex = new RegExp(`^\\d{${length}}$`);
+  return regex.test(code);
 }
 
 // 日期验证（YYYY-MM-DD）

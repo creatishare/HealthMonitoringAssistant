@@ -1,0 +1,254 @@
+import PDFDocument from 'pdfkit';
+
+import { ApiError } from '../middleware/error.middleware';
+import { getAlerts } from './alert.service';
+import { getHealthRecords, getRecentMetrics } from './health-record.service';
+import { getTodayMedications } from './medication.service';
+import { getUserProfile } from './user.service';
+
+interface ReportMetric {
+  key: string;
+  name: string;
+  value: number;
+  unit: string;
+  date: string;
+}
+
+interface ReportAlert {
+  id: string;
+  level: string;
+  message: string;
+  suggestion?: string | null;
+  createdAt: string;
+}
+
+interface ReportMedication {
+  medicationId: string;
+  name: string;
+  dosage: number;
+  dosageUnit: string;
+  scheduledTime: string;
+  status: string;
+}
+
+interface ReportRecord {
+  recordDate: string;
+  creatinine?: number | null;
+  urea?: number | null;
+  potassium?: number | null;
+  sodium?: number | null;
+  phosphorus?: number | null;
+  uricAcid?: number | null;
+  hemoglobin?: number | null;
+  bloodSugar?: number | null;
+  weight?: number | null;
+  bloodPressureSystolic?: number | null;
+  bloodPressureDiastolic?: number | null;
+  urineVolume?: number | null;
+  tacrolimus?: number | null;
+  notes?: string | null;
+}
+
+export interface FollowUpReportData {
+  dateRange: {
+    startDate: string;
+    endDate: string;
+  };
+  generatedAt: string;
+  profile: Awaited<ReturnType<typeof getUserProfile>>;
+  recentMetrics: ReportMetric[];
+  alerts: ReportAlert[];
+  medications: ReportMedication[];
+  records: ReportRecord[];
+}
+
+const METRIC_LABELS: Array<{ key: keyof ReportRecord; label: string; unit?: string }> = [
+  { key: 'creatinine', label: '肌酐', unit: 'μmol/L' },
+  { key: 'urea', label: '尿素氮', unit: 'mmol/L' },
+  { key: 'potassium', label: '血钾', unit: 'mmol/L' },
+  { key: 'sodium', label: '血钠', unit: 'mmol/L' },
+  { key: 'phosphorus', label: '血磷', unit: 'mmol/L' },
+  { key: 'uricAcid', label: '尿酸', unit: 'μmol/L' },
+  { key: 'hemoglobin', label: '血红蛋白', unit: 'g/L' },
+  { key: 'bloodSugar', label: '血糖', unit: 'mmol/L' },
+  { key: 'weight', label: '体重', unit: 'kg' },
+  { key: 'tacrolimus', label: '他克莫司', unit: 'ng/mL' },
+];
+
+function validateDateRange(startDate: string, endDate: string) {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    throw new ApiError('日期格式无效', 400, '00002');
+  }
+
+  if (start > end) {
+    throw new ApiError('开始日期不能晚于结束日期', 400, '00002');
+  }
+}
+
+function formatProfileLines(profile: FollowUpReportData['profile']) {
+  const lines = [
+    `姓名：${profile.name || '未填写'}`,
+    `手机号：${profile.phone}`,
+    `性别：${profile.gender || '未填写'}`,
+    `透析方式：${profile.dialysisType || '未填写'}`,
+    `原发病：${profile.primaryDisease || '未填写'}`,
+    `身高：${profile.height ?? '未填写'}${profile.height ? ' cm' : ''}`,
+    `当前体重：${profile.currentWeight ?? '未填写'}${profile.currentWeight ? ' kg' : ''}`,
+    `干体重：${profile.dryWeight ?? '未填写'}${profile.dryWeight ? ' kg' : ''}`,
+    `基线肌酐：${profile.baselineCreatinine ?? '未填写'}${profile.baselineCreatinine ? ' μmol/L' : ''}`,
+    `确诊日期：${profile.diagnosisDate || '未填写'}`,
+  ];
+
+  if (profile.hasTransplant) {
+    lines.push(`移植情况：已移植（${profile.transplantDate || '日期未填写'}）`);
+  } else {
+    lines.push('移植情况：未移植');
+  }
+
+  return lines;
+}
+
+function formatMetricLines(metrics: ReportMetric[]) {
+  if (metrics.length === 0) {
+    return ['暂无关键指标数据'];
+  }
+
+  return metrics.map((metric) => `${metric.name}：${metric.value} ${metric.unit}（${metric.date}）`);
+}
+
+function formatAlertLines(alerts: ReportAlert[]) {
+  if (alerts.length === 0) {
+    return ['最近暂无未读预警'];
+  }
+
+  return alerts.map((alert) => {
+    const suggestion = alert.suggestion ? `；建议：${alert.suggestion}` : '';
+    return `[${alert.level}] ${alert.message}${suggestion}（${alert.createdAt}）`;
+  });
+}
+
+function formatMedicationLines(medications: ReportMedication[]) {
+  if (medications.length === 0) {
+    return ['今日暂无用药提醒'];
+  }
+
+  return medications.map(
+    (medication) =>
+      `${medication.name}：${medication.dosage}${medication.dosageUnit}，时间 ${medication.scheduledTime}，状态 ${medication.status}`
+  );
+}
+
+function formatRecordLines(records: ReportRecord[]) {
+  if (records.length === 0) {
+    return ['所选时间范围内暂无健康记录'];
+  }
+
+  return records.map((record) => {
+    const metricSummary = METRIC_LABELS.map(({ key, label, unit }) => {
+      const value = record[key];
+      if (value === null || value === undefined) {
+        return null;
+      }
+      return `${label} ${value}${unit ? ` ${unit}` : ''}`;
+    }).filter(Boolean);
+
+    const bloodPressure =
+      record.bloodPressureSystolic != null && record.bloodPressureDiastolic != null
+        ? `血压 ${record.bloodPressureSystolic}/${record.bloodPressureDiastolic} mmHg`
+        : null;
+
+    const urineVolume =
+      record.urineVolume != null ? `尿量 ${record.urineVolume} mL` : null;
+
+    const notes = record.notes ? `备注：${record.notes}` : null;
+
+    return [record.recordDate, ...metricSummary, bloodPressure, urineVolume, notes]
+      .filter(Boolean)
+      .join('；');
+  });
+}
+
+function writeSection(doc: PDFKit.PDFDocument, title: string, lines: string[]) {
+  doc.moveDown();
+  doc.fontSize(16).text(title, { underline: true });
+  doc.moveDown(0.5);
+  doc.fontSize(11);
+
+  lines.forEach((line) => {
+    doc.text(`• ${line}`, {
+      width: 500,
+      align: 'left',
+    });
+    doc.moveDown(0.3);
+  });
+}
+
+export async function buildFollowUpReportData(
+  userId: string,
+  startDate: string,
+  endDate: string
+): Promise<FollowUpReportData> {
+  validateDateRange(startDate, endDate);
+
+  const [profile, recordsResult, recentMetrics, alertsResult, todayMedications] = await Promise.all([
+    getUserProfile(userId),
+    getHealthRecords(userId, { startDate, endDate, page: 1, pageSize: 100 }),
+    getRecentMetrics(userId, 5),
+    getAlerts(userId, { isRead: false, page: 1, pageSize: 5 }),
+    getTodayMedications(userId),
+  ]);
+
+  return {
+    dateRange: { startDate, endDate },
+    generatedAt: new Date().toISOString(),
+    profile,
+    recentMetrics,
+    alerts: alertsResult.list.map((alert) => ({
+      id: alert.id,
+      level: alert.level,
+      message: alert.message,
+      suggestion: alert.suggestion,
+      createdAt: alert.createdAt.toISOString().split('T')[0],
+    })),
+    medications: todayMedications.medications,
+    records: recordsResult.list,
+  };
+}
+
+export async function generateFollowUpReportPdf(
+  userId: string,
+  startDate: string,
+  endDate: string
+): Promise<Buffer> {
+  const reportData = await buildFollowUpReportData(userId, startDate, endDate);
+
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    const chunks: Buffer[] = [];
+
+    doc.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    doc.fontSize(20).text('健康监测助手复诊报告', { align: 'center' });
+    doc.moveDown(0.5);
+    doc.fontSize(11).text(`导出时间：${reportData.generatedAt.split('T')[0]}`, { align: 'center' });
+    doc.text(`统计区间：${startDate} 至 ${endDate}`, { align: 'center' });
+
+    writeSection(doc, '一、基础档案', formatProfileLines(reportData.profile));
+    writeSection(doc, '二、最近关键指标', formatMetricLines(reportData.recentMetrics));
+    writeSection(doc, '三、最近未读预警', formatAlertLines(reportData.alerts));
+    writeSection(doc, '四、今日用药摘要', formatMedicationLines(reportData.medications));
+    writeSection(doc, '五、区间健康记录摘要', formatRecordLines(reportData.records));
+
+    doc.moveDown();
+    doc.fontSize(10).fillColor('gray').text('说明：本报告仅用于复诊资料整理与回顾，不构成医疗诊断建议。', {
+      align: 'left',
+    });
+
+    doc.end();
+  });
+}

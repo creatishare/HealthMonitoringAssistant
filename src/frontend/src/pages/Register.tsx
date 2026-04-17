@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 
 export default function Register() {
   const navigate = useNavigate()
-  const { register } = useAuthStore()
+  const { register, user } = useAuthStore()
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -54,10 +54,12 @@ export default function Register() {
     setLoading(true)
     try {
       await register(phone, password, verificationCode)
+      const nextUser = useAuthStore.getState().user ?? user
       toast.success('注册成功')
-      navigate('/')
+      navigate(nextUser?.onboardingCompleted ? '/' : '/onboarding')
     } catch (error: any) {
-      toast.error(error.message || error.response?.data?.message || '注册失败')
+      const msg = error.response?.data?.message || error.message || '注册失败'
+      toast.error(msg)
     } finally {
       setLoading(false)
     }

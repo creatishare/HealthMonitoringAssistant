@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import logger from '../utils/logger';
+import { AppError } from '../utils/errors';
 
 // 自定义API错误类
 export class ApiError extends Error {
@@ -16,7 +17,7 @@ export class ApiError extends Error {
 
 // 错误处理中间件
 export function errorHandler(
-  err: Error | ApiError,
+  err: Error | ApiError | AppError,
   req: Request,
   res: Response,
   _next: NextFunction
@@ -29,6 +30,12 @@ export function errorHandler(
 
   // 处理ApiError
   if (err instanceof ApiError) {
+    statusCode = err.statusCode;
+    message = err.message;
+    code = err.code;
+  }
+  // 处理AppError
+  else if (err instanceof AppError) {
     statusCode = err.statusCode;
     message = err.message;
     code = err.code;

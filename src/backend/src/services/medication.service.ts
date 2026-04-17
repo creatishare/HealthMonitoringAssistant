@@ -1,5 +1,6 @@
 import prisma from '../config/database';
 import { MedicationFrequency, MedicationStatus } from '@prisma/client';
+import { AppError } from '../utils/errors';
 import logger from '../utils/logger';
 
 // 获取用药列表
@@ -96,7 +97,7 @@ export async function updateMedication(
   });
 
   if (!existingMed) {
-    throw new Error('药品不存在');
+    throw new AppError('药品不存在', 404, '00003');
   }
 
   const updateData: any = { ...data };
@@ -136,7 +137,7 @@ export async function deleteMedication(userId: string, medicationId: string) {
   });
 
   if (!existingMed) {
-    throw new Error('药品不存在');
+    throw new AppError('药品不存在', 404, '00003');
   }
 
   await prisma.medication.delete({
@@ -153,7 +154,7 @@ export async function pauseMedication(userId: string, medicationId: string) {
   });
 
   if (!medication) {
-    throw new Error('药品不存在');
+    throw new AppError('药品不存在', 404, '00003');
   }
 
   const updated = await prisma.medication.update({
@@ -171,7 +172,7 @@ export async function resumeMedication(userId: string, medicationId: string) {
   });
 
   if (!medication) {
-    throw new Error('药品不存在');
+    throw new AppError('药品不存在', 404, '00003');
   }
 
   const updated = await prisma.medication.update({
@@ -284,7 +285,7 @@ export async function recordMedication(
   });
 
   if (!medication) {
-    throw new Error('药品不存在');
+    throw new AppError('药品不存在', 404, '00003');
   }
 
   const log = await prisma.medicationLog.create({

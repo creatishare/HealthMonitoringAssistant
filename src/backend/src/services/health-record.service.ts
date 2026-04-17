@@ -1,5 +1,6 @@
 import prisma from '../config/database';
 import { RecordSource } from '@prisma/client';
+import { AppError } from '../utils/errors';
 import logger from '../utils/logger';
 
 // 获取健康记录列表
@@ -59,7 +60,7 @@ export async function getHealthRecordById(userId: string, recordId: string) {
   });
 
   if (!record) {
-    throw new Error('记录不存在');
+    throw new AppError('记录不存在', 404, '00003');
   }
 
   return {
@@ -148,7 +149,7 @@ export async function updateHealthRecord(
   });
 
   if (!existingRecord) {
-    throw new Error('记录不存在');
+    throw new AppError('记录不存在', 404, '00003');
   }
 
   const updateData: any = { ...data };
@@ -177,7 +178,7 @@ export async function deleteHealthRecord(userId: string, recordId: string) {
   });
 
   if (!existingRecord) {
-    throw new Error('记录不存在');
+    throw new AppError('记录不存在', 404, '00003');
   }
 
   await prisma.healthRecord.delete({

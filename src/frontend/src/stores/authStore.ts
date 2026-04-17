@@ -2,10 +2,23 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { authApi } from '../services/api'
 
+export type UserType = 'kidney_failure' | 'kidney_transplant' | 'other'
+
 interface User {
   id: string
   phone: string
   name?: string
+  userType?: UserType | null
+  onboardingCompleted: boolean
+}
+
+interface AuthResponse {
+  userId: string
+  phone: string
+  accessToken: string
+  refreshToken: string
+  userType?: UserType | null
+  onboardingCompleted?: boolean
 }
 
 interface AuthState {
@@ -17,25 +30,36 @@ interface AuthState {
   register: (phone: string, password: string, verificationCode: string) => Promise<void>
   logout: () => void
   setTokens: (accessToken: string, refreshToken: string) => void
+  completeOnboarding: (userType: UserType) => Promise<void>
+}
+
+function buildUser(response: AuthResponse): User {
+  return {
+    id: response.userId,
+    phone: response.phone,
+    userType: response.userType ?? null,
+    onboardingCompleted: response.onboardingCompleted ?? false,
+  }
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       accessToken: null,
       refreshToken: null,
       isAuthenticated: false,
 
       login: async (phone: string, password: string) => {
-        const response: any = await authApi.login(phone, password)
-        const { userId, accessToken, refreshToken } = response.data || response
+        const apiResponse = await authApi.login(phone, password) as any
+        const response: AuthResponse = apiResponse.data ?? apiResponse
+        const { accessToken, refreshToken } = response
 
         localStorage.setItem('accessToken', accessToken)
         localStorage.setItem('refreshToken', refreshToken)
 
         set({
-          user: { id: userId, phone },
+          user: buildUser(response),
           accessToken,
           refreshToken,
           isAuthenticated: true,
@@ -43,14 +67,15 @@ export const useAuthStore = create<AuthState>()(
       },
 
       register: async (phone: string, password: string, verificationCode: string) => {
-        const response: any = await authApi.register(phone, password, verificationCode)
-        const { userId, accessToken, refreshToken } = response.data || response
+        const apiResponse = await authApi.register(phone, password, verificationCode) as any
+        const response: AuthResponse = apiResponse.data ?? apiResponse
+        const { accessToken, refreshToken } = response
 
         localStorage.setItem('accessToken', accessToken)
         localStorage.setItem('refreshToken', refreshToken)
 
         set({
-          user: { id: userId, phone },
+          user: buildUser(response),
           accessToken,
           refreshToken,
           isAuthenticated: true,
@@ -72,6 +97,23 @@ export const useAuthStore = create<AuthState>()(
         localStorage.setItem('accessToken', accessToken)
         localStorage.setItem('refreshToken', refreshToken)
         set({ accessToken, refreshToken, isAuthenticated: true })
+      },
+
+      completeOnboarding: async (userType: UserType) => {
+        await authApi.completeOnboarding(userType)
+        const currentUser = get().user
+
+        if (!currentUser) {
+          return
+        }
+
+        set({
+          user: {
+            ...currentUser,
+            userType,
+            onboardingCompleted: true,
+          },
+        })
       },
     }),
     {

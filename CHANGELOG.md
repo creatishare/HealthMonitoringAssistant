@@ -38,6 +38,12 @@
   - 血压异常显示黄/红色（收缩压 > 140 或 < 90；> 180 或 < 60 标红）
   - 尿量异常显示黄/红色（< 400 或 > 5000 标黄；< 100 标红）
   - 体重与干体重相差 > 3kg 标黄
+- **复诊报告 PDF 导出（开发中）**: 启动“数据导出 / 报告生成”功能纵切片
+  - 已新增 `src/backend/src/services/report.service.ts`
+  - 已聚合用户档案、区间健康记录、最近关键指标、未读预警、今日用药
+  - 已使用 `pdfkit` 生成基础 PDF Buffer
+  - 已安装后端依赖：`pdfkit`、`@types/pdfkit`、`jest`、`ts-jest`、`@types/jest`、`supertest`、`@types/supertest`
+  - 待完成：`report.controller.ts`、`report.routes.ts`、`server.ts` 路由注册、前端下载入口与构建验证
 
 ### Fixed
 - **Dashboard 请求报错刷屏**: 修复 console 不断输出 `Request aborted` 和 `Failed to fetch`

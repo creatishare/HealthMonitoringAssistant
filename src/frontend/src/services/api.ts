@@ -1,4 +1,5 @@
 import axios from 'axios'
+import type { UserType } from '../stores/authStore'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
@@ -8,7 +9,6 @@ const api = axios.create({
   },
 })
 
-// 请求拦截器 - 添加Token
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('accessToken')
@@ -17,17 +17,13 @@ api.interceptors.request.use(
     }
     return config
   },
-  (error) => {
-    return Promise.reject(error)
-  }
+  (error) => Promise.reject(error)
 )
 
-// 响应拦截器 - 统一错误处理
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
     if (error.response?.status === 401) {
-      // Token过期，清除本地存储并触发全局未认证事件
       localStorage.removeItem('accessToken')
       localStorage.removeItem('refreshToken')
       window.dispatchEvent(new CustomEvent('unauthorized'))
@@ -36,7 +32,6 @@ api.interceptors.response.use(
   }
 )
 
-// 认证相关API
 export const authApi = {
   login: (phone: string, password: string) =>
     api.post('/auth/login', { phone, password }),
@@ -49,9 +44,10 @@ export const authApi = {
     api.post('/auth/refresh', {}, { headers: { Authorization: `Bearer ${refreshToken}` } }),
   resetPassword: (phone: string, verificationCode: string, newPassword: string) =>
     api.post('/auth/reset-password', { phone, verificationCode, newPassword }),
+  completeOnboarding: (userType: UserType) =>
+    api.patch('/users/onboarding', { userType }),
 }
 
-// 健康记录相关API
 export const healthRecordApi = {
   getList: (params?: any) => api.get('/health-records', { params }),
   getById: (id: string) => api.get(`/health-records/${id}`),
@@ -61,7 +57,6 @@ export const healthRecordApi = {
   getTrends: (params: any, config?: any) => api.get('/health-records/trends', { params, ...config }),
 }
 
-// 用药管理相关API
 export const medicationApi = {
   getList: (params?: any) => api.get('/medications', { params }),
   create: (data: any) => api.post('/medications', data),
@@ -75,7 +70,6 @@ export const medicationApi = {
   getStatistics: (params: any) => api.get('/medications/statistics', { params }),
 }
 
-// 预警相关API
 export const alertApi = {
   getList: (params?: any) => api.get('/alerts', { params }),
   getUnreadCount: () => api.get('/alerts/unread-count'),
@@ -84,12 +78,10 @@ export const alertApi = {
   delete: (id: string) => api.delete(`/alerts/${id}`),
 }
 
-// 仪表盘相关API
 export const dashboardApi = {
   getData: (config?: any) => api.get('/dashboard', config),
 }
 
-// OCR相关API
 export const ocrApi = {
   upload: (formData: FormData) => api.post('/ocr/upload', formData, {
     headers: {
@@ -100,4 +92,3 @@ export const ocrApi = {
   confirm: (data: any) => api.post('/ocr/confirm', data),
   getResult: (id: string) => api.get(`/ocr/${id}`),
 }
-

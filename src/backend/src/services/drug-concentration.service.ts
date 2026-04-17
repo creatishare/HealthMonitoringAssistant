@@ -1,5 +1,6 @@
 import prisma from '../config/database';
 import { DrugType, SamplingTime } from '@prisma/client';
+import { AppError } from '../utils/errors';
 import logger from '../utils/logger';
 
 // 参考值范围定义
@@ -96,7 +97,7 @@ export async function createDrugConcentration(
   const referenceRange = getReferenceRange(data.drugType, data.samplingTime);
 
   if (!referenceRange) {
-    throw new Error('该药物类型不支持此采样时间');
+    throw new AppError('该药物类型不支持此采样时间', 400, '00002');
   }
 
   const [min, max] = referenceRange;

@@ -1,4 +1,5 @@
 import prisma from '../config/database';
+import { AppError } from '../utils/errors';
 import { getRecentMetrics } from './health-record.service';
 import { getTodayMedications } from './medication.service';
 import { getUnreadAlertCount, getAlerts } from './alert.service';
@@ -40,7 +41,7 @@ export async function getDashboardData(userId: string) {
   });
 
   if (!user) {
-    throw new Error('用户不存在');
+    throw new AppError('用户不存在', 404, '01004');
   }
 
   // 获取问候语

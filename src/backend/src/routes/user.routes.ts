@@ -7,5 +7,6 @@ const router = Router();
 // 需要认证的接口
 router.get('/profile', authenticate, userController.getProfile);
 router.put('/profile', authenticate, userController.updateProfile);
+router.patch('/onboarding', authenticate, userController.completeOnboarding);
 
 export default router;

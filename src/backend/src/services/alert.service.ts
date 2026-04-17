@@ -1,5 +1,6 @@
 import prisma from '../config/database';
 import { AlertLevel, AlertType, HealthRecord, DrugConcentrationRecord, MedicationLog } from '@prisma/client';
+import { AppError } from '../utils/errors';
 import logger from '../utils/logger';
 
 // 预警规则定义
@@ -236,7 +237,7 @@ export async function markAlertAsRead(userId: string, alertId: string) {
   });
 
   if (!alert) {
-    throw new Error('预警不存在');
+    throw new AppError('预警不存在', 404, '00003');
   }
 
   await prisma.alert.update({
@@ -266,7 +267,7 @@ export async function deleteAlert(userId: string, alertId: string) {
   });
 
   if (!alert) {
-    throw new Error('预警不存在');
+    throw new AppError('预警不存在', 404, '00003');
   }
 
   await prisma.alert.delete({

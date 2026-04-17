@@ -3,147 +3,232 @@
  * @description 集成阿里云短信服务，实现验证码、用药提醒等短信通知
  */
 
+import Dypnsapi20170525, {
+  SendSmsVerifyCodeRequest,
+  CheckSmsVerifyCodeRequest,
+} from '@alicloud/dypnsapi20170525';
+import { Config as OpenApiConfig } from '@alicloud/openapi-client';
+import Util, { RuntimeOptions } from '@alicloud/tea-util';
+import Credential, { Config as CredentialConfig } from '@alicloud/credentials';
+import { AppError } from '../utils/errors';
 import logger from '../utils/logger';
 
-// 阿里云短信配置
 interface SMSConfig {
   accessKeyId: string;
   accessKeySecret: string;
   signName: string;
   endpoint: string;
+  verificationTemplateCode: string;
+  verificationValidTimeSeconds: number;
+  verificationCodeLength: number;
+  verificationIntervalSeconds: number;
 }
 
-// 短信模板类型
+interface AliyunCommonResponse {
+  code?: string;
+  message?: string;
+  requestId?: string;
+  model?: {
+    bizId?: string;
+    outId?: string;
+    verifyCode?: string;
+  };
+  success?: boolean;
+}
+
 export enum SMSTemplate {
-  VERIFICATION_CODE = 'VERIFICATION_CODE',    // 验证码
-  MEDICATION_REMINDER = 'MEDICATION_REMINDER', // 用药提醒
-  MISS_MEDICATION = 'MISS_MEDICATION',         // 漏服提醒
-  ABNORMAL_ALERT = 'ABNORMAL_ALERT',           // 异常指标提醒
+  VERIFICATION_CODE = 'VERIFICATION_CODE',
+  MEDICATION_REMINDER = 'MEDICATION_REMINDER',
+  MISS_MEDICATION = 'MISS_MEDICATION',
+  ABNORMAL_ALERT = 'ABNORMAL_ALERT',
 }
 
-// 短信配置映射
 const smsConfig: SMSConfig = {
   accessKeyId: process.env.SMS_ACCESS_KEY || '',
   accessKeySecret: process.env.SMS_SECRET_KEY || '',
-  signName: process.env.SMS_SIGN_NAME || '肾健康助手',
-  endpoint: 'https://dysmsapi.aliyuncs.com',
+  signName: process.env.SMS_SIGN_NAME || '',
+  endpoint: process.env.SMS_ENDPOINT || 'https://dypnsapi.aliyuncs.com',
+  verificationTemplateCode: process.env.SMS_TEMPLATE_CODE_VERIFICATION || '',
+  verificationValidTimeSeconds: Number(process.env.SMS_VERIFICATION_VALID_TIME || 300),
+  verificationCodeLength: Number(process.env.SMS_VERIFICATION_CODE_LENGTH || 6),
+  verificationIntervalSeconds: Number(process.env.SMS_VERIFICATION_INTERVAL || 60),
 };
 
-// 模板代码映射（需要在阿里云申请）
-const templateCodes: Record<SMSTemplate, string> = {
-  [SMSTemplate.VERIFICATION_CODE]: process.env.SMS_TEMPLATE_CODE_VERIFICATION || '',
+const templateCodes: Record<Exclude<SMSTemplate, SMSTemplate.VERIFICATION_CODE>, string> = {
   [SMSTemplate.MEDICATION_REMINDER]: process.env.SMS_TEMPLATE_CODE_REMINDER || '',
   [SMSTemplate.MISS_MEDICATION]: process.env.SMS_TEMPLATE_CODE_MISS || '',
   [SMSTemplate.ABNORMAL_ALERT]: process.env.SMS_TEMPLATE_CODE_ALERT || '',
 };
 
-/**
- * 发送短信
- */
+interface VerificationSendResult {
+  success: boolean;
+  requestId?: string;
+  bizId?: string;
+  outId?: string;
+  verifyCode?: string;
+  error?: string;
+}
+
+let smsClient: Dypnsapi20170525 | null = null;
+
+function normalizeEndpoint(endpoint: string): string {
+  return endpoint.replace(/^https?:\/\//, '');
+}
+
+function getSMSClient(): Dypnsapi20170525 {
+  if (smsClient) {
+    return smsClient;
+  }
+
+  const credential = new Credential(new CredentialConfig({
+    type: 'access_key',
+    accessKeyId: smsConfig.accessKeyId,
+    accessKeySecret: smsConfig.accessKeySecret,
+  }));
+
+  const config = new OpenApiConfig({
+    credential,
+  });
+
+  config.endpoint = normalizeEndpoint(smsConfig.endpoint);
+  const client = new Dypnsapi20170525(config);
+  smsClient = client;
+  return client;
+}
+
+function getAliyunErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'Unexpected error';
+}
+
+function logAliyunError(action: string, phone: string, error: unknown): void {
+  if (typeof error === 'object' && error !== null) {
+    const errorWithData = error as { message?: string; data?: Record<string, unknown> };
+    logger.error(`阿里云短信接口异常: ${action}`, {
+      phone,
+      message: errorWithData.message,
+      data: errorWithData.data,
+    });
+    return;
+  }
+
+  logger.error(`阿里云短信接口异常: ${action}`, { phone, error: String(error) });
+}
+
+function isAliyunSuccess(data: AliyunCommonResponse): boolean {
+  return data.code === 'OK' && data.success === true;
+}
+
 async function sendSMS(
   phone: string,
-  template: SMSTemplate,
+  template: Exclude<SMSTemplate, SMSTemplate.VERIFICATION_CODE>,
   templateParam: Record<string, string>
 ): Promise<boolean> {
-  // 如果没有配置短信服务，使用模拟模式
   if (!smsConfig.accessKeyId || !smsConfig.accessKeySecret) {
     logger.info(`[SMS模拟] 发送到 ${phone}: 模板=${template}, 参数=${JSON.stringify(templateParam)}`);
     return true;
   }
 
-  try {
-    const templateCode = templateCodes[template];
-    if (!templateCode) {
-      logger.error(`短信模板未配置: ${template}`);
-      return false;
-    }
+  logger.warn('普通短信模板发送尚未接入阿里云官方 SDK', { phone, template, templateParam });
+  return false;
+}
 
-    // 构建请求参数
-    const params = {
-      PhoneNumbers: phone,
-      SignName: smsConfig.signName,
-      TemplateCode: templateCode,
-      TemplateParam: JSON.stringify(templateParam),
+export async function sendVerificationCode(phone: string): Promise<VerificationSendResult> {
+  if (!smsConfig.accessKeyId || !smsConfig.accessKeySecret) {
+    const length = smsConfig.verificationCodeLength;
+    const min = Math.pow(10, length - 1);
+    const max = Math.pow(10, length) - 1;
+    const verifyCode = Math.floor(min + Math.random() * (max - min + 1)).toString();
+    logger.info(`[SMS模拟] 发送验证码到 ${phone}: ${verifyCode}`);
+    return {
+      success: true,
+      verifyCode,
     };
+  }
 
-    // 调用阿里云短信API
-    const result = await callAliyunSMSAPI(params);
+  if (!smsConfig.signName || !smsConfig.verificationTemplateCode) {
+    throw new AppError('短信验证码签名或模板未配置', 500, '00001');
+  }
 
-    if (result.success) {
-      logger.info(`短信发送成功: ${phone}, 模板: ${template}`);
-      return true;
-    } else {
-      logger.error(`短信发送失败: ${phone}, 错误: ${result.error}`);
-      return false;
+  if (!Number.isInteger(smsConfig.verificationCodeLength) || smsConfig.verificationCodeLength < 4 || smsConfig.verificationCodeLength > 8) {
+    throw new AppError('短信验证码长度配置无效', 500, '00001');
+  }
+
+  if (smsConfig.verificationValidTimeSeconds <= 0 || smsConfig.verificationIntervalSeconds <= 0) {
+    throw new AppError('短信验证码时效配置无效', 500, '00001');
+  }
+
+  try {
+    const request = new SendSmsVerifyCodeRequest({
+      phoneNumber: phone,
+      signName: smsConfig.signName,
+      templateCode: smsConfig.verificationTemplateCode,
+      templateParam: JSON.stringify({
+        code: '##code##',
+        min: String(Math.ceil(smsConfig.verificationValidTimeSeconds / 60)),
+      }),
+      codeLength: smsConfig.verificationCodeLength,
+      validTime: smsConfig.verificationValidTimeSeconds,
+      interval: smsConfig.verificationIntervalSeconds,
+      returnVerifyCode: true,
+    });
+
+    const response = await getSMSClient().sendSmsVerifyCodeWithOptions(request, new RuntimeOptions({}));
+    const data = response.body as AliyunCommonResponse;
+
+    if (!isAliyunSuccess(data)) {
+      logger.error('验证码短信发送失败', {
+        phone,
+        code: data.code,
+        message: data.message,
+        requestId: data.requestId,
+        model: data.model,
+      });
+      return {
+        success: false,
+        error: `${data.code || 'UNKNOWN'}: ${data.message || '短信发送失败'}`,
+      };
     }
-  } catch (error) {
-    logger.error('发送短信异常', error);
+
+    return {
+      success: true,
+      requestId: data.requestId,
+      bizId: data.model?.bizId,
+      outId: data.model?.outId,
+      verifyCode: data.model?.verifyCode,
+    };
+  } catch (error: unknown) {
+    logAliyunError('SendSmsVerifyCode', phone, error);
+    return {
+      success: false,
+      error: getAliyunErrorMessage(error),
+    };
+  }
+}
+
+export async function verifySmsCode(phone: string, code: string): Promise<boolean> {
+  if (!smsConfig.accessKeyId || !smsConfig.accessKeySecret) {
+    return false;
+  }
+
+  try {
+    const request = new CheckSmsVerifyCodeRequest({
+      phoneNumber: phone,
+      verifyCode: code,
+    });
+
+    const response = await getSMSClient().checkSmsVerifyCodeWithOptions(request, new RuntimeOptions({}));
+    const data = response.body;
+    return data?.code === 'OK' && data?.model?.verifyResult === 'PASS';
+  } catch (error: unknown) {
+    logAliyunError('CheckSmsVerifyCode', phone, error);
     return false;
   }
 }
 
-/**
- * 调用阿里云短信API
- */
-async function callAliyunSMSAPI(params: Record<string, string>): Promise<{ success: boolean; error?: string }> {
-  const timestamp = new Date().toISOString().replace(/[:-]/g, '').slice(0, 15) + 'Z';
-  const nonce = Math.random().toString(36).substring(2, 12);
-
-  const commonParams = {
-    Format: 'JSON',
-    Version: '2017-05-25',
-    AccessKeyId: smsConfig.accessKeyId,
-    SignatureMethod: 'HMAC-SHA1',
-    Timestamp: timestamp,
-    SignatureVersion: '1.0',
-    SignatureNonce: nonce,
-    Action: 'SendSms',
-  };
-
-  const allParams = { ...commonParams, ...params };
-
-  const sortedKeys = Object.keys(allParams).sort();
-  const canonicalQueryString = sortedKeys
-    .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(allParams[key as keyof typeof allParams])}`)
-    .join('&');
-
-  const stringToSign = `GET&${encodeURIComponent('/')}&${encodeURIComponent(canonicalQueryString)}`;
-  const signature = calculateSignature(stringToSign, smsConfig.accessKeySecret + '&');
-
-  const url = `${smsConfig.endpoint}/?Signature=${encodeURIComponent(signature)}&${canonicalQueryString}`;
-
-  try {
-    const response = await fetch(url, { method: 'GET' });
-    const data = await response.json() as { Code: string; Message: string };
-
-    if (data.Code === 'OK') {
-      return { success: true };
-    } else {
-      return { success: false, error: `${data.Code}: ${data.Message}` };
-    }
-  } catch (error) {
-    return { success: false, error: String(error) };
-  }
-}
-
-/**
- * 计算阿里云签名
- */
-function calculateSignature(stringToSign: string, key: string): string {
-  const crypto = require('crypto');
-  return crypto.createHmac('sha1', key).update(stringToSign).digest('base64');
-}
-
-/**
- * 发送验证码短信
- */
-export async function sendVerificationCode(phone: string, code: string): Promise<boolean> {
-  return sendSMS(phone, SMSTemplate.VERIFICATION_CODE, { code });
-}
-
-/**
- * 发送用药提醒
- */
 export async function sendMedicationReminder(
   phone: string,
   medicationName: string,
@@ -157,9 +242,6 @@ export async function sendMedicationReminder(
   });
 }
 
-/**
- * 发送漏服提醒
- */
 export async function sendMissedMedicationAlert(
   phone: string,
   medicationName: string,
@@ -171,9 +253,6 @@ export async function sendMissedMedicationAlert(
   });
 }
 
-/**
- * 发送异常指标提醒
- */
 export async function sendAbnormalAlert(
   phone: string,
   metricName: string,
@@ -187,16 +266,23 @@ export async function sendAbnormalAlert(
   });
 }
 
-/**
- * 检查短信服务是否可用
- */
 export function isSMSServiceAvailable(): boolean {
-  return !!(smsConfig.accessKeyId && smsConfig.accessKeySecret && smsConfig.signName);
+  return !!(
+    smsConfig.accessKeyId &&
+    smsConfig.accessKeySecret &&
+    smsConfig.signName &&
+    smsConfig.verificationTemplateCode
+  );
 }
 
-/**
- * 批量发送用药提醒
- */
+export function getSMSConfig(): Readonly<Pick<SMSConfig, 'verificationCodeLength' | 'verificationValidTimeSeconds' | 'verificationIntervalSeconds'>> {
+  return {
+    verificationCodeLength: smsConfig.verificationCodeLength,
+    verificationValidTimeSeconds: smsConfig.verificationValidTimeSeconds,
+    verificationIntervalSeconds: smsConfig.verificationIntervalSeconds,
+  };
+}
+
 export async function sendBatchMedicationReminders(
   reminders: Array<{
     phone: string;
@@ -227,6 +313,7 @@ export async function sendBatchMedicationReminders(
 
 export default {
   sendVerificationCode,
+  verifySmsCode,
   sendMedicationReminder,
   sendMissedMedicationAlert,
   sendAbnormalAlert,
