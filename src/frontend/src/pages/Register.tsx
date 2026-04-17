@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { authApi } from '../services/api'
 import toast from 'react-hot-toast'
@@ -13,6 +13,7 @@ export default function Register() {
   const [verificationCode, setVerificationCode] = useState('')
   const [countdown, setCountdown] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [agreed, setAgreed] = useState(false)
 
   const sendCode = async () => {
     if (!phone) {
@@ -48,6 +49,11 @@ export default function Register() {
 
     if (password !== confirmPassword) {
       toast.error('两次输入的密码不一致')
+      return
+    }
+
+    if (!agreed) {
+      toast.error('请阅读并同意隐私政策')
       return
     }
 
@@ -129,10 +135,26 @@ export default function Register() {
           />
         </div>
 
+        <label className="flex items-start gap-2 mt-4 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={agreed}
+            onChange={(e) => setAgreed(e.target.checked)}
+            className="mt-1 w-4 h-4 rounded border-gray-border text-primary focus:ring-primary"
+          />
+          <span className="text-small text-gray-secondary leading-relaxed">
+            我已阅读并同意
+            <Link to="/privacy-policy" className="text-primary hover:underline">
+              《隐私政策》
+            </Link>
+            ，了解本应用如何收集、使用和保护我的个人信息。
+          </span>
+        </label>
+
         <button
           type="submit"
-          disabled={loading}
-          className="btn-primary w-full mt-6"
+          disabled={loading || !agreed}
+          className="btn-primary w-full mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? '注册中...' : '注册'}
         </button>

@@ -66,3 +66,9 @@ temp/
 .cache/
 .parcel-cache/
 .eslintcache
+
+# Playwright
+playwright-report/
+test-results/
+e2e/screenshots/
+e2e/videos/

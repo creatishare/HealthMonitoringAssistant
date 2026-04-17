@@ -10,7 +10,7 @@ export default function BottomNav() {
   ]
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white shadow-nav safe-bottom z-50">
+    <nav className="fixed bottom-0 left-0 right-0 bg-gray-card shadow-nav dark:shadow-none dark:border-t dark:border-gray-border safe-bottom z-50">
       <div className="max-w-mobile mx-auto flex justify-around items-center h-16">
         {navItems.map(({ path, label, icon: Icon }) => (
           <NavLink

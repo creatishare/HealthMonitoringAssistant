@@ -18,6 +18,8 @@ import ProfileEdit from './pages/ProfileEdit'
 import Settings from './pages/Settings'
 import ForgotPassword from './pages/ForgotPassword'
 import Onboarding from './pages/Onboarding'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import HealthInsights from './pages/HealthInsights'
 
 function App() {
   const { isAuthenticated, logout, user } = useAuthStore()
@@ -36,6 +38,7 @@ function App() {
       <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to={needsOnboarding ? '/onboarding' : '/'} />} />
       <Route path="/forgot-password" element={!isAuthenticated ? <ForgotPassword /> : <Navigate to={needsOnboarding ? '/onboarding' : '/'} />} />
       <Route path="/onboarding" element={isAuthenticated ? (needsOnboarding ? <Onboarding /> : <Navigate to="/" />) : <Navigate to="/login" />} />
+      <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
       <Route element={isAuthenticated ? (needsOnboarding ? <Navigate to="/onboarding" /> : <Layout />) : <Navigate to="/login" />}>
         <Route path="/" element={<Dashboard />} />
@@ -52,6 +55,7 @@ function App() {
         <Route path="/profile" element={<Profile />} />
         <Route path="/profile/edit" element={<ProfileEdit />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/insights" element={<HealthInsights />} />
       </Route>
     </Routes>
   )

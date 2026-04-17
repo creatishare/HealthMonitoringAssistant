@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Plus, Bell, AlertTriangle, ChevronRight, Clock, TrendingUp } from 'lucide-react'
+import { Plus, Bell, AlertTriangle, ChevronRight, Clock, TrendingUp, Sparkles } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
 import { useDashboardStore } from '../stores/dashboardStore'
 import { healthRecordApi, medicationApi } from '../services/api'
@@ -149,15 +149,24 @@ export default function Dashboard() {
           </h1>
           <p className="text-helper text-gray-secondary mt-1">{today.date}</p>
         </div>
-        <button
-          onClick={() => navigate('/alerts')}
-          className="relative p-2"
-        >
-          <Bell size={24} className="text-gray-secondary" />
-          {alerts.length > 0 && (
-            <span className="absolute top-1 right-1 w-2 h-2 bg-danger rounded-full"></span>
-          )}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/insights')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-small font-medium hover:bg-primary/20 transition-colors"
+          >
+            <Sparkles size={14} />
+            洞察
+          </button>
+          <button
+            onClick={() => navigate('/alerts')}
+            className="relative p-2"
+          >
+            <Bell size={24} className="text-gray-secondary" />
+            {alerts.length > 0 && (
+              <span className="absolute top-1 right-1 w-2 h-2 bg-danger rounded-full"></span>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* 今日打卡 */}

@@ -25,7 +25,7 @@ export default function Settings() {
   const settingItems: SettingItem[] = [
     { icon: Moon, label: '深色模式', type: 'toggle', value: isDark, onToggle: toggleTheme },
     { icon: Bell, label: '消息通知', type: 'toggle', value: notificationEnabled, onToggle: toggleNotification },
-    { icon: Shield, label: '隐私政策', type: 'link', onClick: () => alert('隐私政策功能开发中') },
+    { icon: Shield, label: '隐私政策', type: 'link', onClick: () => navigate('/privacy-policy') },
     { icon: Info, label: '关于我们', type: 'link', onClick: () => alert('健康监测助手 v1.2.0\n\n为肾衰竭患者提供便捷的健康管理服务') },
   ]
 
