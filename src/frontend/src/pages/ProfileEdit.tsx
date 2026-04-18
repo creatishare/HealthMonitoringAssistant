@@ -123,12 +123,12 @@ export default function ProfileEdit() {
           <h2 className="text-card-title font-medium text-gray-text-primary mb-4">基本信息</h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-small text-gray-secondary mb-1">姓名</label>
+              <label className="block text-small text-gray-secondary mb-1">昵称</label>
               <input
                 type="text"
                 value={formData.name || ''}
                 onChange={(e) => handleChange('name', e.target.value)}
-                placeholder="请输入姓名"
+                placeholder="请输入昵称"
                 className="input-field w-full"
               />
             </div>

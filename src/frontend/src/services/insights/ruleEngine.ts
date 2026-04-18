@@ -111,7 +111,7 @@ export function adherenceToInsights(adherence: MedicationAdherence[]): HealthIns
         type: 'adherence',
         severity: 'warning',
         title: `「${a.name}」用药记录不完整`,
-        content: `最近 ${a.scheduledDays} 次应服记录中，已服 ${a.takenDays} 次，漏服 ${a.missedDays} 次。建议保持规律服药，有助于医生更准确地评估治疗效果。`,
+        content: `最近 ${a.scheduledDays} 次应服记录中，已服 ${a.takenDays} 次，漏服 ${a.missedDays} 次。用药记录的完整性会影响医生对您治疗情况的判断。`,
         disclaimer: DISCLAIMER,
       })
     }

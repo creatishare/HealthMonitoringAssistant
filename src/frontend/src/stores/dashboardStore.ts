@@ -1,10 +1,15 @@
 import { create } from 'zustand'
 import { dashboardApi } from '../services/api'
 
+export type UserType = 'kidney_failure' | 'kidney_transplant' | 'other'
+export type PrimaryDisease = 'diabetic_nephropathy' | 'hypertensive_nephropathy' | 'chronic_glomerulonephritis' | 'other'
+
 interface DashboardData {
   user: {
     name?: string
     greeting: string
+    userType?: UserType | null
+    primaryDisease?: PrimaryDisease | null
   }
   today: {
     date: string

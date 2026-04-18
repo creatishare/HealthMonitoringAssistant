@@ -92,10 +92,17 @@ export async function updateUserProfile(userId: string, data: UserProfileUpdateI
 }
 
 // 完成首次登录初始化
-export async function completeOnboarding(userId: string, userType: UserType) {
+export async function completeOnboarding(
+  userId: string,
+  userType: UserType,
+  primaryDisease?: PrimaryDisease,
+  extraData?: Partial<UserProfileUpdateInput>
+) {
   const profileUpdates: UserProfileUpdateInput = {
     userType,
     onboardingCompleted: true,
+    primaryDisease,
+    ...extraData,
   };
 
   if (userType === 'kidney_failure') {

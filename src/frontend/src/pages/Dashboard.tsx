@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Plus, Bell, AlertTriangle, ChevronRight, Clock, TrendingUp, Sparkles } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
-import { useDashboardStore } from '../stores/dashboardStore'
+import { useDashboardStore, type UserType, type PrimaryDisease } from '../stores/dashboardStore'
 import { healthRecordApi, medicationApi } from '../services/api'
 import toast from 'react-hot-toast'
 
@@ -13,23 +13,58 @@ interface TrendData {
   potassium?: number
   uricAcid?: number
   tacrolimus?: number
+  hemoglobin?: number
+  bloodSugar?: number
+  weight?: number
+  bloodPressureSystolic?: number
+  bloodPressureDiastolic?: number
+  sodium?: number
+  phosphorus?: number
+  urineVolume?: number
 }
 
-const trendMetrics = [
+export const ALL_METRICS = [
   { key: 'creatinine', name: '肌酐', unit: 'μmol/L', color: '#1890FF' },
   { key: 'urea', name: '尿素氮', unit: 'mmol/L', color: '#52C41A' },
   { key: 'potassium', name: '血钾', unit: 'mmol/L', color: '#FAAD14' },
   { key: 'uricAcid', name: '尿酸', unit: 'μmol/L', color: '#722ED1' },
   { key: 'tacrolimus', name: '他克莫司', unit: 'ng/mL', color: '#F5222D' },
+  { key: 'hemoglobin', name: '血红蛋白', unit: 'g/L', color: '#EB2F96' },
+  { key: 'bloodSugar', name: '血糖', unit: 'mmol/L', color: '#FA541C' },
+  { key: 'weight', name: '体重', unit: 'kg', color: '#13C2C2' },
+  { key: 'bloodPressureSystolic', name: '收缩压', unit: 'mmHg', color: '#597EF7' },
+  { key: 'bloodPressureDiastolic', name: '舒张压', unit: 'mmHg', color: '#73D13D' },
+  { key: 'sodium', name: '血钠', unit: 'mmol/L', color: '#36CFC9' },
+  { key: 'phosphorus', name: '血磷', unit: 'mmol/L', color: '#FFC53D' },
+  { key: 'urineVolume', name: '尿量', unit: 'ml', color: '#2F54EB' },
 ]
+
+export function getRecommendedMetrics(userType?: UserType | null, primaryDisease?: PrimaryDisease | null): string[] {
+  switch (userType) {
+    case 'kidney_failure': {
+      if (primaryDisease === 'diabetic_nephropathy') {
+        return ['creatinine', 'urea', 'potassium', 'bloodSugar', 'weight', 'hemoglobin']
+      }
+      return ['creatinine', 'urea', 'potassium', 'hemoglobin', 'weight']
+    }
+    case 'kidney_transplant':
+      return ['creatinine', 'tacrolimus', 'hemoglobin', 'uricAcid', 'weight', 'bloodPressureSystolic']
+    case 'other':
+      return ['creatinine', 'urea', 'uricAcid', 'weight', 'bloodPressureSystolic']
+    default:
+      return ['creatinine', 'urea', 'potassium', 'weight', 'hemoglobin']
+  }
+}
 
 export default function Dashboard() {
   const navigate = useNavigate()
   const location = useLocation()
   const { data, loading, fetchDashboard } = useDashboardStore()
   const [trendData, setTrendData] = useState<TrendData[]>([])
-  const [selectedMetrics, setSelectedMetrics] = useState<string[]>(['creatinine'])
+  const [selectedMetrics, setSelectedMetrics] = useState<string[]>([])
   const [trendLoading, setTrendLoading] = useState(false)
+  const [showMoreMetrics, setShowMoreMetrics] = useState(false)
+  const [hasInitializedMetrics, setHasInitializedMetrics] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -46,6 +81,15 @@ export default function Dashboard() {
     }
   }, [location.pathname])
 
+  // 根据用户类型初始化默认选中指标
+  useEffect(() => {
+    if (data?.user?.userType && !hasInitializedMetrics) {
+      const recommended = getRecommendedMetrics(data.user.userType, data.user.primaryDisease)
+      setSelectedMetrics(recommended)
+      setHasInitializedMetrics(true)
+    }
+  }, [data?.user?.userType, data?.user?.primaryDisease, hasInitializedMetrics])
+
   // 获取趋势数据
   const fetchTrendData = async (signal?: AbortSignal) => {
     setTrendLoading(true)
@@ -55,9 +99,10 @@ export default function Dashboard() {
         .toISOString()
         .split('T')[0]
 
+      const allMetricKeys = ALL_METRICS.map(m => m.key).join(',')
       const response: any = await healthRecordApi.getTrends(
         {
-          metrics: 'creatinine,urea,potassium,uricAcid,tacrolimus',
+          metrics: allMetricKeys,
           startDate,
           endDate,
         },
@@ -300,22 +345,43 @@ export default function Dashboard() {
 
         {/* 指标选择器 */}
         <div className="flex flex-wrap gap-2 mb-4">
-          {trendMetrics.map((metric) => (
-            <button
-              key={metric.key}
-              onClick={() => toggleMetric(metric.key)}
-              className={`px-3 py-1.5 rounded-full text-small transition-colors ${
-                selectedMetrics.includes(metric.key)
-                  ? 'text-white'
-                  : 'bg-gray-100 text-gray-secondary'
-              }`}
-              style={{
-                backgroundColor: selectedMetrics.includes(metric.key) ? metric.color : undefined
-              }}
-            >
-              {metric.name}
-            </button>
-          ))}
+          {(() => {
+            const recommended = getRecommendedMetrics(data?.user?.userType, data?.user?.primaryDisease)
+            const visibleMetrics = showMoreMetrics
+              ? ALL_METRICS
+              : ALL_METRICS.filter(m => recommended.includes(m.key))
+
+            return (
+              <>
+                {visibleMetrics.map((metric) => (
+                  <button
+                    key={metric.key}
+                    onClick={() => toggleMetric(metric.key)}
+                    className={`px-3 py-1.5 rounded-full text-small transition-colors ${
+                      selectedMetrics.includes(metric.key)
+                        ? 'text-white'
+                        : 'bg-gray-bg text-gray-secondary border border-gray-border'
+                    }`}
+                    style={{
+                      backgroundColor: selectedMetrics.includes(metric.key) ? metric.color : undefined
+                    }}
+                  >
+                    {metric.name}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setShowMoreMetrics(v => !v)}
+                  className={`px-3 py-1.5 rounded-full text-small transition-colors ${
+                    showMoreMetrics
+                      ? 'text-white bg-primary'
+                      : 'bg-gray-bg text-gray-secondary border border-gray-border'
+                  }`}
+                >
+                  {showMoreMetrics ? '收起' : '更多'}
+                </button>
+              </>
+            )
+          })()}
         </div>
 
         {/* 趋势图 */}
@@ -349,12 +415,12 @@ export default function Dashboard() {
                     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
                   }}
                   formatter={(value: any, name: string) => {
-                    const metric = trendMetrics.find(m => m.key === name)
+                    const metric = ALL_METRICS.find(m => m.key === name)
                     return [`${value} ${metric?.unit || ''}`, metric?.name || name]
                   }}
                 />
                 {selectedMetrics.map((metricKey) => {
-                  const metric = trendMetrics.find(m => m.key === metricKey)
+                  const metric = ALL_METRICS.find(m => m.key === metricKey)
                   if (!metric) return null
                   return (
                     <Line

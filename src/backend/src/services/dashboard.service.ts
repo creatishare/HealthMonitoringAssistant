@@ -85,6 +85,8 @@ export async function getDashboardData(userId: string) {
     user: {
       name: user.profile?.name,
       greeting,
+      userType: user.profile?.userType,
+      primaryDisease: user.profile?.primaryDisease,
     },
     today: {
       date: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }),

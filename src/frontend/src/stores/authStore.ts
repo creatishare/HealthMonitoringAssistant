@@ -3,12 +3,18 @@ import { persist } from 'zustand/middleware'
 import { authApi } from '../services/api'
 
 export type UserType = 'kidney_failure' | 'kidney_transplant' | 'other'
+export type PrimaryDisease =
+  | 'diabetic_nephropathy'
+  | 'hypertensive_nephropathy'
+  | 'chronic_glomerulonephritis'
+  | 'other'
 
 interface User {
   id: string
   phone: string
   name?: string
   userType?: UserType | null
+  primaryDisease?: PrimaryDisease | null
   onboardingCompleted: boolean
 }
 
@@ -21,6 +27,16 @@ interface AuthResponse {
   onboardingCompleted?: boolean
 }
 
+interface ProfileBasicInfo {
+  name?: string
+  gender?: 'male' | 'female'
+  birthDate?: string
+  height?: number
+  currentWeight?: number
+  diagnosisDate?: string
+  transplantDate?: string
+}
+
 interface AuthState {
   user: User | null
   accessToken: string | null
@@ -30,7 +46,7 @@ interface AuthState {
   register: (phone: string, password: string, verificationCode: string) => Promise<void>
   logout: () => void
   setTokens: (accessToken: string, refreshToken: string) => void
-  completeOnboarding: (userType: UserType) => Promise<void>
+  completeOnboarding: (userType: UserType, primaryDisease: PrimaryDisease, profile?: ProfileBasicInfo) => Promise<void>
 }
 
 function buildUser(response: AuthResponse): User {
@@ -99,8 +115,8 @@ export const useAuthStore = create<AuthState>()(
         set({ accessToken, refreshToken, isAuthenticated: true })
       },
 
-      completeOnboarding: async (userType: UserType) => {
-        await authApi.completeOnboarding(userType)
+      completeOnboarding: async (userType: UserType, primaryDisease: PrimaryDisease, profile?: ProfileBasicInfo) => {
+        await authApi.completeOnboarding(userType, primaryDisease, profile)
         const currentUser = get().user
 
         if (!currentUser) {
@@ -110,7 +126,9 @@ export const useAuthStore = create<AuthState>()(
         set({
           user: {
             ...currentUser,
+            name: profile?.name ?? currentUser.name,
             userType,
+            primaryDisease,
             onboardingCompleted: true,
           },
         })

@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { UserType } from '../stores/authStore'
+import type { UserType, PrimaryDisease } from '../stores/authStore'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
@@ -44,8 +44,19 @@ export const authApi = {
     api.post('/auth/refresh', {}, { headers: { Authorization: `Bearer ${refreshToken}` } }),
   resetPassword: (phone: string, verificationCode: string, newPassword: string) =>
     api.post('/auth/reset-password', { phone, verificationCode, newPassword }),
-  completeOnboarding: (userType: UserType) =>
-    api.patch('/users/onboarding', { userType }),
+  completeOnboarding: (
+    userType: UserType,
+    primaryDisease: PrimaryDisease,
+    profile?: {
+      name?: string
+      gender?: 'male' | 'female'
+      birthDate?: string
+      height?: number
+      currentWeight?: number
+      diagnosisDate?: string
+      transplantDate?: string
+    }
+  ) => api.patch('/users/onboarding', { userType, primaryDisease, ...profile }),
 }
 
 export const healthRecordApi = {

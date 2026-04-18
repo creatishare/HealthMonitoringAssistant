@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft, Plus, X, Trash2, ChevronRight } from 'lucide-react'
 import { medicationApi } from '../services/api'
+import { useAuthStore } from '../stores/authStore'
+import type { UserType, PrimaryDisease } from '../stores/authStore'
 import toast from 'react-hot-toast'
 
 const frequencies = [
@@ -14,36 +16,66 @@ const frequencies = [
 
 /** 常用药物清单（肾衰竭/肾移植术后） */
 const COMMON_MEDICATIONS: CommonMedication[] = [
-  // 免疫抑制剂
-  { name: '环孢素软胶囊', specifications: ['25mg/粒', '50mg/粒'], defaultUnit: '粒' },
-  { name: '他克莫司胶囊', specifications: ['0.5mg/粒', '1mg/粒'], defaultUnit: '粒' },
-  { name: '吗替麦考酚酯胶囊(骁悉)', specifications: ['250mg/粒'], defaultUnit: '粒' },
-  { name: '麦考酚钠肠溶片(米芙)', specifications: ['360mg/片'], defaultUnit: '片' },
-  { name: '西罗莫司片', specifications: ['1mg/片'], defaultUnit: '片' },
-  { name: '醋酸泼尼松片', specifications: ['5mg/片'], defaultUnit: '片' },
+  // 免疫抑制剂（肾移植核心）
+  { name: '环孢素软胶囊', specifications: ['25mg/粒', '50mg/粒'], defaultUnit: '粒', tags: ['transplant', 'immunosuppressant'] },
+  { name: '他克莫司胶囊', specifications: ['0.5mg/粒', '1mg/粒'], defaultUnit: '粒', tags: ['transplant', 'immunosuppressant'] },
+  { name: '吗替麦考酚酯胶囊(骁悉)', specifications: ['250mg/粒'], defaultUnit: '粒', tags: ['transplant', 'immunosuppressant'] },
+  { name: '麦考酚钠肠溶片(米芙)', specifications: ['360mg/片'], defaultUnit: '片', tags: ['transplant', 'immunosuppressant'] },
+  { name: '西罗莫司片', specifications: ['1mg/片'], defaultUnit: '片', tags: ['transplant', 'immunosuppressant'] },
+  { name: '醋酸泼尼松片', specifications: ['5mg/片'], defaultUnit: '片', tags: ['transplant', 'immunosuppressant'] },
   // 降压药
-  { name: '硝苯地平控释片(拜新同)', specifications: ['30mg/片'], defaultUnit: '片' },
-  { name: '苯磺酸氨氯地平片', specifications: ['5mg/片'], defaultUnit: '片' },
-  { name: '缬沙坦胶囊', specifications: ['80mg/粒'], defaultUnit: '粒' },
-  { name: '盐酸贝那普利片', specifications: ['10mg/片'], defaultUnit: '片' },
-  // 纠正贫血
-  { name: '重组人促红素注射液', specifications: ['3000IU/支', '10000IU/支'], defaultUnit: '支' },
-  { name: '罗沙司他胶囊', specifications: ['50mg/粒', '100mg/粒'], defaultUnit: '粒' },
-  { name: '多糖铁复合物胶囊', specifications: ['0.15g/粒'], defaultUnit: '粒' },
-  // 降磷/补钙
-  { name: '碳酸镧咀嚼片', specifications: ['500mg/片'], defaultUnit: '片' },
-  { name: '碳酸钙D3片', specifications: ['600mg/片'], defaultUnit: '片' },
-  { name: '骨化三醇软胶囊', specifications: ['0.25μg/粒'], defaultUnit: '粒' },
+  { name: '硝苯地平控释片(拜新同)', specifications: ['30mg/片'], defaultUnit: '片', tags: ['bp', 'general'] },
+  { name: '苯磺酸氨氯地平片', specifications: ['5mg/片'], defaultUnit: '片', tags: ['bp', 'general'] },
+  { name: '缬沙坦胶囊', specifications: ['80mg/粒'], defaultUnit: '粒', tags: ['bp', 'general'] },
+  { name: '盐酸贝那普利片', specifications: ['10mg/片'], defaultUnit: '片', tags: ['bp', 'general'] },
+  // 纠正贫血（肾衰竭核心）
+  { name: '重组人促红素注射液', specifications: ['3000IU/支', '10000IU/支'], defaultUnit: '支', tags: ['anemia', 'failure'] },
+  { name: '罗沙司他胶囊', specifications: ['50mg/粒', '100mg/粒'], defaultUnit: '粒', tags: ['anemia', 'failure'] },
+  { name: '多糖铁复合物胶囊', specifications: ['0.15g/粒'], defaultUnit: '粒', tags: ['anemia', 'general'] },
+  // 降磷/补钙（肾衰竭核心）
+  { name: '碳酸镧咀嚼片', specifications: ['500mg/片'], defaultUnit: '片', tags: ['phosphorus', 'failure'] },
+  { name: '碳酸钙D3片', specifications: ['600mg/片'], defaultUnit: '片', tags: ['phosphorus', 'failure'] },
+  { name: '骨化三醇软胶囊', specifications: ['0.25μg/粒'], defaultUnit: '粒', tags: ['phosphorus', 'failure'] },
   // 其他常用
-  { name: '阿托伐他汀钙片', specifications: ['10mg/片', '20mg/片'], defaultUnit: '片' },
-  { name: '叶酸片', specifications: ['5mg/片'], defaultUnit: '片' },
-  { name: '碳酸氢钠片', specifications: ['0.5g/片'], defaultUnit: '片' },
+  { name: '阿托伐他汀钙片', specifications: ['10mg/片', '20mg/片'], defaultUnit: '片', tags: ['general'] },
+  { name: '叶酸片', specifications: ['5mg/片'], defaultUnit: '片', tags: ['general'] },
+  { name: '碳酸氢钠片', specifications: ['0.5g/片'], defaultUnit: '片', tags: ['general'] },
 ]
 
 interface CommonMedication {
   name: string
   specifications: string[]
   defaultUnit: string
+  tags: string[]
+}
+
+function getMedicationPriority(med: CommonMedication, userType?: UserType | null, primaryDisease?: PrimaryDisease | null): number {
+  if (!userType) return 0
+  let score = 0
+
+  // 肾移植患者：免疫抑制剂最高优先级
+  if (userType === 'kidney_transplant') {
+    if (med.tags.includes('immunosuppressant')) score += 100
+    if (med.tags.includes('bp')) score += 50
+  }
+
+  // 肾衰竭患者：纠正贫血、降磷补钙高优先级
+  if (userType === 'kidney_failure') {
+    if (med.tags.includes('anemia')) score += 80
+    if (med.tags.includes('phosphorus')) score += 80
+    if (med.tags.includes('bp')) score += 50
+  }
+
+  // 糖尿病肾病：降压药（保护肾脏）高优先级
+  if (primaryDisease === 'diabetic_nephropathy' && med.tags.includes('bp')) score += 30
+
+  // 高血压肾病：降压药最高优先级
+  if (primaryDisease === 'hypertensive_nephropathy' && med.tags.includes('bp')) score += 60
+
+  // 通用药物基础分
+  if (med.tags.includes('general')) score += 10
+
+  return score
 }
 
 /** 底部选择面板 */
@@ -56,7 +88,7 @@ function BottomSelector({
 }: {
   open: boolean
   title: string
-  options: { label: string; value: string; isOther?: boolean }[]
+  options: { label: string; value: string; isOther?: boolean; isSection?: boolean }[]
   onSelect: (value: string) => void
   onClose: () => void
 }) {
@@ -86,22 +118,28 @@ function BottomSelector({
               {opt.isOther && (
                 <div className="mx-4 border-t border-gray-border" />
               )}
-              <button
-                onClick={() => {
-                  onSelect(opt.value)
-                  onClose()
-                }}
-                className={`w-full text-left px-4 py-3 transition-colors flex items-center justify-between ${
-                  opt.isOther
-                    ? 'bg-gray-bg hover:bg-gray-border/30 active:bg-gray-border/50'
-                    : 'hover:bg-primary-light/30 active:bg-primary-light/50'
-                }`}
-              >
-                <span className={`text-body ${opt.isOther ? 'text-gray-text-secondary' : 'text-gray-text-primary'}`}>
+              {opt.isSection ? (
+                <div className="px-4 py-2 text-xs text-gray-secondary bg-gray-bg/50">
                   {opt.label}
-                </span>
-                <ChevronRight size={18} className="text-gray-secondary" />
-              </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    onSelect(opt.value)
+                    onClose()
+                  }}
+                  className={`w-full text-left px-4 py-3 transition-colors flex items-center justify-between ${
+                    opt.isOther
+                      ? 'bg-gray-bg hover:bg-gray-border/30 active:bg-gray-border/50'
+                      : 'hover:bg-primary-light/30 active:bg-primary-light/50'
+                  }`}
+                >
+                  <span className={`text-body ${opt.isOther ? 'text-gray-text-secondary' : 'text-gray-text-primary'}`}>
+                    {opt.label}
+                  </span>
+                  <ChevronRight size={18} className="text-gray-secondary" />
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -114,6 +152,7 @@ export default function MedicationForm() {
   const navigate = useNavigate()
   const { id } = useParams()
   const isEdit = !!id
+  const { user } = useAuthStore()
   const [loading, setLoading] = useState(false)
   const [fetchLoading, setFetchLoading] = useState(false)
 
@@ -282,11 +321,40 @@ export default function MedicationForm() {
     }
   }
 
-  // 药品名称选择器选项
-  const nameOptions = [
-    ...COMMON_MEDICATIONS.map((med) => ({ label: med.name, value: med.name })),
-    { label: '其他（手动输入）', value: '__custom__', isOther: true },
-  ]
+  // 药品名称选择器选项（按用户类型优先排序）
+  const sortedMeds = [...COMMON_MEDICATIONS].sort((a, b) => {
+    const pa = getMedicationPriority(a, user?.userType, user?.primaryDisease)
+    const pb = getMedicationPriority(b, user?.userType, user?.primaryDisease)
+    return pb - pa
+  })
+
+  const recommendedMeds = sortedMeds.filter((m) =>
+    getMedicationPriority(m, user?.userType, user?.primaryDisease) >= 50
+  )
+  const otherMeds = sortedMeds.filter((m) =>
+    getMedicationPriority(m, user?.userType, user?.primaryDisease) < 50
+  )
+
+  const nameOptions = user?.userType
+    ? [
+        ...(recommendedMeds.length > 0
+          ? [
+              { label: '同类患者常用', value: '__section_recommended__', isSection: true },
+              ...recommendedMeds.map((med) => ({ label: med.name, value: med.name })),
+            ]
+          : []),
+        ...(otherMeds.length > 0
+          ? [
+              { label: '其他常用药品', value: '__section_other__', isSection: true },
+              ...otherMeds.map((med) => ({ label: med.name, value: med.name })),
+            ]
+          : []),
+        { label: '其他（手动输入）', value: '__custom__', isOther: true },
+      ]
+    : [
+        ...COMMON_MEDICATIONS.map((med) => ({ label: med.name, value: med.name })),
+        { label: '其他（手动输入）', value: '__custom__', isOther: true },
+      ]
 
   // 规格选择器选项（基于选中的常用药物）
   const specOptions = selectedCommonMed

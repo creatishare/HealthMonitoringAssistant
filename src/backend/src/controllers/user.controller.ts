@@ -1,10 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
-import { UserType } from '@prisma/client';
+import { UserType, PrimaryDisease } from '@prisma/client';
 import * as userService from '../services/user.service';
 import { ApiError } from '../middleware/error.middleware';
 
 function isUserType(value: unknown): value is UserType {
   return value === 'kidney_failure' || value === 'kidney_transplant' || value === 'other';
+}
+
+function isPrimaryDisease(value: unknown): value is PrimaryDisease {
+  return value === 'diabetic_nephropathy' || value === 'hypertensive_nephropathy' || value === 'chronic_glomerulonephritis' || value === 'other';
 }
 
 // 获取用户档案
@@ -88,13 +92,25 @@ export async function completeOnboarding(req: Request, res: Response, next: Next
       throw new ApiError('未登录', 401, '01007');
     }
 
-    const { userType } = req.body;
+    const { userType, primaryDisease, name, gender, birthDate, height, currentWeight, diagnosisDate, transplantDate } = req.body;
 
     if (!isUserType(userType)) {
       throw new ApiError('用户身份类型无效', 400, '01001');
     }
 
-    const profile = await userService.completeOnboarding(userId, userType);
+    if (primaryDisease !== undefined && !isPrimaryDisease(primaryDisease)) {
+      throw new ApiError('原发疾病类型无效', 400, '01008');
+    }
+
+    const profile = await userService.completeOnboarding(userId, userType, primaryDisease, {
+      name,
+      gender,
+      birthDate,
+      height,
+      currentWeight,
+      diagnosisDate,
+      transplantDate,
+    });
 
     res.status(200).json({
       code: 200,

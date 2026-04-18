@@ -8,9 +8,10 @@
 
 **HealthMonitoringAssistant** 是一个面向肾衰竭（CKD）及肾移植术后患者的个人健康数据管理 Web 应用。
 
-- **当前阶段**: MVP v1.0.0 已完成，处于功能增强阶段
-- **目标用户**: 肾衰竭患者、肾移植术后患者
+- **当前阶段**: MVP v1.0.0 已完成，功能增强阶段，内测前
+- **目标用户**: 肾衰竭患者、肾移植术后患者、其他肾病患者
 - **核心定位**: 健康数据记录与管理工具，**不提供医疗诊断**
+- **最近开发方向**: Dashboard 指标个性化展示（进行中）、付费商业化方案（规划中）
 
 ---
 
@@ -169,11 +170,41 @@ throw new AppError('手机号已注册', 409, '00001')  // message, statusCode, 
 - 配置 HTTPS + 域名
 
 ### P1 - 功能增强
+- **Dashboard 指标趋势个性化展示** — 根据 `userType`（肾衰竭/肾移植/其他）+ `primaryDisease`（糖尿病肾病/高血压肾病/慢性肾炎/其他）动态展示推荐关注指标。默认仅展示该类型核心指标，通过"更多"按钮展开全部 13 项。代码已部分实现（后端接口已加字段、前端逻辑已写），但交互体验未达预期，需重新设计后再合并。
+- **商业化付费功能** — 内测通过后实施。完整方案见 `docs/billing-plan.md`。包含：Freemium订阅制（免费基础版 + 高级会员 ¥18/月 或 ¥158/年）、支付宝/微信支付集成、用量配额控制、订阅状态守卫。
 - 健康洞察接入每日打卡数据（血压、体重）
 - 检查报告到期提醒（基于用户类型 + 上次检查日期）
 - PWA 离线支持（Service Worker）
 - 用药冲突检测（基于已录入药物）
 - 数据导出（PDF/Excel）
+
+---
+
+## 6. 当前未完成的代码改动（下次开发需知）
+
+### 6.1 Dashboard 指标个性化展示（进行中，未达预期）
+
+**涉及的文件**：
+- `src/backend/src/services/dashboard.service.ts` — 已在 `user` 对象中返回 `userType` 和 `primaryDisease`，**但后端服务当前未运行，修改未生效**
+- `src/frontend/src/stores/dashboardStore.ts` — 已扩展类型，新增 `UserType` / `PrimaryDisease` 导出
+- `src/frontend/src/pages/Dashboard.tsx` — 已添加：
+  - `ALL_METRICS` 常量（13 个指标：肌酐、尿素氮、血钾、尿酸、他克莫司、血红蛋白、血糖、体重、收缩压、舒张压、血钠、血磷、尿量）
+  - `getRecommendedMetrics()` 函数（按 userType + primaryDisease 推荐）
+  - `showMoreMetrics` 状态 + "更多/收起"按钮
+  - 趋势数据查询已改为查询全部指标
+
+**问题记录**：
+- 用户反馈"更多"按钮交互未达预期（推荐指标太多，手机端仍然占满屏幕）
+- 后端未重启导致 API 未返回新字段，前端默认展示全部指标
+- **下次开发方向**：需重新设计交互方案（如 Tab 分组：核心指标/全部指标、或按优先级仅展示 3 个核心 + 展开、或卡片式折叠）
+
+**重启后端后才能验证**：
+```bash
+cd src/backend && npm run dev
+```
+
+### 6.2 新增文档
+- `docs/billing-plan.md` — 付费商业化完整方案，内测通过后实施
 
 ---
 
@@ -188,10 +219,12 @@ throw new AppError('手机号已注册', 409, '00001')  // message, statusCode, 
 | 隐私政策路由需公开 | 放在认证路由内导致未登录跳转 | 将 `/privacy-policy` 路由移到认证路由组之外 |
 | 深色模式底栏白色 | 硬编码 `bg-white` | 改为 `bg-gray-card` + `dark:shadow-none dark:border-t` |
 | 前端端口冲突 | 前端和后端都试图使用 3001 | 前端使用 3000，后端使用 3001 |
+| Dashboard 新字段不生效 | 修改了后端代码但服务未重启 | `cd src/backend && npm run dev` |
+| 指标个性化默认展示全部 | 后端未返回 userType 时回退逻辑展示全部 13 项 | 已改为默认仅展示 3 个核心指标（肌酐/尿素氮/血钾）|
 
 ---
 
-## 8. 文件索引
+## 9. 文件索引
 
 ### 前端关键文件
 | 文件 | 说明 |
@@ -201,9 +234,15 @@ throw new AppError('手机号已注册', 409, '00001')  // message, statusCode, 
 | `src/services/api.ts` | Axios 封装、API 方法 |
 | `src/services/insights/engine.ts` | 健康洞察主入口 |
 | `src/stores/authStore.ts` | 认证状态 |
+| `src/stores/dashboardStore.ts` | Dashboard 数据（含 userType / primaryDisease） |
 | `src/stores/themeStore.ts` | 主题/深色模式 |
 | `src/components/common/Layout.tsx` | 页面布局 |
 | `src/components/common/BottomNav.tsx` | 底部导航 |
+| `src/pages/Dashboard.tsx` | 首页仪表盘（**指标个性化展示逻辑已部分实现，待继续**） |
+| `src/pages/MedicationForm.tsx` | 用药表单（含 BottomSelector） |
+| `src/pages/HealthInsights.tsx` | 健康洞察页面 |
+| `src/pages/PrivacyPolicy.tsx` | 隐私政策页面 |
+| `src/pages/Register.tsx` | 注册（含隐私政策勾选） |
 | `tailwind.config.js` | Tailwind 配置（含自定义颜色、字体） |
 | `playwright.config.ts` | E2E 测试配置 |
 
@@ -213,6 +252,7 @@ throw new AppError('手机号已注册', 409, '00001')  // message, statusCode, 
 | `src/server.ts` | Express 入口 |
 | `src/utils/errors.ts` | AppError 定义 |
 | `src/services/auth.service.ts` | 认证逻辑 |
+| `src/services/dashboard.service.ts` | Dashboard 数据（**已加 userType / primaryDisease 字段，待重启生效**） |
 | `src/services/health-record.service.ts` | 健康记录 CRUD |
 | `src/services/medication.service.ts` | 用药管理 |
 | `src/prisma/schema.prisma` | 数据库模型 |
@@ -222,7 +262,9 @@ throw new AppError('手机号已注册', 409, '00001')  // message, statusCode, 
 ### 文档
 | 文件 | 说明 |
 |------|------|
-| `CLAUDE.md` | Agent 开发配置总览 |
+| `CLAUDE.md` | **Agent 开发配置总览（必读）** |
+| `docs/developer-handbook.md` | **开发者手册（必读）**：架构约定、启动指南、待办 |
+| `docs/billing-plan.md` | **付费商业化方案**：Freemium模式、支付集成、合规要求 |
 | `docs/architecture.md` | 系统架构设计 |
 | `docs/api-spec.md` | API 详细规范 |
 | `docs/database-schema.md` | 数据库设计 |

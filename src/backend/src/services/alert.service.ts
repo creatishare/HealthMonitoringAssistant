@@ -31,8 +31,8 @@ const metricAlertRules: AlertRule[] = [
     condition: (record: HealthRecord) => record.potassium !== null && record.potassium > 5.5,
     level: 'warning',
     type: 'metric',
-    messageTemplate: '血钾偏高（{value} mmol/L），请注意饮食控制',
-    suggestionTemplate: '减少香蕉、橙子等高钾食物摄入，多饮水',
+    messageTemplate: '血钾偏高（{value} mmol/L），建议复查并咨询医生',
+    suggestionTemplate: '高钾饮食可能影响血钾水平，具体饮食安排请咨询医生或营养师',
   },
   {
     id: 'hyperuricemia_warning',
@@ -40,8 +40,8 @@ const metricAlertRules: AlertRule[] = [
     condition: (record: HealthRecord) => record.uricAcid !== null && record.uricAcid > 420,
     level: 'warning',
     type: 'metric',
-    messageTemplate: '尿酸偏高（{value} μmol/L），注意控制饮食，多饮水',
-    suggestionTemplate: '减少海鲜、动物内脏等高嘌呤食物，多饮水',
+    messageTemplate: '尿酸偏高（{value} μmol/L），建议复查并咨询医生',
+    suggestionTemplate: '尿酸水平与饮食习惯相关，具体饮食调整建议请咨询医生或营养师',
   },
   {
     id: 'creatinine_rise',
