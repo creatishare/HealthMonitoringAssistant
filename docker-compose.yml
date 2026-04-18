@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:14-alpine
+    container_name: hma-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-healthuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme_strong_password}
+      POSTGRES_DB: ${DB_NAME:-health_monitoring}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - hma-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-healthuser} -d ${DB_NAME:-health_monitoring}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: hma-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - hma-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./src/backend
+      dockerfile: Dockerfile
+    container_name: hma-backend
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-healthuser}:${DB_PASSWORD:-changeme_strong_password}@postgres:5432/${DB_NAME:-health_monitoring}?schema=public
+      REDIS_URL: redis://redis:6379
+      PORT: 3001
+      NODE_ENV: production
+    volumes:
+      - backend_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - hma-network
+
+  frontend:
+    build:
+      context: ./src/frontend
+      dockerfile: Dockerfile
+    container_name: hma-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - hma-network
+
+  nginx:
+    image: nginx:1.24-alpine
+    container_name: hma-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - hma-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  backend_uploads:
+
+networks:
+  hma-network:
+    driver: bridge
