@@ -220,23 +220,23 @@ export default function Dashboard() {
         <div className="grid grid-cols-3 md:grid-cols-3 gap-4">
           <div
             onClick={() => navigate('/records/new')}
-            className={`p-4 rounded-lg text-center cursor-pointer transition-colors ${getCheckInClasses(
+            className={`p-3 md:p-4 rounded-lg text-center cursor-pointer transition-colors ${getCheckInClasses(
               today.checkIn.weight.status
             )}`}
           >
             <p className="text-small">体重</p>
-            <p className="text-metric mt-1">
+            <p className="text-xl md:text-metric mt-1 font-semibold whitespace-nowrap">
               {today.checkIn.weight.recorded ? today.checkIn.weight.value : '--'}
             </p>
           </div>
           <div
             onClick={() => navigate('/records/new')}
-            className={`p-4 rounded-lg text-center cursor-pointer transition-colors ${getCheckInClasses(
+            className={`p-3 md:p-4 rounded-lg text-center cursor-pointer transition-colors ${getCheckInClasses(
               today.checkIn.bloodPressure.status
             )}`}
           >
             <p className="text-small">血压</p>
-            <p className="text-metric mt-1">
+            <p className="text-xl md:text-metric mt-1 font-semibold whitespace-nowrap">
               {today.checkIn.bloodPressure.recorded
                 ? `${today.checkIn.bloodPressure.systolic}/${today.checkIn.bloodPressure.diastolic}`
                 : '--/--'}
@@ -244,12 +244,12 @@ export default function Dashboard() {
           </div>
           <div
             onClick={() => navigate('/records/new')}
-            className={`p-4 rounded-lg text-center cursor-pointer transition-colors ${getCheckInClasses(
+            className={`p-3 md:p-4 rounded-lg text-center cursor-pointer transition-colors ${getCheckInClasses(
               today?.checkIn?.urineVolume?.status
             )}`}
           >
             <p className="text-small">尿量</p>
-            <p className="text-metric mt-1">
+            <p className="text-xl md:text-metric mt-1 font-semibold whitespace-nowrap">
               {today?.checkIn?.urineVolume?.recorded ? today.checkIn.urineVolume.value : '--'}
             </p>
           </div>
