@@ -144,30 +144,29 @@ throw new AppError('手机号已注册', 409, '00001')  // message, statusCode, 
 
 ### P0 - 最高优先级
 
-#### 1. UI 响应式适配（最重要）
-**问题**：当前所有页面限制 `max-width: 480px`，仅适配手机端。平板/桌面端显示为中间窄带，两侧大空白。
+#### 1. Dashboard 血压打卡卡片文字溢出（已知问题，待修复）
+**问题**：今日打卡的血压卡片中，数值（如 "120/70"）在小屏手机（iPhone SE 375px 等）上会超出卡片边界。已尝试缩小字体（`text-metric` 28px → `text-xl` 20px），但在用户实际设备上仍溢出。
 
-**涉及文件**：
-- `src/frontend/index.css` — `#root { max-width: 480px; margin: 0 auto; }`
-- `src/frontend/src/components/common/Layout.tsx`
-- `src/frontend/src/components/common/BottomNav.tsx`
-- `src/frontend/tailwind.config.js` — `max-w-mobile: '480px'`
+**涉及文件**：`src/frontend/src/pages/Dashboard.tsx` — 今日打卡区域
 
-**可选方案**：
-- A. 保持现状（仅手机）— 维护成本低
-- B. 手机 + 平板响应式 — 手机保持 480px 单列，平板 (>768px) 加宽布局
-- C. 完全响应式 — 所有屏幕尺寸优化
+**可能原因**：
+- `text-xl` (20px) 对 5 字符+斜杠的组合在小屏（~110px 可用宽度）仍太大
+- Tailwind 自定义 `text-metric` 配置可能覆盖了 `text-xl`
+- 浏览器/容器缓存导致修改未实际生效
 
-**建议实施路径**（如选择方案 B）：
-1. 将 `#root` 的 `max-width: 480px` 改为响应式：手机 100%，平板/桌面自适应
-2. `Layout.tsx` 改为 flex 布局，内容区宽度响应式
-3. `BottomNav.tsx` 在桌面端可改为左侧边栏导航
-4. Dashboard 卡片在宽屏下改为多列网格
+**建议修复方向**（下次开发时选择其一）：
+- 方案 A：血压数值改为 `text-sm` 或 `text-base`（14-16px），小屏够用
+- 方案 B：血压不显示具体数值，改为图标 + 文字状态（如 "正常" / "偏高"），点击进入记录页查看详情
+- 方案 C：把血压拆成两行显示（收缩压 120 / 舒张压 70），每行更小字号
+- 方案 D：今日打卡从 3 列改为 2 列（血压单独占一行），给每列更多空间
+
+**部署注意事项**：前端 Docker 构建有缓存，修改后必须 `docker rmi healthmonitoringassistant_frontend:latest && docker-compose build --no-cache frontend`
 
 ### P0 - 部署与基础设施
-- 部署到阿里云 ECS / 腾讯云
+- ~~部署到阿里云 ECS / 腾讯云~~ ✅ 已完成（2026-04-19）
 - 生产环境 Redis 替换内存 Map 存储验证码
 - 配置 HTTPS + 域名
+- 修复部署后 SMS 发送验证码 404 问题
 
 ### P1 - 功能增强
 - **Dashboard 指标趋势个性化展示** — 根据 `userType`（肾衰竭/肾移植/其他）+ `primaryDisease`（糖尿病肾病/高血压肾病/慢性肾炎/其他）动态展示推荐关注指标。默认仅展示该类型核心指标，通过"更多"按钮展开全部 13 项。代码已部分实现（后端接口已加字段、前端逻辑已写），但交互体验未达预期，需重新设计后再合并。
@@ -185,7 +184,7 @@ throw new AppError('手机号已注册', 409, '00001')  // message, statusCode, 
 ### 6.1 Dashboard 指标个性化展示（进行中，未达预期）
 
 **涉及的文件**：
-- `src/backend/src/services/dashboard.service.ts` — 已在 `user` 对象中返回 `userType` 和 `primaryDisease`，**但后端服务当前未运行，修改未生效**
+- `src/backend/src/services/dashboard.service.ts` — 已在 `user` 对象中返回 `userType` 和 `primaryDisease`
 - `src/frontend/src/stores/dashboardStore.ts` — 已扩展类型，新增 `UserType` / `PrimaryDisease` 导出
 - `src/frontend/src/pages/Dashboard.tsx` — 已添加：
   - `ALL_METRICS` 常量（13 个指标：肌酐、尿素氮、血钾、尿酸、他克莫司、血红蛋白、血糖、体重、收缩压、舒张压、血钠、血磷、尿量）
@@ -195,16 +194,30 @@ throw new AppError('手机号已注册', 409, '00001')  // message, statusCode, 
 
 **问题记录**：
 - 用户反馈"更多"按钮交互未达预期（推荐指标太多，手机端仍然占满屏幕）
-- 后端未重启导致 API 未返回新字段，前端默认展示全部指标
 - **下次开发方向**：需重新设计交互方案（如 Tab 分组：核心指标/全部指标、或按优先级仅展示 3 个核心 + 展开、或卡片式折叠）
 
-**重启后端后才能验证**：
-```bash
-cd src/backend && npm run dev
-```
+### 6.2 Dashboard 血压打卡卡片文字溢出（已知问题，待修复）
 
-### 6.2 新增文档
+**涉及的文件**：`src/frontend/src/pages/Dashboard.tsx`
+
+**问题描述**：今日打卡中血压数值（如 "120/70"）在小屏手机上超出卡片边界。已尝试改为 `text-xl`（20px）但仍溢出。
+
+**根本原因待确认**：
+- Tailwind 自定义 `text-metric`（28px）配置优先级可能高于 `text-xl`
+- 或浏览器/容器缓存导致 CSS 未更新（已确认 Docker 内文件是最新的，但渲染仍用旧样式）
+
+**建议修复方向**：
+- 方案 A：改为 `text-sm`（14px）或直接用 `text-[14px]` 内联样式
+- 方案 B：血压不显示数值，改为状态文字（"正常"/"偏高"）+ 图标
+- 方案 C：血压拆成两行（收缩压 120 / 舒张压 70）
+- 方案 D：今日打卡改为 2 列布局，血压单独占一行
+
+**验证方式**：修改后本地 `npm run build` 生成 dist，检查 `dist/assets/*.css` 中对应类名的实际字体大小。
+
+### 6.3 新增文档
 - `docs/billing-plan.md` — 付费商业化完整方案，内测通过后实施
+- `docs/dev-log.md` — 开发日志
+- `docs/server-operations.md` — 服务器运维手册
 
 ---
 
@@ -221,6 +234,8 @@ cd src/backend && npm run dev
 | 前端端口冲突 | 前端和后端都试图使用 3001 | 前端使用 3000，后端使用 3001 |
 | Dashboard 新字段不生效 | 修改了后端代码但服务未重启 | `cd src/backend && npm run dev` |
 | 指标个性化默认展示全部 | 后端未返回 userType 时回退逻辑展示全部 13 项 | 已改为默认仅展示 3 个核心指标（肌酐/尿素氮/血钾）|
+| Docker 前端缓存不更新 | `docker-compose up -d --build` 使用缓存镜像 | 先 `docker rmi healthmonitoringassistant_frontend:latest` 再 `--no-cache` 重建 |
+| 血压卡片文字溢出 | `text-metric` (28px) 在小屏 (~110px 宽度) 放不下 "120/70" | 尝试 `text-xl` (20px) 仍溢出，待进一步缩小或改布局 |
 
 ---
 

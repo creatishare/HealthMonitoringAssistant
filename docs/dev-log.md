@@ -28,6 +28,21 @@
 - 底部导航栏使用 `md:hidden` / `hidden md:flex` 实现双布局切换
 - TypeScript 类型检查通过，无新增错误
 
+### 已知问题（待修复）
+
+**Dashboard 血压打卡卡片文字溢出**
+- 现象：今日打卡中血压数值（如 "120/70"）在小屏手机（375px 等）上超出卡片边界
+- 尝试修复：将 `text-metric` (28px) 改为 `text-xl` (20px) + `whitespace-nowrap`，但部署后仍溢出
+- 可能原因：Tailwind 自定义 `text-metric` 配置优先级可能高于 `text-xl`；或浏览器/容器缓存
+- 待下次开发时进一步修复（方案：改用 `text-sm`、拆成两行、或改为 2 列布局）
+
+### 部署踩坑
+
+**Docker 前端构建缓存**
+- 问题：`docker-compose up -d --build` 后前端文件未更新（容器内仍为旧时间戳）
+- 根因：Docker 缓存了旧镜像层
+- 解决：先 `docker rmi healthmonitoringassistant_frontend:latest`，再 `docker-compose build --no-cache frontend`
+
 ---
 
 ## 2026-04-19 — 服务器部署与生产配置
