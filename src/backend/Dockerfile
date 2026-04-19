@@ -3,7 +3,10 @@ FROM node:18-slim
 WORKDIR /app
 
 # 安装系统依赖（bcrypt、Prisma 等需要）
-RUN apt-get update && apt-get install -y \
+# 换用阿里云 Debian 镜像源，避免国内服务器下载缓慢
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list && \
+    apt-get update && apt-get install -y \
     python3 \
     make \
     g++ \
