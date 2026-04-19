@@ -30,11 +30,11 @@
 
 ### 已知问题（待修复）
 
-**Dashboard 血压打卡卡片文字溢出**
+**Dashboard 血压打卡卡片文字溢出 — 已修复**
 - 现象：今日打卡中血压数值（如 "120/70"）在小屏手机（375px 等）上超出卡片边界
-- 尝试修复：将 `text-metric` (28px) 改为 `text-xl` (20px) + `whitespace-nowrap`，但部署后仍溢出
-- 可能原因：Tailwind 自定义 `text-metric` 配置优先级可能高于 `text-xl`；或浏览器/容器缓存
-- 待下次开发时进一步修复（方案：改用 `text-sm`、拆成两行、或改为 2 列布局）
+- 方案：将血压卡片从 2 列布局中抽出，改为 `col-span-2` 独占整行，蓝色底框 (`bg-primary`)，白色文字。上方保留体重和尿量各占一列。
+- 字体：`text-2xl md:text-3xl`，配合 `tracking-wide`，整行宽度下不再溢出。
+- 涉及文件：`src/frontend/src/pages/Dashboard.tsx`
 
 ### 部署踩坑
 
@@ -69,7 +69,8 @@
 
 | 问题 | 现象 | 原因 | 解决方案 |
 |------|------|------|----------|
-| nginx 默认页面 | 访问公网 IP 显示 "Welcome to nginx!" | 容器内 `/etc/nginx/conf.d/default.conf` 未正确挂载项目配置，使用了 nginx 镜像自带的默认页面 | 确认宿主机 `nginx/default.conf` 存在且 `docker-compose.yml` 中 volumes 挂载路径正确，重建 nginx 容器 |
+| nginx 默认页面（首次） | 访问公网 IP 显示 "Welcome to nginx!" | 容器内 `/etc/nginx/conf.d/default.conf` 未正确挂载项目配置，使用了 nginx 镜像自带的默认页面 | 确认宿主机 `nginx/default.conf` 存在且 `docker-compose.yml` 中 volumes 挂载路径正确，重建 nginx 容器 |
+| nginx 默认页面（重建后） | 前端代码更新并重建后，访问公网 IP 仍显示 "Welcome to nginx!" | `nginx/default.conf` 中 `location /` 使用 `root /usr/share/nginx/html`，指向 nginx 容器自身的文件系统，但 nginx 与 frontend 容器之间没有共享 volume，因此无法访问前端构建产物 | 将 `location /` 改为 `proxy_pass http://frontend/;`，由 nginx 反向代理到 frontend 容器 |
 | SMS 404 | 注册时发送验证码提示 "Request failed with status code 404" | 后端服务可能未正常启动或 API 路由未匹配 | 检查后端容器状态 `docker-compose ps`，查看后端日志 `docker-compose logs backend` 排查 |
 | 目录权限 | 服务器上文件属主为 root | Docker 和 git 操作使用了 sudo | 不影响运行，如需本地开发同步注意权限问题 |
 

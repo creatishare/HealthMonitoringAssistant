@@ -144,21 +144,12 @@ throw new AppError('手机号已注册', 409, '00001')  // message, statusCode, 
 
 ### P0 - 最高优先级
 
-#### 1. Dashboard 血压打卡卡片文字溢出（已知问题，待修复）
-**问题**：今日打卡的血压卡片中，数值（如 "120/70"）在小屏手机（iPhone SE 375px 等）上会超出卡片边界。已尝试缩小字体（`text-metric` 28px → `text-xl` 20px），但在用户实际设备上仍溢出。
+#### 1. Dashboard 血压打卡卡片文字溢出 — 已修复
+**问题**：今日打卡的血压卡片中，数值（如 "120/70"）在小屏手机（iPhone SE 375px 等）上会超出卡片边界。
+
+**修复方案**：将血压卡片改为独占整行（`col-span-2`），蓝色底框 (`bg-primary`) + 白色文字，上方保留体重和尿量各占一列。字号使用 `text-2xl md:text-3xl`，配合整行宽度不再溢出。
 
 **涉及文件**：`src/frontend/src/pages/Dashboard.tsx` — 今日打卡区域
-
-**可能原因**：
-- `text-xl` (20px) 对 5 字符+斜杠的组合在小屏（~110px 可用宽度）仍太大
-- Tailwind 自定义 `text-metric` 配置可能覆盖了 `text-xl`
-- 浏览器/容器缓存导致修改未实际生效
-
-**建议修复方向**（下次开发时选择其一）：
-- 方案 A：血压数值改为 `text-sm` 或 `text-base`（14-16px），小屏够用
-- 方案 B：血压不显示具体数值，改为图标 + 文字状态（如 "正常" / "偏高"），点击进入记录页查看详情
-- 方案 C：把血压拆成两行显示（收缩压 120 / 舒张压 70），每行更小字号
-- 方案 D：今日打卡从 3 列改为 2 列（血压单独占一行），给每列更多空间
 
 **部署注意事项**：前端 Docker 构建有缓存，修改后必须 `docker rmi healthmonitoringassistant_frontend:latest && docker-compose build --no-cache frontend`
 
