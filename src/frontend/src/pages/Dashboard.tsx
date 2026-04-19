@@ -220,7 +220,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 gap-4">
           {/* 体重 */}
           <div
-            onClick={() => navigate('/records/new')}
+            onClick={() => navigate('/records/new?type=weight')}
             className={`p-3 md:p-4 rounded-lg text-center cursor-pointer transition-colors ${getCheckInClasses(
               today.checkIn.weight.status
             )}`}
@@ -233,7 +233,7 @@ export default function Dashboard() {
           </div>
           {/* 尿量 */}
           <div
-            onClick={() => navigate('/records/new')}
+            onClick={() => navigate('/records/new?type=urineVolume')}
             className={`p-3 md:p-4 rounded-lg text-center cursor-pointer transition-colors ${getCheckInClasses(
               today?.checkIn?.urineVolume?.status
             )}`}
@@ -246,7 +246,7 @@ export default function Dashboard() {
           </div>
           {/* 血压 */}
           <div
-            onClick={() => navigate('/records/new')}
+            onClick={() => navigate('/records/new?type=bloodPressure')}
             className={`p-3 md:p-4 rounded-lg text-center cursor-pointer transition-colors ${getCheckInClasses(
               today.checkIn.bloodPressure.status
             )}`}

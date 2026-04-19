@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, Camera } from 'lucide-react'
 import { healthRecordApi } from '../services/api'
 import toast from 'react-hot-toast'
 
+type QuickType = 'weight' | 'bloodPressure' | 'urineVolume' | null
+
 export default function RecordForm() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
+  const [searchParams] = useSearchParams()
+  const quickType: QuickType = searchParams.get('type') as QuickType
   const isEdit = Boolean(id)
+  const isQuick = Boolean(quickType) && !isEdit
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     recordDate: new Date().toISOString().split('T')[0],
@@ -126,6 +131,14 @@ export default function RecordForm() {
     { key: 'urineVolume', label: '本次尿量', unit: 'ml', placeholder: '本次排尿量，如：200' },
   ]
 
+  const quickTitle = {
+    weight: '录入体重',
+    bloodPressure: '录入血压',
+    urineVolume: '录入尿量',
+  }
+
+  const pageTitle = isEdit ? '编辑指标' : isQuick ? quickTitle[quickType!] : '录入指标'
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -134,10 +147,10 @@ export default function RecordForm() {
             <ChevronLeft size={24} className="text-gray-text-primary" />
           </button>
           <h1 className="text-page-title font-semibold text-gray-text-primary">
-            {isEdit ? '编辑指标' : '录入指标'}
+            {pageTitle}
           </h1>
         </div>
-        {!isEdit && (
+        {!isEdit && !isQuick && (
           <button
             onClick={() => navigate('/records/ocr')}
             className="btn-primary flex items-center gap-1 px-4 py-2"
@@ -160,88 +173,101 @@ export default function RecordForm() {
           />
         </div>
 
-        <div className="card">
-          <h2 className="text-card-title font-medium text-gray-text-primary mb-4">血液指标</h2>
-          <div className="grid grid-cols-2 gap-4">
-            {inputFields.map(({ key, label, unit, placeholder }) => (
-              <div key={key}>
+        {(!isQuick || quickType === 'weight' || quickType === 'urineVolume') && (
+          <div className="card">
+            <h2 className="text-card-title font-medium text-gray-text-primary mb-4">
+              {isQuick && quickType === 'urineVolume' ? '尿量' : '基本信息'}
+            </h2>
+            <div className={`grid gap-4 ${isQuick ? 'grid-cols-1' : 'grid-cols-2'}`}>
+              {basicFields
+                .filter(({ key }) => !isQuick || key === quickType)
+                .map(({ key, label, unit, placeholder }) => (
+                  <div key={key}>
+                    <label className="block text-small text-gray-secondary mb-1">
+                      {label} ({unit})
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={(formData as any)[key]}
+                      onChange={(e) => handleChange(key, e.target.value)}
+                      placeholder={placeholder}
+                      className="input-field w-full"
+                    />
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {(!isQuick || quickType === 'bloodPressure') && (
+          <div className="card">
+            <h2 className="text-card-title font-medium text-gray-text-primary mb-4">血压</h2>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
                 <label className="block text-small text-gray-secondary mb-1">
-                  {label} ({unit})
+                  收缩压/高压 <span className="text-gray-helper">(mmHg)</span>
                 </label>
                 <input
                   type="number"
-                  step="0.01"
-                  value={(formData as any)[key]}
-                  onChange={(e) => handleChange(key, e.target.value)}
-                  placeholder={placeholder}
+                  value={formData.bloodPressureSystolic}
+                  onChange={(e) => handleChange('bloodPressureSystolic', e.target.value)}
+                  placeholder="<140"
                   className="input-field w-full"
                 />
               </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="card">
-          <h2 className="text-card-title font-medium text-gray-text-primary mb-4">基本信息</h2>
-          <div className="grid grid-cols-2 gap-4">
-            {basicFields.map(({ key, label, unit, placeholder }) => (
-              <div key={key}>
+              <div>
                 <label className="block text-small text-gray-secondary mb-1">
-                  {label} ({unit})
+                  舒张压/低压 <span className="text-gray-helper">(mmHg)</span>
                 </label>
                 <input
                   type="number"
-                  step="0.1"
-                  value={(formData as any)[key]}
-                  onChange={(e) => handleChange(key, e.target.value)}
-                  placeholder={placeholder}
+                  value={formData.bloodPressureDiastolic}
+                  onChange={(e) => handleChange('bloodPressureDiastolic', e.target.value)}
+                  placeholder="<90"
                   className="input-field w-full"
                 />
               </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="card">
-          <h2 className="text-card-title font-medium text-gray-text-primary mb-4">血压</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-small text-gray-secondary mb-1">
-                收缩压/高压 <span className="text-gray-helper">(mmHg)</span>
-              </label>
-              <input
-                type="number"
-                value={formData.bloodPressureSystolic}
-                onChange={(e) => handleChange('bloodPressureSystolic', e.target.value)}
-                placeholder="<140"
-                className="input-field w-full"
-              />
-            </div>
-            <div>
-              <label className="block text-small text-gray-secondary mb-1">
-                舒张压/低压 <span className="text-gray-helper">(mmHg)</span>
-              </label>
-              <input
-                type="number"
-                value={formData.bloodPressureDiastolic}
-                onChange={(e) => handleChange('bloodPressureDiastolic', e.target.value)}
-                placeholder="<90"
-                className="input-field w-full"
-              />
             </div>
           </div>
-        </div>
+        )}
 
-        <div className="card">
-          <label className="block text-helper text-gray-secondary mb-2">备注</label>
-          <textarea
-            value={formData.notes}
-            onChange={(e) => handleChange('notes', e.target.value)}
-            placeholder="添加备注信息..."
-            rows={3}
-            className="input-field w-full resize-none"
-          />
-        </div>
+        {/* 非快速模式下显示完整表单 */}
+        {!isQuick && (
+          <>
+            <div className="card">
+              <h2 className="text-card-title font-medium text-gray-text-primary mb-4">血液指标</h2>
+              <div className="grid grid-cols-2 gap-4">
+                {inputFields.map(({ key, label, unit, placeholder }) => (
+                  <div key={key}>
+                    <label className="block text-small text-gray-secondary mb-1">
+                      {label} ({unit})
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={(formData as any)[key]}
+                      onChange={(e) => handleChange(key, e.target.value)}
+                      placeholder={placeholder}
+                      className="input-field w-full"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="card">
+              <label className="block text-helper text-gray-secondary mb-2">备注</label>
+              <textarea
+                value={formData.notes}
+                onChange={(e) => handleChange('notes', e.target.value)}
+                placeholder="添加备注信息..."
+                rows={3}
+                className="input-field w-full resize-none"
+              />
+            </div>
+          </>
+        )}
 
         <button type="submit" disabled={loading} className="btn-primary w-full">
           {loading ? '保存中...' : '保存'}
