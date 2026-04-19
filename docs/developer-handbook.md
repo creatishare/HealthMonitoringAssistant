@@ -147,6 +147,20 @@ throw new AppError('手机号已注册', 409, '00001')  // message, statusCode, 
 #### 1. Dashboard 血压打卡卡片文字溢出 — 已修复
 **问题**：今日打卡的血压卡片中，数值（如 "120/70"）在小屏手机（iPhone SE 375px 等）上会超出卡片边界。
 
+**修复方案**：将血压卡片改为独占整行（`col-span-2`），上方保留体重和尿量各占一列。字号使用 `text-2xl md:text-3xl`，配合整行宽度不再溢出。
+
+**涉及文件**：`src/frontend/src/pages/Dashboard.tsx`
+
+#### 2. Dashboard 血压打卡卡片颜色不一致（新待办）
+**问题**：血压卡片当前使用固定蓝色底框（`bg-primary` + 白色文字），而体重和尿量卡片使用 `getCheckInClasses()` 根据状态动态变色（正常=绿色 `bg-green-50 text-success`，警告=黄色，异常=红色）。视觉上不协调。
+
+**状态**：代码已修改为使用 `getCheckInClasses(today.checkIn.bloodPressure.status)`，但尚未构建部署到服务器。
+
+**涉及文件**：`src/frontend/src/pages/Dashboard.tsx`
+
+**下次开发时**：构建并部署前端镜像 `docker rmi ... && docker-compose build --no-cache frontend`，验证血压卡片颜色是否与体重/尿量保持一致。
+**问题**：今日打卡的血压卡片中，数值（如 "120/70"）在小屏手机（iPhone SE 375px 等）上会超出卡片边界。
+
 **修复方案**：将血压卡片改为独占整行（`col-span-2`），蓝色底框 (`bg-primary`) + 白色文字，上方保留体重和尿量各占一列。字号使用 `text-2xl md:text-3xl`，配合整行宽度不再溢出。
 
 **涉及文件**：`src/frontend/src/pages/Dashboard.tsx` — 今日打卡区域
@@ -154,10 +168,10 @@ throw new AppError('手机号已注册', 409, '00001')  // message, statusCode, 
 **部署注意事项**：前端 Docker 构建有缓存，修改后必须 `docker rmi healthmonitoringassistant_frontend:latest && docker-compose build --no-cache frontend`
 
 ### P0 - 部署与基础设施
-- ~~部署到阿里云 ECS / 腾讯云~~ ✅ 已完成（2026-04-19）
+- ~~部署到阿里云 ECS~~ ✅ 已完成（2026-04-19）
+- ~~修复部署后 SMS / API 404~~ ✅ 已完成（2026-04-19：根因是 nginx `proxy_pass` 保留 `/api/` 前缀，后端路由无此前缀）
 - 生产环境 Redis 替换内存 Map 存储验证码
 - 配置 HTTPS + 域名
-- 修复部署后 SMS 发送验证码 404 问题
 
 ### P1 - 功能增强
 - **Dashboard 指标趋势个性化展示** — 根据 `userType`（肾衰竭/肾移植/其他）+ `primaryDisease`（糖尿病肾病/高血压肾病/慢性肾炎/其他）动态展示推荐关注指标。默认仅展示该类型核心指标，通过"更多"按钮展开全部 13 项。代码已部分实现（后端接口已加字段、前端逻辑已写），但交互体验未达预期，需重新设计后再合并。
@@ -187,23 +201,25 @@ throw new AppError('手机号已注册', 409, '00001')  // message, statusCode, 
 - 用户反馈"更多"按钮交互未达预期（推荐指标太多，手机端仍然占满屏幕）
 - **下次开发方向**：需重新设计交互方案（如 Tab 分组：核心指标/全部指标、或按优先级仅展示 3 个核心 + 展开、或卡片式折叠）
 
-### 6.2 Dashboard 血压打卡卡片文字溢出（已知问题，待修复）
+### 6.2 Dashboard 血压打卡卡片文字溢出 — 已修复
 
 **涉及的文件**：`src/frontend/src/pages/Dashboard.tsx`
 
 **问题描述**：今日打卡中血压数值（如 "120/70"）在小屏手机上超出卡片边界。已尝试改为 `text-xl`（20px）但仍溢出。
 
-**根本原因待确认**：
-- Tailwind 自定义 `text-metric`（28px）配置优先级可能高于 `text-xl`
-- 或浏览器/容器缓存导致 CSS 未更新（已确认 Docker 内文件是最新的，但渲染仍用旧样式）
+**修复方案**：将血压卡片改为独占整行（`col-span-2`），上方保留体重和尿量各占一列。字号 `text-2xl md:text-3xl`，整行宽度下不再溢出。
 
-**建议修复方向**：
-- 方案 A：改为 `text-sm`（14px）或直接用 `text-[14px]` 内联样式
-- 方案 B：血压不显示数值，改为状态文字（"正常"/"偏高"）+ 图标
-- 方案 C：血压拆成两行（收缩压 120 / 舒张压 70）
-- 方案 D：今日打卡改为 2 列布局，血压单独占一行
+---
 
-**验证方式**：修改后本地 `npm run build` 生成 dist，检查 `dist/assets/*.css` 中对应类名的实际字体大小。
+### 6.3 Dashboard 血压打卡卡片颜色不一致（新待办）
+
+**涉及的文件**：`src/frontend/src/pages/Dashboard.tsx`
+
+**问题描述**：血压卡片当前使用固定蓝色底框（`bg-primary` + 白色文字），而体重和尿量卡片使用 `getCheckInClasses()` 根据状态动态变色（正常=绿色 `bg-green-50 text-success`，警告=黄色，异常=红色）。视觉上不协调。
+
+**已提交的代码修改**：已将血压卡片改为使用 `getCheckInClasses(today.checkIn.bloodPressure.status)`，但尚未构建部署到服务器。
+
+**待办**：下次开发时构建并部署前端镜像，验证血压卡片颜色是否与体重/尿量保持一致。
 
 ### 6.3 新增文档
 - `docs/billing-plan.md` — 付费商业化完整方案，内测通过后实施
@@ -226,7 +242,12 @@ throw new AppError('手机号已注册', 409, '00001')  // message, statusCode, 
 | Dashboard 新字段不生效 | 修改了后端代码但服务未重启 | `cd src/backend && npm run dev` |
 | 指标个性化默认展示全部 | 后端未返回 userType 时回退逻辑展示全部 13 项 | 已改为默认仅展示 3 个核心指标（肌酐/尿素氮/血钾）|
 | Docker 前端缓存不更新 | `docker-compose up -d --build` 使用缓存镜像 | 先 `docker rmi healthmonitoringassistant_frontend:latest` 再 `--no-cache` 重建 |
-| 血压卡片文字溢出 | `text-metric` (28px) 在小屏 (~110px 宽度) 放不下 "120/70" | 尝试 `text-xl` (20px) 仍溢出，待进一步缩小或改布局 |
+| 血压卡片文字溢出 | `text-metric` (28px) 在小屏 (~110px 宽度) 放不下 "120/70" | 改为独占整行 `col-span-2` + `text-2xl md:text-3xl`，不再溢出 |
+| nginx 容器访问不到前端文件 | `location /` 用 `root /usr/share/nginx/html` 指向 nginx 自身文件系统，frontend 容器的 dist 文件无法共享 | `location /` 改为 `proxy_pass http://frontend/;`，由 nginx 反向代理到 frontend 容器 |
+| 后端 API 404（部署后） | nginx `proxy_pass http://backend:3001/api/` 保留了 `/api/` 前缀，但后端 `server.ts` 路由挂载在 `/auth`、`/users` 等（无 `/api` 前缀） | nginx `proxy_pass` 改为 `http://backend:3001/;`（去掉 `/api/` 后缀），转发时自动剥离前缀 |
+| 运行中容器修改挂载文件失败 | `docker cp` 或 `docker exec sed` 修改容器内 volume 挂载的文件报错 "Resource busy" | 必须先 `docker-compose stop` 容器，修改后再 `docker-compose start` |
+| git HTTP/2 网络错误 | 阿里云 ↔ GitHub 之间 `git fetch/push` 报错 "Error in the HTTP2 framing layer" | 服务器上设置 `git config --global http.version HTTP/1.1` |
+| git reset 回退生产环境修改 | 服务器上 `git reset --hard origin/main` 后，之前手动修改的 nginx 配置被旧版本覆盖 | 本地确保 push 成功后再让服务器 pull；生产环境配置变更优先用 `sed` + `docker cp` 而非依赖 git 同步 |
 
 ---
 

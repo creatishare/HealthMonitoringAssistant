@@ -76,15 +76,26 @@
 
 ### 部署状态
 
-- **服务器环境**：阿里云/腾讯云 ECS（假设，由用户实际操作）
+- **服务器环境**：阿里云 ECS
 - **访问方式**：HTTP + 公网 IP（内测阶段，无域名和 HTTPS）
-- **服务状态**：已部署，应用可访问，短信服务待验证修复
+- **服务状态**：已部署，应用可访问，注册/登录流程已验证可用
 - **数据库**：PostgreSQL 14 + Redis 7（Docker 容器，数据持久化在 Volume）
+
+### 新增部署踩坑（2026-04-19 下午 session）
+
+| 问题 | 现象 | 原因 | 解决方案 |
+|------|------|------|----------|
+| nginx 默认页面（重建后） | 前端代码更新并重建后，访问公网 IP 仍显示 "Welcome to nginx!" | `nginx/default.conf` 中 `location /` 使用 `root /usr/share/nginx/html`，指向 nginx 容器自身的文件系统（默认欢迎页），但 nginx 与 frontend 容器之间没有共享 volume，因此无法访问前端构建产物 | 将 `location /` 改为 `proxy_pass http://frontend/;`，由 nginx 反向代理到 frontend 容器 |
+| 后端 API 404 | 登录时浏览器返回 `POST /api/auth/login 404` | `server.ts` 中 Express 路由挂载在 `/auth`、`/users` 等路径上，**没有 `/api` 前缀**。nginx 配置 `location /api/ { proxy_pass http://backend:3001/api/; }` 把 `/api/auth/login` 原样转发给后端，后端找不到 `/api/auth/login` 路由 | 将 nginx 中 `proxy_pass http://backend:3001/api/;` 改为 `proxy_pass http://backend:3001/;`，nginx 转发时会自动去掉 `/api/` 前缀 |
+| `docker cp` 资源繁忙 | 试图用 `docker cp` 或 `docker exec sed` 修改运行中容器内的挂载卷配置文件，报错 "Resource busy" | 运行中的容器内通过 volume 挂载的文件会被 Docker 锁定，不允许原位修改 | 必须先 `docker-compose stop nginx`，再 `docker cp` 复制文件，然后 `docker-compose start nginx` |
+| git HTTP/2  framing error | 服务器上 `git fetch` 或 `git push` 报错 "Error in the HTTP2 framing layer" | GitHub 与阿里云之间的网络链路对 HTTP/2 支持不稳定 | 服务器上执行 `git config --global http.version HTTP/1.1` |
+| git reset 回退手动修改 | 服务器上执行 `git reset --hard origin/main` 后，之前手动修改的 nginx 配置被覆盖回旧版本 | `origin/main` 上的 commit 因 push 失败未同步到远程，服务器 fetch 到的是旧状态 | 在本地确认 push 成功后再在服务器上 pull；或直接在生产环境用 `sed` / `docker cp` 修改，不再依赖 git pull 同步配置 |
 
 ### 下一步
 
-- [ ] 修复 SMS 404 问题（检查后端正则和路由）
-- [ ] 验证注册/登录流程在服务器环境是否完整可用
+- [ ] ~~修复 SMS 404 问题~~ ✅ 已完成（根因是 nginx 代理路径保留 `/api/` 前缀，后端路由无此前缀）
+- [ ] ~~验证注册/登录流程在服务器环境是否完整可用~~ ✅ 已完成
+- [ ] Dashboard 血压卡片颜色不一致（蓝色固定 vs 其他指标状态变色）
 - [ ] 购买域名 + ICP 备案（如需正式对外）
 - [ ] 配置 HTTPS（域名备案后）
 
