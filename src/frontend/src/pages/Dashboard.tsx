@@ -244,17 +244,19 @@ export default function Dashboard() {
               <span className="text-xs ml-1">ml</span>
             </p>
           </div>
-          {/* 血压 — 蓝色底框，占满整行 */}
+          {/* 血压 — 占满整行 */}
           <div
             onClick={() => navigate('/records/new')}
-            className="col-span-2 bg-primary rounded-xl p-4 text-center cursor-pointer transition-colors hover:bg-primary-dark"
+            className={`col-span-2 rounded-xl p-4 text-center cursor-pointer transition-colors ${getCheckInClasses(
+              today.checkIn.bloodPressure.status
+            )}`}
           >
-            <p className="text-small text-white/80">血压</p>
-            <p className="text-2xl md:text-3xl mt-1 font-bold text-white tracking-wide">
+            <p className="text-small opacity-80">血压</p>
+            <p className="text-2xl md:text-3xl mt-1 font-bold tracking-wide">
               {today.checkIn.bloodPressure.recorded
                 ? `${today.checkIn.bloodPressure.systolic}/${today.checkIn.bloodPressure.diastolic}`
                 : '--/--'}
-              <span className="text-sm font-normal ml-2 text-white/70">mmHg</span>
+              <span className="text-sm font-normal ml-2 opacity-70">mmHg</span>
             </p>
           </div>
         </div>
