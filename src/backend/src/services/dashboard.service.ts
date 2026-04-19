@@ -59,7 +59,8 @@ export async function getDashboardData(userId: string) {
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  const todayRecord = await prisma.healthRecord.findFirst({
+  // 查询当天所有记录（按创建时间倒序，最新的在前面）
+  const todayRecords = await prisma.healthRecord.findMany({
     where: {
       userId,
       recordDate: {
@@ -67,7 +68,21 @@ export async function getDashboardData(userId: string) {
         lt: tomorrow,
       },
     },
+    orderBy: {
+      createdAt: 'desc',
+    },
   });
+
+  // 从当天多条记录中聚合打卡数据
+  // 体重/血压取最新一条非空值；尿量累加所有非空值
+  const latestWeight = todayRecords.find((r) => r.weight != null)?.weight;
+  const latestBloodPressureRecord = todayRecords.find(
+    (r) => r.bloodPressureSystolic != null && r.bloodPressureDiastolic != null
+  );
+  const totalUrineVolume = todayRecords.reduce((sum, r) => {
+    if (r.urineVolume != null) return sum + r.urineVolume;
+    return sum;
+  }, 0);
 
   // 获取今日用药
   const todayMedications = await getTodayMedications(userId);
@@ -92,22 +107,23 @@ export async function getDashboardData(userId: string) {
       date: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }),
       checkIn: {
         weight: {
-          recorded: todayRecord?.weight !== null && todayRecord?.weight !== undefined,
-          value: todayRecord?.weight,
-          status: getWeightStatus(todayRecord?.weight, user.profile?.dryWeight),
+          recorded: latestWeight != null,
+          value: latestWeight,
+          status: getWeightStatus(latestWeight, user.profile?.dryWeight),
         },
         bloodPressure: {
-          recorded:
-            todayRecord?.bloodPressureSystolic !== null &&
-            todayRecord?.bloodPressureSystolic !== undefined,
-          systolic: todayRecord?.bloodPressureSystolic,
-          diastolic: todayRecord?.bloodPressureDiastolic,
-          status: getBloodPressureStatus(todayRecord?.bloodPressureSystolic, todayRecord?.bloodPressureDiastolic),
+          recorded: latestBloodPressureRecord != null,
+          systolic: latestBloodPressureRecord?.bloodPressureSystolic,
+          diastolic: latestBloodPressureRecord?.bloodPressureDiastolic,
+          status: getBloodPressureStatus(
+            latestBloodPressureRecord?.bloodPressureSystolic,
+            latestBloodPressureRecord?.bloodPressureDiastolic
+          ),
         },
         urineVolume: {
-          recorded: todayRecord?.urineVolume !== null && todayRecord?.urineVolume !== undefined,
-          value: todayRecord?.urineVolume,
-          status: getUrineVolumeStatus(todayRecord?.urineVolume),
+          recorded: totalUrineVolume > 0,
+          value: totalUrineVolume > 0 ? totalUrineVolume : undefined,
+          status: getUrineVolumeStatus(totalUrineVolume > 0 ? totalUrineVolume : null),
         },
       },
     },

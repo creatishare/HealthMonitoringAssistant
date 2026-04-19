@@ -123,7 +123,7 @@ export default function RecordForm() {
 
   const basicFields = [
     { key: 'weight', label: '体重', unit: 'kg', placeholder: '' },
-    { key: 'urineVolume', label: '24小时尿量', unit: 'ml', placeholder: '1000-2000' },
+    { key: 'urineVolume', label: '本次尿量', unit: 'ml', placeholder: '本次排尿量，如：200' },
   ]
 
   return (

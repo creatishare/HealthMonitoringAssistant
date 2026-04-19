@@ -91,11 +91,43 @@
 | git HTTP/2  framing error | 服务器上 `git fetch` 或 `git push` 报错 "Error in the HTTP2 framing layer" | GitHub 与阿里云之间的网络链路对 HTTP/2 支持不稳定 | 服务器上执行 `git config --global http.version HTTP/1.1` |
 | git reset 回退手动修改 | 服务器上执行 `git reset --hard origin/main` 后，之前手动修改的 nginx 配置被覆盖回旧版本 | `origin/main` 上的 commit 因 push 失败未同步到远程，服务器 fetch 到的是旧状态 | 在本地确认 push 成功后再在服务器上 pull；或直接在生产环境用 `sed` / `docker cp` 修改，不再依赖 git pull 同步配置 |
 
+### 新增部署踩坑（2026-04-19 晚间 session）
+
+| 问题 | 现象 | 原因 | 解决方案 |
+|------|------|------|----------|
+| **git pull 未更新代码** | 服务器执行 `git pull origin main` 后 `git log` 仍显示旧 commit | 阿里云到 GitHub 网络不稳定，`pull` 过程中断或 fetch 不完整 | 用 `git fetch origin main` + `git reset --hard origin/main` 强制同步到远程最新版本 |
+| **github.com 连接超时** | `git pull` 报错 "Failed to connect to github.com port 443 after 130709 ms: Connection timed out" | 国内服务器访问 GitHub HTTPS 不稳定 | 配置 `git config --global http.version HTTP/1.1` 并延长超时时间；如持续超时改用 SSH 协议或 SCP 上传 |
+| **Docker 镜像被容器占用无法删除** | `docker rmi healthmonitoringassistant_frontend:latest` 报错 "conflict: unable to delete... container is using its referenced image" | 前端容器正在运行，引用了该镜像 | 先 `docker-compose stop frontend`，如果仍报错用 `docker rmi -f` 强制删除 |
+| **ContainerConfig KeyError 导致 up 失败** | `docker-compose up -d` 报错 `KeyError: 'ContainerConfig'`，Traceback 指向 docker-compose Python 代码 | 强制删除镜像后，旧容器的 image config 损坏，docker-compose 尝试重建容器时读取不到 ContainerConfig | 必须先 `docker rm -f hma-frontend` 删除旧容器（即使已 stop），再 `docker-compose up -d`；或者直接用 `docker-compose down` + `docker-compose up -d` 彻底重建 |
+| **前端代码修改未生效** | 血压卡片样式修改后部署到服务器，浏览器刷新后仍然是旧的蓝色样式 | 服务器上的 git 代码未真正更新到最新 commit，Docker 构建的是旧代码 | 部署前务必 `git log --oneline -3` 确认服务器 commit 与本地一致；不一致时先强制同步代码再构建 |
+
+### 血压卡片修复复盘（关键教训）
+
+**问题**：Dashboard 今日打卡中血压卡片颜色与其他指标不一致（固定蓝色 vs 动态状态色）。
+
+**第一次修复（commit d9bfc61）**：
+- 只把 `className="col-span-2 bg-primary ..."` 改成了 `className={\`col-span-2 ... \${getCheckInClasses(status)}\`}`
+- 结果：虽然颜色变成动态了，但卡片仍然独占整行（`col-span-2 rounded-xl p-4`），字号 `text-2xl md:text-3xl font-bold`，视觉上仍然与其他两个卡片（体重、尿量）完全不同
+
+**第二次修复（commit bdeda90）**：
+- 将血压卡片完全对齐其他卡片的样式规范：
+  - 去掉 `col-span-2`，改为普通 `grid-cols-2` 子项
+  - `rounded-xl p-4` → `rounded-lg p-3 md:p-4`
+  - 标签 `text-small opacity-80` → `text-small`
+  - 数值 `text-2xl md:text-3xl font-bold` → `text-base md:text-lg font-semibold whitespace-nowrap`
+  - 单位 `text-sm opacity-70` → `text-xs ml-1`
+- 结果：三个打卡卡片视觉完全一致，均通过 `getCheckInClasses(status)` 动态变色
+
+**教训**：
+1. 修复"颜色不一致"时，不能只改颜色类，要对比该组件与同类组件的**所有样式属性**（布局、圆角、padding、字号、字重、opacity）
+2. 部署后必须在浏览器中**用 Ctrl+F5 强制刷新**验证效果，不能只看代码提交了就认为完成
+3. 服务器上执行 `git log --oneline -3` 确认 commit 哈希与本地一致，是验证代码已同步的最可靠方式
+
 ### 下一步
 
 - [ ] ~~修复 SMS 404 问题~~ ✅ 已完成（根因是 nginx 代理路径保留 `/api/` 前缀，后端路由无此前缀）
 - [ ] ~~验证注册/登录流程在服务器环境是否完整可用~~ ✅ 已完成
-- [ ] Dashboard 血压卡片颜色不一致（蓝色固定 vs 其他指标状态变色）
+- [x] ~~Dashboard 血压卡片颜色不一致（蓝色固定 vs 其他指标状态变色）~~ ✅ 已修复（见下方"血压卡片修复复盘"）
 - [ ] 购买域名 + ICP 备案（如需正式对外）
 - [ ] 配置 HTTPS（域名备案后）
 
