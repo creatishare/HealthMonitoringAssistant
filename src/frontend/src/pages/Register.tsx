@@ -73,12 +73,13 @@ export default function Register() {
 
   return (
     <div className="min-h-screen bg-gray-bg flex flex-col justify-center p-6">
-      <div className="mb-8">
-        <h1 className="text-title text-gray-text-primary mb-2">创建账号</h1>
-        <p className="text-helper text-gray-secondary">注册新账号开始使用</p>
-      </div>
+      <div className="w-full max-w-md mx-auto">
+        <div className="mb-8">
+          <h1 className="text-title text-gray-text-primary mb-2">创建账号</h1>
+          <p className="text-helper text-gray-secondary">注册新账号开始使用</p>
+        </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-helper text-gray-secondary mb-2">手机号</label>
           <input
@@ -169,6 +170,7 @@ export default function Register() {
           立即登录
         </button>
       </p>
+      </div>
     </div>
   )
 }

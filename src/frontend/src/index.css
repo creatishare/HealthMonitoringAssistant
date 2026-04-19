@@ -44,9 +44,16 @@
 
   #root {
     min-height: 100vh;
-    max-width: 480px;
+    width: 100%;
     margin: 0 auto;
     background-color: var(--color-bg);
+  }
+
+  /* 桌面端限制最大宽度，手机端完全自适应 */
+  @media (min-width: 768px) {
+    #root {
+      max-width: 1200px;
+    }
   }
 }
 

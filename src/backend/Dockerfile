@@ -1,9 +1,15 @@
-FROM node:18-alpine
+FROM node:18-slim
 
 WORKDIR /app
 
-# 安装系统依赖（bcrypt 等原生模块需要编译工具）
-RUN apk add --no-cache python3 make g++
+# 安装系统依赖（bcrypt、Prisma 等需要）
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    openssl \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # 复制依赖文件
 COPY package*.json ./
@@ -24,5 +30,5 @@ RUN mkdir -p uploads
 
 EXPOSE 3001
 
-# 启动前等待数据库就绪，然后运行迁移，最后启动服务
+# 启动前运行迁移，然后启动服务
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]

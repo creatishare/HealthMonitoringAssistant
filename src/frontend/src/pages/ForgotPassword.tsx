@@ -90,17 +90,18 @@ export default function ForgotPassword() {
 
   return (
     <div className="min-h-screen bg-gray-bg flex flex-col justify-center p-6">
-      {/* 返回按钮 */}
-      <button
-        onClick={() => navigate('/login')}
-        className="absolute top-6 left-6 text-gray-secondary hover:text-gray-text-primary"
-      >
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-      </button>
+      <div className="w-full max-w-md mx-auto">
+        {/* 返回按钮 */}
+        <button
+          onClick={() => navigate('/login')}
+          className="mb-6 text-gray-secondary hover:text-gray-text-primary"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
 
-      <div className="mb-8">
+        <div className="mb-8">
         <h1 className="text-title text-gray-text-primary mb-2">
           {step === 'phone' && '找回密码'}
           {step === 'verify' && '验证手机号'}
@@ -222,6 +223,7 @@ export default function ForgotPassword() {
           立即登录
         </button>
       </p>
+      </div>
     </div>
   )
 }

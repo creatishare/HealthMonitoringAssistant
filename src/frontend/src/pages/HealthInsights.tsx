@@ -95,14 +95,14 @@ export default function HealthInsightsPage() {
     return (
       <div className="min-h-screen bg-gray-bg">
         <header className="sticky top-0 z-40 bg-gray-card/80 backdrop-blur-md border-b border-gray-border">
-          <div className="max-w-mobile mx-auto px-4 h-14 flex items-center gap-3">
+          <div className="w-full mx-auto px-4 h-14 flex items-center gap-3">
             <button aria-label="back" onClick={() => navigate(-1)} className="p-2 -ml-2">
               <ArrowLeft size={20} className="text-gray-text-primary" />
             </button>
             <h1 className="text-page-title text-gray-text-primary">健康洞察</h1>
           </div>
         </header>
-        <div className="max-w-mobile mx-auto p-6 text-center text-gray-text-secondary text-helper">
+        <div className="w-full mx-auto p-6 text-center text-gray-text-secondary text-helper">
           暂无足够数据生成分析报告，建议先记录更多健康指标。
         </div>
       </div>
@@ -112,7 +112,7 @@ export default function HealthInsightsPage() {
   return (
     <div className="min-h-screen bg-gray-bg pb-8">
       <header className="sticky top-0 z-40 bg-gray-card/80 backdrop-blur-md border-b border-gray-border">
-        <div className="max-w-mobile mx-auto px-4 h-14 flex items-center gap-3">
+        <div className="w-full mx-auto px-4 h-14 flex items-center gap-3">
           <button aria-label="back" onClick={() => navigate(-1)} className="p-2 -ml-2">
             <ArrowLeft size={20} className="text-gray-text-primary" />
           </button>
@@ -120,7 +120,7 @@ export default function HealthInsightsPage() {
         </div>
       </header>
 
-      <div className="max-w-mobile mx-auto px-4 py-4 space-y-4">
+      <div className="w-full mx-auto px-4 py-4 space-y-4">
         {/* 顶部免责声明 */}
         <div className="flex items-start gap-2 rounded-card bg-yellow-50 dark:bg-yellow-900/20 p-3 text-small text-warning">
           <ShieldAlert size={16} className="shrink-0 mt-0.5" />

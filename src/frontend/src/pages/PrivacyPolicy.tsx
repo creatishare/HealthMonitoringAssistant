@@ -99,7 +99,7 @@ export default function PrivacyPolicy() {
   const navigate = useNavigate()
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-3xl mx-auto">
       {/* 头部 */}
       <div className="flex items-center gap-4">
         <button onClick={() => navigate(-1)} className="p-2 -ml-2" aria-label="back">

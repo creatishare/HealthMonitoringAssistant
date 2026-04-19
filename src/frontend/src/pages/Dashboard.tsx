@@ -217,7 +217,7 @@ export default function Dashboard() {
       {/* 今日打卡 */}
       <div className="card">
         <h2 className="text-card-title font-medium text-gray-text-primary mb-4">今日打卡</h2>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 md:grid-cols-3 gap-4">
           <div
             onClick={() => navigate('/records/new')}
             className={`p-4 rounded-lg text-center cursor-pointer transition-colors ${getCheckInClasses(
@@ -385,7 +385,7 @@ export default function Dashboard() {
         </div>
 
         {/* 趋势图 */}
-        <div className="h-48">
+        <div className="h-48 md:h-64">
           {trendLoading ? (
             <div className="flex justify-center py-12">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
@@ -458,7 +458,7 @@ export default function Dashboard() {
             查看全部 <ChevronRight size={16} />
           </button>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {recentMetrics.map((metric: any) => (
             <div
               key={metric.key}

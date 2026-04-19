@@ -96,7 +96,7 @@ function BottomSelector({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex flex-col justify-end max-w-mobile mx-auto"
+      className="fixed inset-0 z-[60] flex flex-col justify-end w-full"
       onClick={onClose}
     >
       {/* 遮罩 */}
