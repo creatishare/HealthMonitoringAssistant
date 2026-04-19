@@ -65,17 +65,23 @@ export async function recognizeImage(req: Request, res: Response, next: NextFunc
 export async function confirmOCRResult(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = req.user?.userId;
-    const { imageId, recordDate, data, notes } = req.body;
+    const { imageId, imageIds, recordDate, data, notes } = req.body;
 
     if (!userId) {
       throw new ApiError('未登录', 401, '01007');
     }
 
-    if (!imageId || !recordDate || !data) {
+    if (!recordDate || !data) {
       throw new ApiError('缺少必要参数', 400, '00002');
     }
 
-    const result = await ocrService.confirmOCRResult(userId, imageId, {
+    // 兼容单图（imageId）和多图（imageIds）两种模式
+    const ids = imageIds || (imageId ? [imageId] : []);
+    if (ids.length === 0) {
+      throw new ApiError('缺少图片ID', 400, '00002');
+    }
+
+    const result = await ocrService.confirmOCRResult(userId, ids, {
       recordDate,
       extractedData: data,
       notes,

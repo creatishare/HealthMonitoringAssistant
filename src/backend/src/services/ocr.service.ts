@@ -186,22 +186,23 @@ export async function recognizeImage(imageId: string): Promise<OCRResult> {
   }
 }
 
-// 确认并保存OCR结果
+// 确认并保存OCR结果（支持单图和多图）
 export async function confirmOCRResult(
   userId: string,
-  imageId: string,
+  imageIds: string[],
   data: {
     recordDate: string;
     extractedData: Record<string, number>;
     notes?: string;
   }
 ) {
-  const report = await prisma.labReport.findFirst({
-    where: { id: imageId, userId },
+  // 验证所有图片存在且属于当前用户
+  const reports = await prisma.labReport.findMany({
+    where: { id: { in: imageIds }, userId },
   });
 
-  if (!report) {
-    throw new AppError('图片不存在', 404, '00003');
+  if (reports.length !== imageIds.length) {
+    throw new AppError('部分图片不存在或无权限', 404, '00003');
   }
 
   // 创建健康记录
@@ -223,16 +224,16 @@ export async function confirmOCRResult(
     },
   });
 
-  // 更新报告关联
-  await prisma.labReport.update({
-    where: { id: imageId },
+  // 更新所有报告关联到同一条健康记录
+  await prisma.labReport.updateMany({
+    where: { id: { in: imageIds } },
     data: {
       healthRecordId: healthRecord.id,
       extractedData: data.extractedData as any,
     },
   });
 
-  logger.info(`OCR结果已确认并保存: ${healthRecord.id}`);
+  logger.info(`OCR结果已确认并保存: ${healthRecord.id}, 关联图片: ${imageIds.length} 张`);
 
   return {
     recordId: healthRecord.id,
