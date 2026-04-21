@@ -1,6 +1,57 @@
 # 开发日志 (Development Log)
 
 > 按日期记录每日开发内容、问题与解决方案、部署状态。
+> **阅读提示**：Agent 开始新任务前，请先阅读本日志最新条目和"开放问题"章节。
+
+---
+
+## 2026-04-21 — iOS 日期输入框修复 + 部署问题
+
+### 今日完成
+
+1. **修复 iOS Safari 日期输入框溢出**
+   - 问题：`input[type="date"]` 在 iOS Safari 中因 WebKit 默认样式，内部控件撑破 `.input-field` 的固定高度（`h-12` / 48px）
+   - 方案：`src/frontend/src/index.css` 添加全局 WebKit 重置
+     ```css
+     input[type="date"],
+     input[type="datetime-local"] {
+       -webkit-appearance: none;
+       appearance: none;
+     }
+     input[type="date"]::-webkit-date-and-time-value,
+     input[type="datetime-local"]::-webkit-date-and-time-value {
+       text-align: left;
+       line-height: 1.5;
+     }
+     ```
+   - 涉及文件：`src/frontend/src/index.css`
+
+2. **前端部署（过程中踩坑）**
+   - 提交 `28014b0` 已推送至 GitHub
+   - 服务器上 `git pull` 因阿里云到 GitHub 443 超时失败
+   - 删除旧镜像后 `docker-compose up -d` 报错 `No such image`（Compose 缓存引用已删除的 SHA256 层）
+   - 解决：`docker-compose rm -f frontend` 清理容器引用 + `docker-compose build --no-cache frontend` 重新构建
+
+### 新增已知问题（P0）
+
+**SPA 路由刷新 404**
+- 现象：从首页（`/`）正常进入应用，点击导航到其他页面（如 `/records`、`/medications`）正常，但在这些页面按 F5 刷新或直接访问 URL 时报 nginx 404
+- 根因：React Router 是客户端路由，所有路径实际都由 `index.html` 内的 JS 处理。当前 nginx 配置 `location / { proxy_pass http://frontend/; }` 将非根路径请求转发到 frontend 容器，但 frontend 容器（nginx 静态服务器）没有 `/records/index.html` 等物理文件，返回 404
+- 解决方案（待实施）：
+  1. 外层 nginx（`nginx/default.conf`）添加 `try_files`：
+     ```nginx
+     location / {
+         proxy_pass http://frontend/;
+         # 如果 frontend 返回 404，回退到 index.html
+         proxy_intercept_errors on;
+         error_page 404 = @spa_fallback;
+     }
+     location @spa_fallback {
+         proxy_pass http://frontend/index.html;
+     }
+     ```
+  2. 或更简洁：frontend 容器自身 nginx 配置 `try_files $uri $uri/ /index.html;`
+- 涉及文件：`nginx/default.conf`、`src/frontend/Dockerfile`（如需修改 frontend 容器内 nginx 配置）
 
 ---
 
@@ -191,3 +242,49 @@
    - AuthStore 需从 `response.data.data.tokens` 提取 token
 
 ---
+
+---
+
+## 2026-04-21 — SPA路由404修复
+
+### 今日完成
+
+**修复SPA路由刷新404问题**
+
+- **问题**: React Router客户端路由在非首页路径（如 `/records`、`/medications`）刷新或直接访问时报nginx 404
+- **根因**: frontend容器使用nginx默认配置，没有配置`try_files`回退到`index.html`
+- **方案**: 前端容器添加自定义nginx配置
+  
+**修改文件**:
+1. `src/frontend/nginx.conf` (新增) - 自定义Nginx配置，支持SPA路由
+   ```nginx
+   server {
+       listen 80;
+       root /usr/share/nginx/html;
+       index index.html;
+
+       location / {
+           try_files $uri $uri/ /index.html;
+       }
+   }
+   ```
+
+2. `src/frontend/Dockerfile` (修改) - 复制自定义配置到容器
+   ```dockerfile
+   COPY nginx.conf /etc/nginx/conf.d/default.conf
+   ```
+
+**部署说明**:
+```bash
+# 重新构建前端镜像
+docker-compose down
+docker rmi healthmonitoringassistant_frontend:latest
+docker-compose build --no-cache frontend
+docker-compose up -d
+```
+
+**验证方式**:
+1. 访问首页 `/` 正常
+2. 点击导航到 `/records` 正常
+3. 在 `/records` 页面按 F5 刷新，应正常显示而非404
+
