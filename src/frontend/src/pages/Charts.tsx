@@ -66,131 +66,123 @@ export default function Charts() {
   const hasRange = range?.min != null && range?.max != null
 
   const recommended = getRecommendedMetrics(user?.userType, user?.primaryDisease)
-  const visibleMetrics = showMoreMetrics
-    ? ALL_METRICS
-    : ALL_METRICS.filter(m => recommended.includes(m.key))
+  const visibleMetrics = showMoreMetrics ? ALL_METRICS : ALL_METRICS.filter((m) => recommended.includes(m.key))
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-4">
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2">
-          <ChevronLeft size={24} className="text-gray-text-primary" />
+    <div className="page-shell">
+      <div className="page-header-compact">
+        <button onClick={() => navigate(-1)} className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-border bg-white/65 text-gray-text-primary backdrop-blur-xl dark:bg-white/5">
+          <ChevronLeft size={20} />
         </button>
-        <h1 className="text-page-title font-semibold text-gray-text-primary">趋势图表</h1>
+        <div>
+          <p className="section-kicker">长期观察</p>
+          <h1 className="mt-2 text-page-title text-gray-text-primary">趋势图表</h1>
+        </div>
       </div>
 
-      {/* 指标选择 */}
-      <div className="card">
-        <div className="flex flex-wrap gap-2">
+      <section className="card">
+        <div className="page-header">
+          <div>
+            <h2 className="text-card-title text-gray-text-primary">选择关注指标</h2>
+            <p className="mt-1 text-helper text-gray-text-secondary">先显示与你当前用户类型最相关的指标，其余指标可按需展开。</p>
+          </div>
+          <button onClick={() => setShowMoreMetrics((v) => !v)} className={`chip ${showMoreMetrics ? 'chip-active' : ''}`}>
+            {showMoreMetrics ? '收起全部' : '展开更多'}
+          </button>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
           {visibleMetrics.map((metric) => (
             <button
               key={metric.key}
               onClick={() => setSelectedMetric(metric)}
-              className={`px-3 py-1.5 rounded-full text-small transition-colors ${
-                selectedMetric.key === metric.key
-                  ? 'text-white'
-                  : 'bg-gray-bg text-gray-secondary border border-gray-border'
-              }`}
-              style={{
-                backgroundColor: selectedMetric.key === metric.key ? metric.color : undefined
-              }}
+              className={`chip ${selectedMetric.key === metric.key ? 'chip-active' : ''}`}
+              style={selectedMetric.key === metric.key ? { backgroundColor: metric.color } : undefined}
             >
               {metric.name}
             </button>
           ))}
-          <button
-            onClick={() => setShowMoreMetrics(v => !v)}
-            className={`px-3 py-1.5 rounded-full text-small transition-colors ${
-              showMoreMetrics
-                ? 'text-white bg-primary'
-                : 'bg-gray-bg text-gray-secondary border border-gray-border'
-            }`}
-          >
-            {showMoreMetrics ? '收起' : '更多'}
-          </button>
         </div>
-      </div>
+      </section>
 
-      {/* 时间范围选择 */}
-      <div className="card">
-        <div className="flex gap-2">
+      <section className="card">
+        <div className="page-header">
+          <div>
+            <h2 className="text-card-title text-gray-text-primary">观察时间</h2>
+            <p className="mt-1 text-helper text-gray-text-secondary">切换不同周期，观察波动范围和变化速度。</p>
+          </div>
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-2">
           {timeRanges.map((range) => (
             <button
               key={range.label}
               onClick={() => setSelectedRange(range)}
-              className={`flex-1 py-2 rounded-lg text-small ${
+              className={`rounded-[18px] px-3 py-3 text-helper font-medium transition-all ${
                 selectedRange.label === range.label
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 text-gray-secondary'
+                  ? 'bg-primary text-white shadow-[0_12px_24px_rgba(62,99,221,0.22)]'
+                  : 'border border-gray-border bg-white/65 text-gray-text-secondary backdrop-blur-xl dark:bg-white/5'
               }`}
             >
               {range.label}
             </button>
           ))}
         </div>
-      </div>
+      </section>
 
-      {/* 图表 */}
-      <div className="card">
-        <div className="flex items-center gap-2 mb-4">
-          <TrendingUp size={20} className="text-primary" />
-          <h2 className="text-card-title font-medium text-gray-text-primary">
-            {selectedMetric.name}趋势
-          </h2>
-          <span className="text-small text-gray-secondary">({selectedMetric.unit})</span>
+      <section className="card overflow-hidden">
+        <div className="page-header">
+          <div>
+            <p className="section-kicker">图表</p>
+            <h2 className="mt-2 flex items-center gap-2 text-card-title text-gray-text-primary">
+              <TrendingUp size={18} className="text-primary" />
+              {selectedMetric.name}趋势
+            </h2>
+            <p className="mt-1 text-helper text-gray-text-secondary">当前单位：{selectedMetric.unit}</p>
+          </div>
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <div className="flex justify-center py-16">
+            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
           </div>
         ) : data.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-secondary">暂无数据</p>
+          <div className="flex min-h-[280px] flex-col items-center justify-center text-center text-gray-text-secondary">
+            <TrendingUp size={42} className="mb-3 opacity-25" />
+            <p className="text-body">暂无数据</p>
+            <p className="mt-1 text-small">录入更多健康记录后再回来查看。</p>
           </div>
         ) : (
-          <div className="h-64">
+          <div className="mt-4 h-72 md:h-80">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E5E5" />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(145,161,196,0.28)" />
                 <XAxis
                   dataKey="date"
-                  tick={{ fontSize: 12 }}
+                  tick={{ fontSize: 12, fill: '#8A94AB' }}
                   tickFormatter={(value) => {
                     const date = new Date(value)
                     return `${date.getMonth() + 1}/${date.getDate()}`
                   }}
                 />
-                <YAxis tick={{ fontSize: 12 }} domain={['auto', 'auto']} />
+                <YAxis tick={{ fontSize: 12, fill: '#8A94AB' }} domain={['auto', 'auto']} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#fff',
-                    border: '1px solid #E5E5E5',
-                    borderRadius: '8px',
+                    backgroundColor: 'rgba(255,255,255,0.96)',
+                    border: '1px solid rgba(145,161,196,0.24)',
+                    borderRadius: '16px',
                   }}
                   formatter={(value: any) => [`${value} ${selectedMetric.unit}`, selectedMetric.name]}
                 />
                 {hasRange && (
                   <>
-                    <ReferenceLine
-                      y={range.max}
-                      stroke="#F5222D"
-                      strokeDasharray="3 3"
-                      label={{ value: '上限', fill: '#F5222D', fontSize: 12 }}
-                    />
-                    <ReferenceLine
-                      y={range.min}
-                      stroke="#52C41A"
-                      strokeDasharray="3 3"
-                      label={{ value: '下限', fill: '#52C41A', fontSize: 12 }}
-                    />
+                    <ReferenceLine y={range.max} stroke="#D9485F" strokeDasharray="4 4" label={{ value: '上限', fill: '#D9485F', fontSize: 12 }} />
+                    <ReferenceLine y={range.min} stroke="#2F9E6D" strokeDasharray="4 4" label={{ value: '下限', fill: '#2F9E6D', fontSize: 12 }} />
                   </>
                 )}
                 <Line
                   type="monotone"
                   dataKey={selectedMetric.key}
                   stroke={selectedMetric.color}
-                  strokeWidth={2}
+                  strokeWidth={2.5}
                   dot={{ fill: selectedMetric.color, strokeWidth: 0, r: 4 }}
                   activeDot={{ r: 6 }}
                 />
@@ -198,25 +190,25 @@ export default function Charts() {
             </ResponsiveContainer>
           </div>
         )}
-      </div>
+      </section>
 
-      {/* 参考范围说明 */}
       {hasRange && (
-        <div className="card">
-          <h3 className="text-body font-medium text-gray-text-primary mb-3">参考范围</h3>
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-success"></div>
-              <span className="text-small text-gray-secondary">
-                正常范围: {range.min} - {range.max} {selectedMetric.unit}
-              </span>
+        <section className="card">
+          <div>
+            <p className="section-kicker">参考值</p>
+            <h3 className="mt-2 text-card-title text-gray-text-primary">参考范围</h3>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="metric-panel border border-success/20 bg-emerald-50/80 dark:bg-emerald-950/20">
+              <p className="text-small font-medium text-success">正常范围</p>
+              <p className="mt-2 text-body text-gray-text-primary">{range.min} - {range.max} {selectedMetric.unit}</p>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-danger"></div>
-              <span className="text-small text-gray-secondary">超出正常范围</span>
+            <div className="metric-panel border border-danger/20 bg-red-50/80 dark:bg-red-950/20">
+              <p className="text-small font-medium text-danger">超出范围</p>
+              <p className="mt-2 text-body text-gray-text-primary">高于上限或低于下限时，请结合医生建议判断。</p>
             </div>
           </div>
-        </div>
+        </section>
       )}
     </div>
   )

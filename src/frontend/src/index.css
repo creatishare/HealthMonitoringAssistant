@@ -4,25 +4,23 @@
 
 @layer base {
   :root {
-    /* 浅色模式颜色变量 */
-    --color-bg: #F5F5F5;
-    --color-card: #FFFFFF;
-    --color-text-primary: #262626;
-    --color-text-secondary: #595959;
-    --color-text-helper: #8C8C8C;
-    --color-border: #D9D9D9;
-    --color-disabled: #BFBFBF;
+    --color-bg: #f4f6fb;
+    --color-card: rgba(255, 255, 255, 0.82);
+    --color-text-primary: #1f2a44;
+    --color-text-secondary: #5e6b85;
+    --color-text-helper: #8a94ab;
+    --color-border: rgba(145, 161, 196, 0.26);
+    --color-disabled: #b2bccf;
   }
 
   .dark {
-    /* 深色模式颜色变量 */
-    --color-bg: #141414;
-    --color-card: #1F1F1F;
-    --color-text-primary: #E6E6E6;
-    --color-text-secondary: #B3B3B3;
-    --color-text-helper: #808080;
-    --color-border: #434343;
-    --color-disabled: #555555;
+    --color-bg: #0f1728;
+    --color-card: rgba(18, 28, 48, 0.82);
+    --color-text-primary: #eef3ff;
+    --color-text-secondary: #b5c0d8;
+    --color-text-helper: #7f8aa7;
+    --color-border: rgba(139, 160, 206, 0.18);
+    --color-disabled: #54627f;
   }
 
   * {
@@ -37,19 +35,28 @@
 
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
-    background-color: var(--color-bg);
+    background:
+      radial-gradient(circle at top left, rgba(107, 138, 255, 0.12), transparent 28%),
+      radial-gradient(circle at top right, rgba(101, 194, 173, 0.12), transparent 22%),
+      linear-gradient(180deg, #f8faff 0%, var(--color-bg) 100%);
     color: var(--color-text-primary);
     min-height: 100vh;
+  }
+
+  .dark body {
+    background:
+      radial-gradient(circle at top left, rgba(90, 114, 255, 0.18), transparent 26%),
+      radial-gradient(circle at top right, rgba(68, 186, 158, 0.16), transparent 22%),
+      linear-gradient(180deg, #121b2f 0%, var(--color-bg) 100%);
   }
 
   #root {
     min-height: 100vh;
     width: 100%;
     margin: 0 auto;
-    background-color: var(--color-bg);
+    background: transparent;
   }
 
-  /* iOS date/datetime 输入框默认样式重置，防止超出固定高度容器 */
   input[type="date"],
   input[type="datetime-local"] {
     -webkit-appearance: none;
@@ -62,74 +69,105 @@
     line-height: 1.5;
   }
 
-  /* 桌面端限制最大宽度，手机端完全自适应 */
   @media (min-width: 768px) {
     #root {
-      max-width: 1200px;
+      max-width: 1440px;
     }
   }
 }
 
 @layer components {
+  .page-shell {
+    @apply space-y-5 md:space-y-6;
+  }
+
+  .page-header {
+    @apply flex items-start justify-between gap-4;
+  }
+
+  .page-header-compact {
+    @apply flex items-center gap-4;
+  }
+
   .btn-primary {
-    @apply h-12 px-4 bg-primary text-white rounded-button font-medium text-body;
-    @apply hover:bg-primary-dark transition-colors duration-150;
-    @apply disabled:bg-gray-disabled disabled:cursor-not-allowed;
+    @apply inline-flex h-12 items-center justify-center gap-2 rounded-button px-5 text-body font-medium text-white;
+    @apply bg-primary shadow-[0_10px_24px_rgba(62,99,221,0.22)] transition-all duration-200;
+    @apply hover:-translate-y-0.5 hover:bg-primary-dark hover:shadow-[0_14px_32px_rgba(62,99,221,0.28)];
+    @apply disabled:translate-y-0 disabled:bg-gray-disabled disabled:shadow-none disabled:cursor-not-allowed;
   }
 
   .btn-secondary {
-    @apply h-12 px-4 bg-gray-card text-primary border border-primary rounded-button font-medium text-body;
-    @apply hover:bg-primary-light transition-colors duration-150;
+    @apply inline-flex h-12 items-center justify-center gap-2 rounded-button border border-gray-border px-5 text-body font-medium text-gray-text-primary;
+    @apply bg-gray-card backdrop-blur-xl transition-all duration-200;
+    @apply hover:-translate-y-0.5 hover:border-primary/30 hover:bg-white/90 dark:hover:bg-slate-900/70;
   }
 
   .btn-medication {
-    @apply h-12 px-4 bg-medication text-white rounded-button font-medium text-body;
-    @apply hover:opacity-90 transition-opacity duration-150;
+    @apply inline-flex h-12 items-center justify-center gap-2 rounded-button px-5 text-body font-medium text-white;
+    @apply bg-medication shadow-[0_10px_24px_rgba(111,91,211,0.25)] transition-all duration-200;
+    @apply hover:-translate-y-0.5 hover:opacity-95;
   }
 
   .input-field {
-    @apply h-12 px-4 bg-gray-card border border-gray-border rounded-input text-body text-gray-text-primary;
+    @apply h-12 w-full rounded-input border border-gray-border bg-gray-card px-4 text-body text-gray-text-primary backdrop-blur-xl;
     @apply focus:outline-none focus:border-primary focus:shadow-input-focus;
     @apply placeholder:text-gray-text-helper;
   }
 
   .card {
-    @apply bg-gray-card rounded-card p-4 shadow-card;
+    @apply rounded-card border border-gray-border bg-gray-card p-4 shadow-card backdrop-blur-xl md:p-5;
+  }
+
+  .card-muted {
+    @apply rounded-card border border-gray-border bg-white/52 p-4 backdrop-blur-xl dark:bg-slate-900/36;
   }
 
   .card-medication {
-    @apply bg-gray-card rounded-card p-4 shadow-card border-l-4 border-medication;
-    @apply bg-gradient-to-r from-medication-light to-transparent;
+    @apply rounded-card border border-medication/15 bg-gradient-to-br from-medication-light via-white/95 to-white/75 p-4 shadow-card backdrop-blur-xl md:p-5;
   }
 
   .dark .card-medication {
-    --tw-gradient-from: rgba(114, 46, 209, 0.1) var(--tw-gradient-from-position);
-    --tw-gradient-to: rgba(114, 46, 209, 0) var(--tw-gradient-to-position);
-    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+    background-image: linear-gradient(135deg, rgba(111, 91, 211, 0.2), rgba(18, 28, 48, 0.85) 48%, rgba(18, 28, 48, 0.72));
   }
 
   .card-alert-critical {
-    @apply bg-gray-card rounded-card p-4 shadow-card border-l-4 border-danger;
-    @apply bg-red-50 dark:bg-red-900/20;
+    @apply rounded-card border border-danger/20 bg-red-50/85 p-4 shadow-card backdrop-blur-xl dark:bg-red-950/25;
   }
 
   .card-alert-warning {
-    @apply bg-gray-card rounded-card p-4 shadow-card border-l-4 border-warning;
-    @apply bg-yellow-50 dark:bg-yellow-900/20;
+    @apply rounded-card border border-warning/20 bg-yellow-50/85 p-4 shadow-card backdrop-blur-xl dark:bg-yellow-950/20;
   }
 
   .card-alert-info {
-    @apply bg-gray-card rounded-card p-4 shadow-card border-l-4 border-primary;
-    @apply bg-blue-50 dark:bg-blue-900/20;
+    @apply rounded-card border border-primary/20 bg-primary-light/70 p-4 shadow-card backdrop-blur-xl dark:bg-primary/10;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border border-gray-border bg-white/70 px-3 py-1.5 text-small text-gray-text-secondary backdrop-blur-xl transition-all duration-200 dark:bg-slate-900/40;
+  }
+
+  .chip-active {
+    @apply border-transparent bg-primary text-white shadow-[0_10px_24px_rgba(62,99,221,0.2)];
+  }
+
+  .section-kicker {
+    @apply text-small font-semibold uppercase tracking-[0.18em] text-gray-text-helper;
+  }
+
+  .metric-panel {
+    @apply rounded-[22px] border border-gray-border bg-white/60 px-4 py-4 backdrop-blur-xl transition-all duration-200 dark:bg-slate-900/30;
+  }
+
+  .metric-panel:hover {
+    @apply border-primary/20;
   }
 
   .nav-item {
-    @apply flex flex-col items-center justify-center text-gray-text-helper;
-    @apply hover:text-primary transition-colors duration-150;
+    @apply flex flex-col items-center justify-center rounded-2xl px-3 py-2 text-gray-text-helper transition-all duration-200;
   }
 
   .nav-item.active {
-    @apply text-primary;
+    @apply bg-white/80 text-primary shadow-[0_10px_22px_rgba(62,99,221,0.16)] dark:bg-white/10;
   }
 }
 

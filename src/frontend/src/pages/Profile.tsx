@@ -21,52 +21,50 @@ export default function Profile() {
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-page-title font-semibold text-gray-text-primary">个人中心</h1>
-
-      {/* 用户信息卡片 */}
-      <div className="card bg-gradient-to-r from-primary to-primary-dark text-white">
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
-            <User size={32} className="text-white" />
-          </div>
-          <div>
-            <h2 className="text-card-title font-medium">用户</h2>
-            <p className="text-small text-white/80 mt-1">完善个人档案，获取更精准的健康建议</p>
-          </div>
-        </div>
+    <div className="page-shell">
+      <div>
+        <p className="section-kicker">账户</p>
+        <h1 className="mt-2 text-page-title text-gray-text-primary">个人中心</h1>
       </div>
 
-      {/* 功能菜单 */}
-      <div className="card p-0 overflow-hidden">
-        {menuItems.map((item, index) => (
+      <section className="card overflow-hidden p-0">
+        <div className="bg-gradient-to-br from-primary/12 via-white/75 to-emerald-50/70 p-6 dark:from-primary/20 dark:via-white/5 dark:to-emerald-950/20">
+          <div className="flex items-center gap-4">
+            <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-primary text-white shadow-[0_14px_28px_rgba(62,99,221,0.24)]">
+              <User size={30} />
+            </div>
+            <div>
+              <h2 className="text-card-title text-gray-text-primary">用户</h2>
+              <p className="mt-1 text-helper text-gray-text-secondary">完善个人档案，获得更贴近自身情况的提醒和展示。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="card p-2">
+        {menuItems.map((item) => (
           <button
             key={item.path}
             onClick={() => navigate(item.path)}
-            className={`w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors ${
-              index !== menuItems.length - 1 ? 'border-b border-gray-border' : ''
-            }`}
+            className="flex w-full items-center justify-between rounded-[20px] p-3 text-left transition-colors hover:bg-white/70 dark:hover:bg-white/5"
           >
             <div className="flex items-center gap-3">
-              <item.icon size={20} className="text-gray-secondary" />
-              <span className="text-body text-gray-text-primary">{item.label}</span>
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <item.icon size={18} />
+              </span>
+              <span className="text-body font-medium text-gray-text-primary">{item.label}</span>
             </div>
-            <ChevronRight size={20} className="text-gray-secondary" />
+            <ChevronRight size={18} className="text-gray-text-helper" />
           </button>
         ))}
-      </div>
+      </section>
 
-      {/* 退出登录 */}
-      <button
-        onClick={handleLogout}
-        className="card w-full flex items-center justify-center gap-2 text-danger hover:bg-red-50 transition-colors"
-      >
+      <button onClick={handleLogout} className="card flex w-full items-center justify-center gap-2 text-danger transition-colors hover:bg-red-50/80 dark:hover:bg-red-950/20">
         <LogOut size={20} />
-        <span className="text-body">退出登录</span>
+        <span className="text-body font-medium">退出登录</span>
       </button>
 
-      {/* 版本信息 */}
-      <p className="text-center text-small text-gray-helper">健康监测助手 v1.0.0</p>
+      <p className="text-center text-small text-gray-text-helper">健康监测助手 v1.0.0</p>
     </div>
   )
 }

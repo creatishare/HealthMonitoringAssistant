@@ -9,16 +9,17 @@ export default {
     extend: {
       colors: {
         primary: {
-          DEFAULT: '#1890FF',
-          dark: '#096DD9',
-          light: '#E6F7FF',
+          DEFAULT: '#3E63DD',
+          dark: '#2F4FB8',
+          light: '#E8EEFF',
+          soft: '#F4F7FF',
         },
-        success: '#52C41A',
-        warning: '#FAAD14',
-        danger: '#F5222D',
+        success: '#2F9E6D',
+        warning: '#D98E04',
+        danger: '#D9485F',
         medication: {
-          DEFAULT: '#722ED1',
-          light: '#F9F0FF',
+          DEFAULT: '#6F5BD3',
+          light: '#F1EEFF',
         },
         gray: {
           bg: 'var(--color-bg)',
@@ -36,13 +37,13 @@ export default {
         sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'Noto Sans', 'PingFang SC', 'Microsoft YaHei', 'sans-serif'],
       },
       fontSize: {
-        'title': ['24px', { lineHeight: '1.4', fontWeight: '600' }],
-        'page-title': ['20px', { lineHeight: '1.4', fontWeight: '600' }],
-        'card-title': ['18px', { lineHeight: '1.5', fontWeight: '500' }],
-        'body': ['16px', { lineHeight: '1.6' }],
-        'helper': ['14px', { lineHeight: '1.5' }],
+        'title': ['30px', { lineHeight: '1.2', fontWeight: '700' }],
+        'page-title': ['22px', { lineHeight: '1.3', fontWeight: '650' }],
+        'card-title': ['18px', { lineHeight: '1.45', fontWeight: '600' }],
+        'body': ['16px', { lineHeight: '1.65' }],
+        'helper': ['14px', { lineHeight: '1.55' }],
         'small': ['12px', { lineHeight: '1.5' }],
-        'metric': ['28px', { lineHeight: '1.4', fontWeight: '600' }],
+        'metric': ['30px', { lineHeight: '1.15', fontWeight: '700' }],
       },
       spacing: {
         'xs': '4px',
@@ -54,14 +55,14 @@ export default {
         '3xl': '48px',
       },
       borderRadius: {
-        'card': '12px',
-        'button': '8px',
-        'input': '8px',
+        'card': '24px',
+        'button': '16px',
+        'input': '18px',
       },
       boxShadow: {
-        'card': '0 2px 8px rgba(0,0,0,0.08)',
-        'nav': '0 -2px 8px rgba(0,0,0,0.05)',
-        'input-focus': '0 0 0 2px rgba(24,144,255,0.2)',
+        'card': '0 18px 45px rgba(25, 36, 68, 0.08)',
+        'nav': '0 18px 40px rgba(25, 36, 68, 0.12)',
+        'input-focus': '0 0 0 4px rgba(62, 99, 221, 0.14)',
       },
       maxWidth: {
         'mobile': '480px',

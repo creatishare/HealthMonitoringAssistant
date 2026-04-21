@@ -13,9 +13,9 @@ const ICONS: Record<HealthInsight['severity'], typeof Info> = {
 }
 
 const COLORS: Record<HealthInsight['severity'], string> = {
-  info: 'text-primary bg-blue-50 dark:bg-blue-900/20',
-  warning: 'text-warning bg-yellow-50 dark:bg-yellow-900/20',
-  critical: 'text-danger bg-red-50 dark:bg-red-900/20',
+  info: 'text-primary bg-primary/10',
+  warning: 'text-warning bg-yellow-100 dark:bg-yellow-950/30',
+  critical: 'text-danger bg-red-100 dark:bg-red-950/30',
 }
 
 export default function HealthInsightsPage() {
@@ -41,11 +41,9 @@ export default function HealthInsightsPage() {
 
       const records = recordsRes.data?.list ?? []
       const logs = logsRes.data?.list ?? []
-
-      // 构造 checkIns（从 dashboard 数据中提取最近 30 天的打卡记录）
       const checkIns: Array<{ date: string; weight?: number; systolic?: number; diastolic?: number }> = []
 
-      const report = generateInsightReport(
+      const nextReport = generateInsightReport(
         {
           userType,
           records,
@@ -61,7 +59,7 @@ export default function HealthInsightsPage() {
         14
       )
 
-      setReport(report)
+      setReport(nextReport)
     } catch (err: any) {
       toast.error('分析数据加载失败')
     } finally {
@@ -85,24 +83,25 @@ export default function HealthInsightsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-bg flex items-center justify-center">
-        <div className="text-gray-text-secondary text-helper">正在分析健康数据...</div>
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-helper text-gray-text-secondary">正在分析健康数据...</div>
       </div>
     )
   }
 
   if (!report || !grouped) {
     return (
-      <div className="min-h-screen bg-gray-bg">
-        <header className="sticky top-0 z-40 bg-gray-card/80 backdrop-blur-md border-b border-gray-border">
-          <div className="w-full mx-auto px-4 h-14 flex items-center gap-3">
-            <button aria-label="back" onClick={() => navigate(-1)} className="p-2 -ml-2">
-              <ArrowLeft size={20} className="text-gray-text-primary" />
-            </button>
-            <h1 className="text-page-title text-gray-text-primary">健康洞察</h1>
+      <div className="page-shell">
+        <div className="page-header-compact">
+          <button aria-label="back" onClick={() => navigate(-1)} className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-border bg-white/65 text-gray-text-primary backdrop-blur-xl dark:bg-white/5">
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <p className="section-kicker">本地分析</p>
+            <h1 className="mt-2 text-page-title text-gray-text-primary">健康洞察</h1>
           </div>
-        </header>
-        <div className="w-full mx-auto p-6 text-center text-gray-text-secondary text-helper">
+        </div>
+        <div className="card py-12 text-center text-helper text-gray-text-secondary">
           暂无足够数据生成分析报告，建议先记录更多健康指标。
         </div>
       </div>
@@ -110,89 +109,81 @@ export default function HealthInsightsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-bg pb-8">
-      <header className="sticky top-0 z-40 bg-gray-card/80 backdrop-blur-md border-b border-gray-border">
-        <div className="w-full mx-auto px-4 h-14 flex items-center gap-3">
-          <button aria-label="back" onClick={() => navigate(-1)} className="p-2 -ml-2">
-            <ArrowLeft size={20} className="text-gray-text-primary" />
-          </button>
-          <h1 className="text-page-title text-gray-text-primary">健康洞察</h1>
+    <div className="page-shell">
+      <div className="page-header-compact">
+        <button aria-label="back" onClick={() => navigate(-1)} className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-border bg-white/65 text-gray-text-primary backdrop-blur-xl dark:bg-white/5">
+          <ArrowLeft size={20} />
+        </button>
+        <div>
+          <p className="section-kicker">本地分析</p>
+          <h1 className="mt-2 text-page-title text-gray-text-primary">健康洞察</h1>
         </div>
-      </header>
-
-      <div className="w-full mx-auto px-4 py-4 space-y-4">
-        {/* 顶部免责声明 */}
-        <div className="flex items-start gap-2 rounded-card bg-yellow-50 dark:bg-yellow-900/20 p-3 text-small text-warning">
-          <ShieldAlert size={16} className="shrink-0 mt-0.5" />
-          <span>
-            以下分析仅基于您记录的数据进行统计整理，仅供参考，不能替代医生的专业诊断和治疗建议。
-          </span>
-        </div>
-
-        {/* 关键异常警告 */}
-        {report.hasCriticalAnomaly && (
-          <div className="rounded-card bg-red-50 dark:bg-red-900/20 p-4 text-danger flex items-start gap-3">
-            <AlertCircle size={20} className="shrink-0 mt-0.5" />
-            <div>
-              <div className="font-medium text-body">检测到关键指标异常</div>
-              <div className="text-helper mt-1">
-                部分指标明显偏离正常参考范围，建议尽快联系主治医生复查。
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 摘要 */}
-        {grouped.summary.map((insight) => (
-          <InsightCard key={insight.title} insight={insight} />
-        ))}
-
-        {/* 异常指标 */}
-        {grouped.anomalies.length > 0 && (
-          <Section title="指标异常提醒" icon={AlertTriangle}>
-            {grouped.anomalies.map((insight) => (
-              <InsightCard key={insight.title} insight={insight} />
-            ))}
-          </Section>
-        )}
-
-        {/* 用药依从性 */}
-        {grouped.adherence.length > 0 && (
-          <Section title="用药分析" icon={Pill}>
-            {grouped.adherence.map((insight) => (
-              <InsightCard key={insight.title} insight={insight} />
-            ))}
-          </Section>
-        )}
-
-        {/* 趋势分析 */}
-        {grouped.trends.length > 0 && (
-          <Section title="指标趋势" icon={TrendingUp}>
-            {grouped.trends.map((insight) => (
-              <InsightCard key={insight.title} insight={insight} />
-            ))}
-          </Section>
-        )}
-
-        {report.insights.length === 1 && (
-          <div className="text-center text-gray-text-secondary text-helper py-8">
-            暂无更多可分析的数据，建议持续记录健康指标以获得更全面的洞察。
-          </div>
-        )}
       </div>
+
+      <div className="card-alert-warning flex items-start gap-3">
+        <ShieldAlert size={18} className="mt-0.5 shrink-0 text-warning" />
+        <span className="text-helper text-gray-text-primary">以下分析仅基于您记录的数据进行统计整理，仅供参考，不能替代医生的专业诊断和治疗建议。</span>
+      </div>
+
+      {report.hasCriticalAnomaly && (
+        <div className="card-alert-critical flex items-start gap-3">
+          <AlertCircle size={20} className="mt-0.5 shrink-0 text-danger" />
+          <div>
+            <div className="text-body font-medium text-gray-text-primary">检测到关键指标异常</div>
+            <div className="mt-1 text-helper text-gray-text-secondary">部分指标明显偏离正常参考范围，建议尽快联系主治医生复查。</div>
+          </div>
+        </div>
+      )}
+
+      {grouped.summary.map((insight) => (
+        <InsightCard key={insight.title} insight={insight} />
+      ))}
+
+      {grouped.anomalies.length > 0 && (
+        <Section title="指标异常提醒" icon={AlertTriangle}>
+          {grouped.anomalies.map((insight) => (
+            <InsightCard key={insight.title} insight={insight} />
+          ))}
+        </Section>
+      )}
+
+      {grouped.adherence.length > 0 && (
+        <Section title="用药分析" icon={Pill}>
+          {grouped.adherence.map((insight) => (
+            <InsightCard key={insight.title} insight={insight} />
+          ))}
+        </Section>
+      )}
+
+      {grouped.trends.length > 0 && (
+        <Section title="指标趋势" icon={TrendingUp}>
+          {grouped.trends.map((insight) => (
+            <InsightCard key={insight.title} insight={insight} />
+          ))}
+        </Section>
+      )}
+
+      {report.insights.length === 1 && (
+        <div className="card py-10 text-center text-helper text-gray-text-secondary">
+          暂无更多可分析的数据，建议持续记录健康指标以获得更全面的洞察。
+        </div>
+      )}
     </div>
   )
 }
 
 function Section({ title, icon: Icon, children }: { title: string; icon: typeof Info; children: React.ReactNode }) {
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2 text-gray-text-primary font-medium text-body">
-        <Icon size={18} className="text-primary" />
-        {title}
+    <section className="space-y-3">
+      <div>
+        <p className="section-kicker">分析模块</p>
+        <div className="mt-2 flex items-center gap-2 text-card-title text-gray-text-primary">
+          <Icon size={18} className="text-primary" />
+          {title}
+        </div>
       </div>
       {children}
-    </div>
+    </section>
   )
 }
 
@@ -201,21 +192,17 @@ function InsightCard({ insight }: { insight: HealthInsight }) {
   const colorClass = COLORS[insight.severity]
 
   return (
-    <div className="bg-gray-card rounded-card p-4 space-y-2">
+    <div className="card">
       <div className="flex items-start gap-3">
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${colorClass}`}>
+        <div className={`flex h-10 w-10 items-center justify-center rounded-2xl shrink-0 ${colorClass}`}>
           <Icon size={18} />
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="font-medium text-body text-gray-text-primary">{insight.title}</div>
-          <p className="text-helper text-gray-text-secondary mt-1 leading-relaxed">{insight.content}</p>
+        <div className="min-w-0 flex-1">
+          <div className="text-body font-medium text-gray-text-primary">{insight.title}</div>
+          <p className="mt-1 text-helper leading-relaxed text-gray-text-secondary">{insight.content}</p>
         </div>
       </div>
-      {insight.disclaimer && (
-        <p className="text-small text-gray-text-helper border-t border-gray-border pt-2">
-          {insight.disclaimer}
-        </p>
-      )}
+      {insight.disclaimer && <p className="mt-3 border-t border-gray-border pt-3 text-small text-gray-text-helper">{insight.disclaimer}</p>}
     </div>
   )
 }

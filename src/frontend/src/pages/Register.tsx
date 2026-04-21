@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { Eye, EyeOff } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { authApi } from '../services/api'
 import toast from 'react-hot-toast'
@@ -14,6 +15,8 @@ export default function Register() {
   const [countdown, setCountdown] = useState(0)
   const [loading, setLoading] = useState(false)
   const [agreed, setAgreed] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const sendCode = async () => {
     if (!phone) {
@@ -35,7 +38,8 @@ export default function Register() {
         })
       }, 1000)
     } catch (error: any) {
-      toast.error(error.message || error.response?.data?.message || '发送失败')
+      const msg = error.response?.data?.message || error.message || '发送失败'
+      toast.error(msg)
     }
   }
 
@@ -116,24 +120,46 @@ export default function Register() {
 
         <div>
           <label className="block text-helper text-gray-secondary mb-2">密码</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="6-20位，包含字母和数字"
-            className="input-field w-full"
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="6-20位，包含字母和数字"
+              className="input-field w-full pr-12"
+            />
+            <button
+              type="button"
+              aria-label={showPassword ? '隐藏密码' : '显示密码'}
+              aria-pressed={showPassword}
+              onClick={() => setShowPassword((value) => !value)}
+              className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-gray-text-helper transition-colors hover:text-primary"
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
         </div>
 
         <div>
           <label className="block text-helper text-gray-secondary mb-2">确认密码</label>
-          <input
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="请再次输入密码"
-            className="input-field w-full"
-          />
+          <div className="relative">
+            <input
+              type={showConfirmPassword ? 'text' : 'password'}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="请再次输入密码"
+              className="input-field w-full pr-12"
+            />
+            <button
+              type="button"
+              aria-label={showConfirmPassword ? '隐藏密码' : '显示密码'}
+              aria-pressed={showConfirmPassword}
+              onClick={() => setShowConfirmPassword((value) => !value)}
+              className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-gray-text-helper transition-colors hover:text-primary"
+            >
+              {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
         </div>
 
         <label className="flex items-start gap-2 mt-4 cursor-pointer">

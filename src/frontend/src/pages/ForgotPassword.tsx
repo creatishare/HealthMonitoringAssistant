@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Eye, EyeOff } from 'lucide-react'
 import { authApi } from '../services/api'
 import toast from 'react-hot-toast'
 
@@ -10,6 +11,8 @@ export default function ForgotPassword() {
   const [verificationCode, setVerificationCode] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [countdown, setCountdown] = useState(0)
 
@@ -36,7 +39,7 @@ export default function ForgotPassword() {
       }, 1000)
       setStep('verify')
     } catch (error: any) {
-      toast.error(error.message || error.response?.data?.message || '发送失败')
+      toast.error(error.response?.data?.message || error.message || '发送失败')
     } finally {
       setLoading(false)
     }
@@ -82,7 +85,7 @@ export default function ForgotPassword() {
       toast.success('密码重置成功，请使用新密码登录')
       navigate('/login')
     } catch (error: any) {
-      toast.error(error.message || error.response?.data?.message || '重置失败')
+      toast.error(error.response?.data?.message || error.message || '重置失败')
     } finally {
       setLoading(false)
     }
@@ -184,24 +187,46 @@ export default function ForgotPassword() {
         <form onSubmit={handleResetSubmit} className="space-y-4">
           <div>
             <label className="block text-helper text-gray-secondary mb-2">新密码</label>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="请输入新密码（至少6位）"
-              className="input-field w-full"
-            />
+            <div className="relative">
+              <input
+                type={showNewPassword ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="请输入新密码（至少6位）"
+                className="input-field w-full pr-12"
+              />
+              <button
+                type="button"
+                aria-label={showNewPassword ? '隐藏密码' : '显示密码'}
+                aria-pressed={showNewPassword}
+                onClick={() => setShowNewPassword((value) => !value)}
+                className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-gray-text-helper transition-colors hover:text-primary"
+              >
+                {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           <div>
             <label className="block text-helper text-gray-secondary mb-2">确认密码</label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="请再次输入新密码"
-              className="input-field w-full"
-            />
+            <div className="relative">
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="请再次输入新密码"
+                className="input-field w-full pr-12"
+              />
+              <button
+                type="button"
+                aria-label={showConfirmPassword ? '隐藏密码' : '显示密码'}
+                aria-pressed={showConfirmPassword}
+                onClick={() => setShowConfirmPassword((value) => !value)}
+                className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-gray-text-helper transition-colors hover:text-primary"
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           <button

@@ -30,70 +30,55 @@ export default function Settings() {
   ]
 
   return (
-    <div className="space-y-4">
-      {/* 头部 */}
-      <div className="flex items-center gap-4">
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2">
-          <ChevronLeft size={24} className="text-gray-text-primary" />
+    <div className="page-shell">
+      <div className="page-header-compact">
+        <button onClick={() => navigate(-1)} className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-border bg-white/65 text-gray-text-primary backdrop-blur-xl dark:bg-white/5">
+          <ChevronLeft size={20} />
         </button>
-        <h1 className="text-page-title font-semibold text-gray-text-primary">系统设置</h1>
+        <div>
+          <p className="section-kicker">偏好</p>
+          <h1 className="mt-2 text-page-title text-gray-text-primary">系统设置</h1>
+        </div>
       </div>
 
-      {/* 设置列表 */}
-      <div className="card p-0 overflow-hidden">
-        {settingItems.map((item, index) => (
-          <div
-            key={item.label}
-            className={`w-full flex items-center justify-between p-4 ${
-              index !== settingItems.length - 1 ? 'border-b border-gray-border' : ''
-            }`}
-          >
+      <section className="card p-2">
+        {settingItems.map((item) => (
+          <div key={item.label} className="flex w-full items-center justify-between rounded-[20px] p-3">
             <div className="flex items-center gap-3">
-              <item.icon size={20} className="text-gray-secondary" />
-              <span className="text-body text-gray-text-primary">{item.label}</span>
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <item.icon size={18} />
+              </span>
+              <span className="text-body font-medium text-gray-text-primary">{item.label}</span>
             </div>
             {item.type === 'toggle' ? (
               <button
                 onClick={item.onToggle || (() => {})}
-                className={`w-12 h-6 rounded-full transition-colors ${
-                  item.value ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'
-                }`}
+                className={`h-7 w-12 rounded-full p-0.5 transition-colors ${item.value ? 'bg-primary' : 'bg-gray-disabled/60'}`}
               >
-                <div
-                  className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform m-0.5 ${
-                    item.value ? 'translate-x-6' : 'translate-x-0'
-                  }`}
-                />
+                <div className={`h-6 w-6 rounded-full bg-white shadow-md transition-transform ${item.value ? 'translate-x-5' : 'translate-x-0'}`} />
               </button>
             ) : (
-              <button
-                onClick={item.onClick}
-                className="text-small text-gray-secondary"
-              >
+              <button onClick={item.onClick} className="chip">
                 查看
               </button>
             )}
           </div>
         ))}
-      </div>
+      </section>
 
-      {/* 缓存清理 */}
-      <div className="card p-0 overflow-hidden">
+      <section className="card p-2">
         <button
           onClick={() => {
             localStorage.clear()
             window.location.reload()
           }}
-          className="w-full flex items-center justify-between p-4 text-danger hover:bg-red-50 transition-colors"
+          className="flex w-full items-center justify-between rounded-[20px] p-3 text-danger transition-colors hover:bg-red-50/80 dark:hover:bg-red-950/20"
         >
-          <span className="text-body">清除缓存并退出</span>
+          <span className="text-body font-medium">清除缓存并退出</span>
         </button>
-      </div>
+      </section>
 
-      {/* 版本信息 */}
-      <p className="text-center text-small text-gray-helper mt-8">
-        健康监测助手 v1.0.0
-      </p>
+      <p className="text-center text-small text-gray-text-helper">健康监测助手 v1.0.0</p>
     </div>
   )
 }
