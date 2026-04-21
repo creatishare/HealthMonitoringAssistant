@@ -49,6 +49,19 @@
     background-color: var(--color-bg);
   }
 
+  /* iOS date/datetime 输入框默认样式重置，防止超出固定高度容器 */
+  input[type="date"],
+  input[type="datetime-local"] {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="datetime-local"]::-webkit-date-and-time-value {
+    text-align: left;
+    line-height: 1.5;
+  }
+
   /* 桌面端限制最大宽度，手机端完全自适应 */
   @media (min-width: 768px) {
     #root {
