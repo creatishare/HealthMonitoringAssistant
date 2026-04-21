@@ -288,3 +288,90 @@ docker-compose up -d
 2. 点击导航到 `/records` 正常
 3. 在 `/records` 页面按 F5 刷新，应正常显示而非404
 
+
+---
+
+## 🚀 下次开发入口（Agent必读）
+
+**当前日期**: 2026-04-21  
+**Git提交**: `c3a3df3` fix: SPA路由刷新404问题  
+**部署状态**: 修复已推送GitHub，待服务器部署验证
+
+### 当前项目状态
+
+MVP v1.0.0 功能已完成并部署到生产服务器（阿里云ECS，HTTP + IP直连）。最近完成SPA路由404修复。
+
+### 待办清单（按优先级排序）
+
+| 优先级 | 任务 | 状态 | 说明 |
+|--------|------|------|------|
+| **P0** | 生产环境Redis | ❌ 未开始 | 验证码目前存内存Map，重启丢失。需切换到Redis |
+| **P0** | SPA路由404部署验证 | 🚧 待验证 | 代码已提交，需服务器拉取+重建验证 |
+| **P1** | Dashboard指标个性化 | 🚧 进行中 | 根据userType+primaryDisease动态展示。代码部分实现，需重新设计交互 |
+| **P1** | iOS日期输入框 | ✅ 已修复 | 2026-04-21已添加WebKit样式重置 |
+| **P2** | 健康洞察增强 | ❌ 未开始 | 接入每日打卡数据（血压、体重）到洞察引擎 |
+| **P2** | 检查报告到期提醒 | ❌ 未开始 | 基于用户类型和上次检查日期智能提醒复查 |
+| **P2** | 商业化付费功能 | ❌ 未开始 | 内测通过后实施，方案见docs/billing-plan.md |
+| **P3** | 域名+HTTPS+ICP备案 | ❌ 未开始 | 当前IP直连，正式对外需备案 |
+
+### 如果继续开发，建议从以下任务选择
+
+#### 选项A：生产环境Redis（P0，技术债）
+- 文件：`src/backend/src/services/auth.service.ts`
+- 当前：验证码存储在内存 `Map<string, {code, expiresAt}>`
+- 目标：切换到Redis，支持多实例共享、重启不丢失
+- 已有：docker-compose.yml中已配置Redis服务
+- 步骤：
+  1. 安装redis客户端库
+  2. 替换内存Map操作
+  3. 添加Redis连接错误回退
+
+#### 选项B：Dashboard指标个性化交互重设计（P1，产品优化）
+- 文件：`src/frontend/src/pages/Dashboard.tsx`
+- 当前问题：用户反馈"更多/收起"交互体验未达预期
+- 已有代码：后端返回userType/primaryDisease，前端有ALL_METRICS和getRecommendedMetrics()
+- 待决策：Tab分组、优先级折叠、卡片式折叠等新交互方案
+- 需要：重新设计交互后再实现
+
+#### 选项C：健康洞察增强（P2，功能扩展）
+- 文件：`src/frontend/src/services/insights/`
+- 当前：基于化验单指标的分析
+- 目标：接入每日打卡数据（血压、体重、尿量）
+- 已有：每日打卡数据在健康记录中
+- 步骤：
+  1. 扩展insights引擎支持打卡指标
+  2. 添加血压趋势分析（晨晚波动、异常标记）
+  3. 体重变化趋势（水肿/脱水提示）
+  4. 尿量监测（少尿/无尿预警）
+
+### 技术上下文速查
+
+**后端**
+- 验证码存储：`src/backend/src/services/auth.service.ts` 内存Map `verificationCodes`
+- Dashboard API：`src/backend/src/services/dashboard.service.ts` 已返回userType/primaryDisease
+- Redis服务：docker-compose.yml已定义，端口6379
+
+**前端**
+- Dashboard：`src/frontend/src/pages/Dashboard.tsx` 指标趋势图、今日打卡
+- 洞察引擎：`src/frontend/src/services/insights/` 纯本地规则引擎
+- 路由：React Router，nginx已配置try_files
+
+**部署**
+- 路径：`/root/HealthMonitoringAssistant`（以实际服务器为准）
+- 命令：`docker-compose down && docker-compose build --no-cache frontend && docker-compose up -d`
+
+### 重要记忆
+
+1. **Docker前端缓存**: 必须先`docker rmi`删除旧镜像再build，否则不会使用新代码
+2. **Prisma命令**: 必须在`src/backend/`下执行，不要在前端目录运行
+3. **后端热重启**: 开发环境重启后端会清空内存验证码
+4. **Token提取层级**: 后端返回`{code, message, data}`，axios interceptor返回`response.data`，AuthStore需从`response.data.data`提取
+5. **真实Aliyun凭证**: 已配置在服务器`.env`，本地测试失败会自动fallback到mock码
+
+### 相关文档
+
+- `CLAUDE.md` — 项目概览、架构约定、当前待办
+- `docs/billing-plan.md` — 付费商业化完整方案
+- `docs/server-operations.md` — 服务器运维手册
+- `docs/quick-deploy.md` — IP直连快速部署指南
+
