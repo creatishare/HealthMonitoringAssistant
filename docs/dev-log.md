@@ -5,6 +5,109 @@
 
 ---
 
+## 2026-04-25 — 用药提醒跨天修复 + 我的/用药/记录页面 UI 重构 + PDF 中文修复
+
+### 今日完成
+
+1. **修复用药提醒“点已服用后第二天不自动更新”**
+   - 根因：
+     - 旧逻辑由前端用浏览器日期拼 `scheduledTime`，后端用服务器本地日期查询今日记录，跨天/时区/页面未刷新时容易把昨天状态带到今天。
+     - `recordMedication()` 每次点击都创建新 `MedicationLog`，没有同一分钟幂等更新。
+   - 方案：
+     - `src/backend/src/services/medication.service.ts`
+       - 新增 `Asia/Shanghai` 日期工具：`getAppDateString()`、`getAppDateTime()`、`getAppDateRange()`。
+       - `getTodayMedications()` 返回每条提醒的精确 `scheduledAt`（ISO），前端直接回传，不再自己猜日期。
+       - `recordMedication()` 先查同用户/同药品/同一分钟 `MedicationLog`，存在则 update，不存在才 create。
+       - `getMedicationLogs(date)` 改用同一套应用时区日界线。
+       - `weekly` 频率改为按创建日差值 `% 7` 判断，避免服务器星期/时区漂移。
+     - `src/frontend/src/pages/Dashboard.tsx`
+       - `handleMarkTaken()` 改为接收整条 medication，使用 `scheduledAt`。
+       - 新增跨午夜定时刷新 + 窗口重新聚焦刷新。
+     - `src/frontend/src/pages/Medications.tsx`
+       - 点击服用同样使用后端返回的 `scheduledAt`。
+     - `src/frontend/src/stores/dashboardStore.ts`
+       - medication 类型新增 `scheduledAt?: string`。
+
+2. **“我的”页面重构 + 功能入口补齐**
+   - `src/frontend/src/pages/Profile.tsx`
+     - 改成截图风格：个人卡、健康档案摘要、功能入口列表。
+     - 新增入口：数据导出、提醒设置、分享给医生、隐私与安全、帮助中心、意见反馈。
+     - `数据导出`：生成近 30 天健康报告 PDF 并下载。
+     - `分享给医生`：优先调用系统分享 API；不支持时自动下载 PDF。
+   - 新增页面：
+     - `src/frontend/src/pages/ReminderSettings.tsx` — 独立提醒设置页（消息通知、用药提醒管理、提前量说明、通知方式说明）。
+     - `src/frontend/src/pages/PrivacySecurity.tsx` — 隐私政策入口 + 修改登录密码表单（调用 `/auth/change-password`）。
+     - `src/frontend/src/pages/HelpCenter.tsx` — 使用指南 + 常见问题折叠问答。
+   - `src/frontend/src/App.tsx`
+     - 新增路由：`/reminder-settings`、`/privacy-security`、`/help-center`。
+   - `src/frontend/src/services/api.ts`
+     - 新增 `userApi.getProfile/updateProfile`、`authApi.changePassword`。
+
+3. **报告导出 API + PDF 中文乱码修复**
+   - 新增后端接口：
+     - `src/backend/src/controllers/report.controller.ts`
+     - `src/backend/src/routes/report.routes.ts`
+     - `src/backend/src/server.ts` 挂载 `/reports`
+   - `GET /reports/follow-up`
+     - 默认导出近 30 天报告，也支持 `startDate` / `endDate`。
+     - 返回 PDF 文件，响应头已加 `Cache-Control: no-store`，避免浏览器缓存旧乱码 PDF。
+   - `src/backend/src/services/report.service.ts`
+     - 使用 `pdfkit` 注册中文字体，候选路径：
+       - macOS: `/Library/Fonts/Arial Unicode.ttf`、`/System/Library/Fonts/Supplemental/Arial Unicode.ttf`、`/System/Library/Fonts/STHeiti Medium.ttc`
+       - Linux/Docker: `/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc` 等
+       - 可用 `PDF_FONT_PATH` 环境变量覆盖。
+     - 注意：如果已下载的 PDF 里 `strings xxx.pdf | rg "BaseFont"` 仍只有 `/Helvetica`，说明后端跑的是旧进程或浏览器拿了旧缓存。重启后端并重新导出，正常应看到 `ArialUnicodeMS` 或 Noto CJK 字体。
+   - Docker 字体补充：
+     - `src/backend/Dockerfile` 增加 `fonts-noto-cjk`
+     - `infrastructure/docker/Dockerfile.backend` 增加 `font-noto-cjk`
+
+4. **“用药”页面 UI 重构**
+   - `src/frontend/src/pages/Medications.tsx`
+     - 改为截图风格三段式：
+       1. “今日用药计划”时间轴，按提醒时间分组，展示 `已服/服用`。
+       2. 虚线大卡片“添加新药物”。
+       3. “我的药物”卡片列表：左侧色条、药品分类、规格/频率、提醒时间标签、通知开关。
+     - 三点菜单保留“编辑 / 删除”。
+     - 暂停/恢复提醒后会刷新今日计划和列表。
+
+5. **“健康记录”页面 UI 重构**
+   - `src/frontend/src/pages/Records.tsx`
+     - 改为截图风格工作台：
+       1. “智能识别检测报告”卡片，含“拍照识别 / 上传图片”入口。
+       2. “手动录入”内嵌表单，可切换“日常指标 / 化验指标”。
+       3. “最近记录”卡片列表，支持查看全部/收起和编辑。
+     - 日常指标：体重、尿量、收缩压、舒张压、心率。
+     - 化验指标：肌酐、尿素氮、血钾、血红蛋白、尿酸、他克莫司。
+     - 重要注意：当前后端 `HealthRecord` 没有独立 `heartRate` 字段，心率暂存到 `notes`（格式：`心率：72次/分`），最近记录会从 `notes` 提取展示。后续若要做心率趋势，需 Prisma migration 增加正式字段。
+
+### 验证情况
+
+- 后端构建通过：
+  ```bash
+  cd src/backend && npm run build
+  ```
+- 前端构建通过：
+  ```bash
+  cd src/frontend && npm run build
+  ```
+- 本地开发服务注意：
+  - 前端：`src/frontend` 下 `npm run dev -- --host 127.0.0.1`
+  - 后端：`src/backend` 下 `npm run dev`
+  - 如果 `3001` 被旧 node 进程占用但接口无响应，用 `lsof -nP -iTCP:3001 -sTCP:LISTEN` 查 PID，确认后 kill，再启动当前后端。
+
+### 当前注意点 / 下次优先
+
+- `docs/dev-log.md`、`AGENTS.md` 曾有较旧状态说明，后续开发请以本条和 `AGENTS.md` 最新日期为准。
+- PDF 中文乱码排查顺序：
+  1. 重新导出后检查文件大小，正常嵌入中文字体后会明显大于旧的 3KB。
+  2. `strings ~/Downloads/健康报告*.pdf | rg "BaseFont|FontName|ToUnicode"`，正常应出现 `ArialUnicodeMS` / `NotoSansCJK` / `ToUnicode`，不应只有 `/Helvetica`。
+  3. 若仍旧，重启后端进程并确认 `src/backend/src/services/report.service.ts` 已加载最新代码。
+- “健康记录”页面的内嵌录入成功后留在 `/records` 并刷新最近记录；原 `/records/new` 表单仍保留，用于旧入口/编辑流程。
+- `Profile.tsx` 的数据导出/分享依赖后端 `/reports/follow-up`，没有后端服务时会失败。
+- 仍未处理：生产环境 Redis 替换验证码内存 Map、Dashboard 指标个性化交互重新设计、健康洞察增强。
+
+---
+
 ## 2026-04-21 — iOS 日期输入框修复 + 部署问题
 
 ### 今日完成
@@ -375,3 +478,108 @@ MVP v1.0.0 功能已完成并部署到生产服务器（阿里云ECS，HTTP + IP
 - `docs/server-operations.md` — 服务器运维手册
 - `docs/quick-deploy.md` — IP直连快速部署指南
 
+---
+
+## 2026-04-23 — 安全隐患审计（待修复）
+
+> 针对后端 `src/backend/src/**`、`nginx/`、`docker-compose.yml` 做了一次系统性安全审计。**以下问题尚未修复**,下次开发优先处理 CRITICAL 项。
+
+### 🚨 CRITICAL（上线正式用户前必须修）
+
+#### C1. JWT 硬编码兜底密钥
+- **文件**: `src/backend/src/utils/jwt.ts:5`
+- **问题**: `const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';`
+- **风险**: 若 `JWT_SECRET` 环境变量未注入(部署配置失误),全站 token 用公开字符串 `your-secret-key` 签名。攻击者克隆仓库即可伪造任意 `userId` 的 JWT,绕过所有鉴权。
+- **修复**: 删除 fallback,启动时校验 env 缺失则 throw:
+  ```typescript
+  const JWT_SECRET = process.env.JWT_SECRET;
+  if (!JWT_SECRET) throw new Error('JWT_SECRET env var is required');
+  ```
+
+#### C2. 生产环境无 HTTPS,PHI + 密码 + token 明文传输
+- **文件**: `nginx/default.conf`(只 `listen 80`)
+- **风险**: 医疗数据(化验指标、手机号、密码、JWT)在公网明文传输。中间人攻击可盗取任意用户会话和健康数据。
+- **修复**: 申请免费证书(Let's Encrypt / 阿里云免费 DV 证书),nginx 改为 `listen 443 ssl`,80 端口强制 302 跳转,添加 `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload` 响应头。
+- **前置条件**: 需完成 ICP 备案 + 域名解析。
+
+#### C3. 登录 / 验证码接口零速率限制
+- **范围**: 全后端无 `express-rate-limit`,也无任何 IP/手机号级别的限流
+- **问题**:
+  - `/auth/login` 无失败次数计数,可对任意手机号暴力撞密码(最小密码长度又只有 6 位,见 M11)
+  - `/auth/verification-code` 有 60 秒同手机号间隔,但无 IP 级限制,攻击者可轮换手机号发垃圾短信(消耗阿里云余额)
+  - 6 位短信验证码空间仅 100 万 + 5 分钟 TTL,`/auth/register`、`/auth/reset-password` 无校验失败次数上限,可暴力枚举 OTP
+- **修复**:
+  - `/auth/login`: 每 IP 15 分钟 5 次
+  - `/auth/verification-code`: 每 IP 1 小时 3 次
+  - `/auth/register` 和 `/auth/reset-password`: 每 IP 1 小时 10 次
+  - 单个 phone+code 校验失败累计 5 次后锁定该验证码
+  - 推荐使用 `express-rate-limit` + Redis store(配合 P0 Redis 切换任务一起做)
+
+#### C4. OCR 接口跨用户 IDOR,可读他人化验单
+- **文件**: `src/backend/src/services/ocr.service.ts:87-89`
+- **问题**: `prisma.labReport.findUnique({ where: { id: imageId } })` **缺少 `userId` 过滤**。任何已登录用户只要猜到 UUID,即可调用 `/ocr/recognize` 触发对他人上传化验单的识别,并拿到完整化验文本(医院名 + 全部指标)。
+- **修复**: `recognizeImage` 新增 `userId` 参数,where 条件改为 `{ id: imageId, userId }`。参考同文件 `getOCRResult` 已经正确的写法。
+- **影响**: 直接的 PHI 泄露漏洞,医疗合规红线。
+
+### HIGH
+
+#### H5. 无安全响应头(helmet / CSP / X-Frame-Options / HSTS)
+- **文件**: `src/backend/src/server.ts` 未引入 helmet
+- **风险**: 无 CSP → XSS 无额外防线;无 X-Frame-Options → 点击劫持;无 Referrer-Policy → URL 可能带 token 泄漏到外站
+- **修复**: `npm i helmet`,`app.use(helmet())` 加在 cors 之前;nginx 补 5 个标准 header
+
+#### H6. CORS 通配,无 origin 白名单
+- **文件**: `src/backend/src/server.ts` `app.use(cors())`
+- **修复**: `cors({ origin: ['https://yourdomain.com'], credentials: true })`
+
+#### H7. OCR 上传响应回显服务器绝对路径
+- **文件**: `src/backend/src/controllers/ocr.controller.ts`(约 28-30 行)
+- **问题**: 响应体包含 `filePath: req.file.path`(如 `/app/uploads/ocr/xxx.jpg`),泄漏容器内部布局
+- **修复**: 从响应中移除 `filePath`,只返回 `imageId`
+
+#### H8. OCR 原始医疗文本被 debug 日志持久化
+- **文件**: `src/backend/src/services/ocr.service.ts:129, 289`
+- **问题**: `logger.debug('OCR原始文本:\n' + rawText)` 把完整化验单文字写日志,一旦 `LOG_LEVEL=debug` PHI 落盘
+- **修复**: 删除这两条 debug 日志(无安全的生产形态)
+
+### MEDIUM
+
+#### M9. SMS 开发回退把 OTP 明文打 warn 日志
+- **文件**: `src/backend/src/services/auth.service.ts:277`
+- **问题**: `logger.warn('[开发回退]...验证码: ${phone} => ${verifyCode}')`,日志聚合环境中明文 OTP
+- **修复**: 日志去掉 `verifyCode`,只记录"发生 fallback + 手机号"
+
+#### M10. `metric` 查询参数作为 Prisma 属性键,无白名单
+- **文件**: `src/backend/src/services/health-record.service.ts:28`
+- **问题**: `where[metric] = { not: null }`,`metric` 直接来自 query,Prisma 虽不能 SQL 注入,但未知字段可能触发 schema 错误回显
+- **修复**: 对 `metric` 加已知字段 enum 白名单
+
+#### M11. 密码最小长度仅 6 位
+- **文件**: `src/backend/src/utils/password.ts:20`
+- **问题**: 医疗应用低于 OWASP 最低 8 位;叠加零速率限制(C3)风险放大
+- **修复**: 提升到 8 位以上,医疗场景建议 12 位
+
+### 修复优先级建议(下次开发入口)
+
+**第一批(立即做,改动小、影响大、不需基础设施变更)**:
+- [ ] C1 JWT fallback 删除
+- [ ] C4 OCR IDOR(加 userId 过滤)
+- [ ] H7 OCR 响应移除 filePath
+- [ ] H8 删除 OCR 原始文本 debug 日志
+- [ ] M9 SMS fallback 日志脱敏
+
+**第二批(需改配置、略复杂)**:
+- [ ] C3 速率限制(推荐与 P0 Redis 切换合并做,用 `rate-limit-redis`)
+- [ ] H5 helmet + 安全响应头
+- [ ] H6 CORS 白名单
+- [ ] M10 metric 字段白名单
+- [ ] M11 密码长度提升至 8+ 位
+
+**第三批(需基础设施)**:
+- [ ] C2 HTTPS(依赖域名 + ICP 备案)
+
+### 审计范围说明
+
+- **已审计**: 后端 controllers/services/middleware/routes、Prisma schema、nginx 配置、docker-compose、根目录 `.env*` 文件
+- **未审计**: 前端 XSS(`dangerouslySetInnerHTML`)、Playwright E2E 测试中的凭证管理
+- **未发现问题**: `.env` 已正确 gitignore 未被跟踪;Prisma 未见 `$queryRaw` 拼接;bcrypt 已用于密码哈希

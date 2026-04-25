@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { Request } from 'express';
 import logger from '../utils/logger';
+import { AppError } from '../utils/errors';
 
 // 确保上传目录存在
 const uploadDir = path.join(process.cwd(), 'uploads', 'ocr');
@@ -33,7 +34,7 @@ const fileFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFil
   if (allowedMimes.includes(file.mimetype) && allowedExts.includes(ext)) {
     cb(null, true);
   } else {
-    cb(new Error('只允许上传图片文件 (JPG, PNG, WebP)'));
+    cb(new AppError('只允许上传图片文件 (JPG, PNG, WebP)', 400, '00002'));
   }
 };
 
@@ -51,12 +52,12 @@ export const upload = multer({
 export function handleUploadError(error: Error, _req: Request, _res: any, next: any) {
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
-      return next(new Error('文件大小超过限制 (最大10MB)'));
+      return next(new AppError('文件大小超过限制 (最大10MB)', 400, '00002'));
     }
     if (error.code === 'LIMIT_UNEXPECTED_FILE') {
-      return next(new Error('字段名错误，请使用 "image" 作为文件字段名'));
+      return next(new AppError('字段名错误，请使用 "image" 作为文件字段名', 400, '00002'));
     }
-    return next(new Error(`上传错误: ${error.message}`));
+    return next(new AppError(`上传错误: ${error.message}`, 400, '00002'));
   }
   next(error);
 }

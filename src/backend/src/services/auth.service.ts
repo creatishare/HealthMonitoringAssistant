@@ -4,6 +4,7 @@ import { generateTokenPair, revokeRefreshToken, revokeAllUserRefreshTokens } fro
 import { isValidPhone, isValidVerificationCode } from '../utils/validators';
 import { AppError } from '../utils/errors';
 import logger from '../utils/logger';
+import { maskPhone } from '../utils/privacy';
 import {
   sendVerificationCode as sendSMSCode,
   verifySmsCode,
@@ -109,7 +110,7 @@ export async function register(
     userAgent
   );
 
-  logger.info(`用户注册成功: ${phone}`);
+  logger.info(`用户注册成功: ${maskPhone(phone)}`);
 
   return {
     ...formatAuthUser(user),
@@ -156,7 +157,7 @@ export async function login(
     userAgent
   );
 
-  logger.info(`用户登录成功: ${phone}`);
+  logger.info(`用户登录成功: ${maskPhone(phone)}`);
 
   return {
     ...formatAuthUser(user),
@@ -274,7 +275,7 @@ export async function sendVerificationCode(
   // 开发环境回退：阿里云失败时自动生成模拟验证码，确保本地测试可用
   if ((!smsResult.success || !verifyCode) && process.env.NODE_ENV === 'development') {
     verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
-    logger.warn(`[开发回退] 阿里云短信发送失败，使用模拟验证码: ${phone} => ${verifyCode}`);
+    logger.warn(`[开发回退] 阿里云短信发送失败，使用模拟验证码: ${maskPhone(phone)} => ${verifyCode}`);
     smsResult = { success: true, verifyCode };
   }
 
@@ -290,7 +291,7 @@ export async function sendVerificationCode(
     expiresAt,
   });
 
-  logger.info(`验证码已发送: ${phone}`);
+  logger.info(`验证码已发送: ${maskPhone(phone)}`);
 
   return {
     expireIn: config.verificationValidTimeSeconds,
@@ -384,5 +385,5 @@ export async function resetPassword(
   // 清除验证码
   verificationCodes.delete(phone);
 
-  logger.info(`用户重置密码成功: ${phone}`);
+  logger.info(`用户重置密码成功: ${maskPhone(phone)}`);
 }

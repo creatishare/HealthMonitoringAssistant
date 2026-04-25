@@ -1,6 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
 import * as authService from '../services/auth.service';
-import { ApiError } from '../middleware/error.middleware';
+import { AppError } from '../utils/errors';
+
+function parseVerificationType(type: unknown): 'register' | 'reset-password' {
+  if (type === undefined) {
+    return 'register';
+  }
+
+  if (type === 'register' || type === 'reset-password') {
+    return type;
+  }
+
+  throw new AppError('验证码类型不正确', 400, '00002');
+}
 
 // 注册
 export async function register(req: Request, res: Response, next: NextFunction) {
@@ -10,7 +22,7 @@ export async function register(req: Request, res: Response, next: NextFunction) 
     const userAgent = req.headers['user-agent'];
 
     if (!phone || !password || !verificationCode) {
-      throw new ApiError('缺少必要参数', 400, '00002');
+      throw new AppError('缺少必要参数', 400, '00002');
     }
 
     const result = await authService.register(phone, password, verificationCode, ipAddress, userAgent);
@@ -33,7 +45,7 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     const userAgent = req.headers['user-agent'];
 
     if (!phone || !password) {
-      throw new ApiError('手机号和密码不能为空', 400, '00002');
+      throw new AppError('手机号和密码不能为空', 400, '00002');
     }
 
     const result = await authService.login(phone, password, ipAddress, userAgent);
@@ -55,7 +67,7 @@ export async function logout(req: Request, res: Response, next: NextFunction) {
     const { refreshToken } = req.body;
 
     if (!userId) {
-      throw new ApiError('未登录', 401, '01007');
+      throw new AppError('未登录', 401, '01007');
     }
 
     await authService.logout(userId, refreshToken);
@@ -78,7 +90,7 @@ export async function refresh(req: Request, res: Response, next: NextFunction) {
     const userAgent = req.headers['user-agent'];
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new ApiError('未提供刷新令牌', 401, '01009');
+      throw new AppError('未提供刷新令牌', 401, '01009');
     }
 
     const refreshToken = authHeader.substring(7);
@@ -100,10 +112,10 @@ export async function sendVerificationCode(req: Request, res: Response, next: Ne
     const { phone, type = 'register' } = req.body;
 
     if (!phone) {
-      throw new ApiError('手机号不能为空', 400, '01001');
+      throw new AppError('手机号不能为空', 400, '01001');
     }
 
-    const result = await authService.sendVerificationCode(phone, type);
+    const result = await authService.sendVerificationCode(phone, parseVerificationType(type));
 
     res.status(200).json({
       code: 200,
@@ -122,11 +134,11 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
     const { oldPassword, newPassword } = req.body;
 
     if (!userId) {
-      throw new ApiError('未登录', 401, '01007');
+      throw new AppError('未登录', 401, '01007');
     }
 
     if (!oldPassword || !newPassword) {
-      throw new ApiError('原密码和新密码不能为空', 400, '00002');
+      throw new AppError('原密码和新密码不能为空', 400, '00002');
     }
 
     await authService.changePassword(userId, oldPassword, newPassword);
@@ -147,7 +159,7 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
     const { phone, verificationCode, newPassword } = req.body;
 
     if (!phone || !verificationCode || !newPassword) {
-      throw new ApiError('缺少必要参数', 400, '00002');
+      throw new AppError('缺少必要参数', 400, '00002');
     }
 
     await authService.resetPassword(phone, verificationCode, newPassword);

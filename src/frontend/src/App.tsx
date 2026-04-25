@@ -16,6 +16,9 @@ import Alerts from './pages/Alerts'
 import Profile from './pages/Profile'
 import ProfileEdit from './pages/ProfileEdit'
 import Settings from './pages/Settings'
+import ReminderSettings from './pages/ReminderSettings'
+import PrivacySecurity from './pages/PrivacySecurity'
+import HelpCenter from './pages/HelpCenter'
 import ForgotPassword from './pages/ForgotPassword'
 import Onboarding from './pages/Onboarding'
 import PrivacyPolicy from './pages/PrivacyPolicy'
@@ -55,6 +58,9 @@ function App() {
         <Route path="/profile" element={<Profile />} />
         <Route path="/profile/edit" element={<ProfileEdit />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/reminder-settings" element={<ReminderSettings />} />
+        <Route path="/privacy-security" element={<PrivacySecurity />} />
+        <Route path="/help-center" element={<HelpCenter />} />
         <Route path="/insights" element={<HealthInsights />} />
       </Route>
     </Routes>

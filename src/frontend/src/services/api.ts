@@ -42,6 +42,8 @@ export const authApi = {
     api.post('/auth/verification-code', { phone, type }),
   refreshToken: (refreshToken: string) =>
     api.post('/auth/refresh', {}, { headers: { Authorization: `Bearer ${refreshToken}` } }),
+  changePassword: (oldPassword: string, newPassword: string) =>
+    api.post('/auth/change-password', { oldPassword, newPassword }),
   resetPassword: (phone: string, verificationCode: string, newPassword: string) =>
     api.post('/auth/reset-password', { phone, verificationCode, newPassword }),
   completeOnboarding: (
@@ -68,6 +70,11 @@ export const healthRecordApi = {
   getTrends: (params: any, config?: any) => api.get('/health-records/trends', { params, ...config }),
 }
 
+export const userApi = {
+  getProfile: () => api.get('/users/profile'),
+  updateProfile: (data: any) => api.put('/users/profile', data),
+}
+
 export const medicationApi = {
   getList: (params?: any) => api.get('/medications', { params }),
   create: (data: any) => api.post('/medications', data),
@@ -91,6 +98,11 @@ export const alertApi = {
 
 export const dashboardApi = {
   getData: (config?: any) => api.get('/dashboard', config),
+}
+
+export const reportApi = {
+  downloadFollowUp: (params?: { startDate?: string; endDate?: string; t?: number }) =>
+    api.get('/reports/follow-up', { params, responseType: 'blob' }),
 }
 
 export const ocrApi = {

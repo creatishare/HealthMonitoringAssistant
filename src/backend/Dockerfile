@@ -12,6 +12,7 @@ RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debia
     g++ \
     openssl \
     libssl-dev \
+    fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制依赖文件

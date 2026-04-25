@@ -25,6 +25,7 @@ interface DashboardData {
     dosage: number
     dosageUnit: string
     scheduledTime: string
+    scheduledAt?: string
     status: string
     logId?: string
   }>

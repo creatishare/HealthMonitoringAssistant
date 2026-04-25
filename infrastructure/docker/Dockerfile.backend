@@ -31,7 +31,7 @@ FROM node:18-alpine AS production
 WORKDIR /app
 
 # 安装必要依赖
-RUN apk add --no-cache dumb-init curl
+RUN apk add --no-cache dumb-init curl font-noto-cjk
 
 # 复制生产依赖
 COPY package*.json ./

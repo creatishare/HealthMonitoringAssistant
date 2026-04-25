@@ -23,6 +23,17 @@ interface TrendData {
   urineVolume?: number
 }
 
+interface TodayMedication {
+  medicationId: string
+  name: string
+  dosage: number
+  dosageUnit: string
+  scheduledTime: string
+  scheduledAt?: string
+  status: string
+  logId?: string
+}
+
 export const ALL_METRICS = [
   { key: 'creatinine', name: '肌酐', unit: 'μmol/L', color: '#3E63DD' },
   { key: 'urea', name: '尿素氮', unit: 'mmol/L', color: '#2F9E6D' },
@@ -56,6 +67,19 @@ export function getRecommendedMetrics(userType?: UserType | null, primaryDisease
   }
 }
 
+function getLocalScheduledAt(scheduledTime: string) {
+  const [hours, minutes] = scheduledTime.split(':').map(Number)
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0).toISOString()
+}
+
+function getMillisecondsUntilNextDay() {
+  const now = new Date()
+  const nextDay = new Date(now)
+  nextDay.setHours(24, 0, 5, 0)
+  return nextDay.getTime() - now.getTime()
+}
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -80,6 +104,42 @@ export default function Dashboard() {
       controller.abort()
     }
   }, [location.pathname])
+
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>
+
+    const refreshDashboard = () => {
+      fetchDashboard().catch((err) => {
+        if (err?.name !== 'CanceledError' && err?.name !== 'AbortError') {
+          toast.error('加载数据失败')
+        }
+      })
+      fetchTrendData()
+    }
+
+    const scheduleNextDayRefresh = () => {
+      timeoutId = setTimeout(() => {
+        refreshDashboard()
+        scheduleNextDayRefresh()
+      }, getMillisecondsUntilNextDay())
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshDashboard()
+      }
+    }
+
+    scheduleNextDayRefresh()
+    window.addEventListener('focus', refreshDashboard)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      clearTimeout(timeoutId)
+      window.removeEventListener('focus', refreshDashboard)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [fetchDashboard])
 
   useEffect(() => {
     if (data?.user?.userType && !hasInitializedMetrics) {
@@ -122,11 +182,11 @@ export default function Dashboard() {
     )
   }
 
-  const handleMarkTaken = async (medicationId: string, scheduledTime: string) => {
+  const handleMarkTaken = async (med: TodayMedication) => {
     try {
       await medicationApi.recordLog({
-        medicationId,
-        scheduledTime: new Date(`${new Date().toISOString().split('T')[0]}T${scheduledTime}:00`).toISOString(),
+        medicationId: med.medicationId,
+        scheduledTime: med.scheduledAt || getLocalScheduledAt(med.scheduledTime),
         status: 'taken',
         actualTime: new Date().toISOString(),
       })
@@ -147,7 +207,7 @@ export default function Dashboard() {
 
   const { user, today, medications, alerts, recentMetrics } = data
 
-  const sortedMedications = [...medications].sort((a: any, b: any) => {
+  const sortedMedications = [...medications].sort((a: TodayMedication, b: TodayMedication) => {
     if (a.status === 'taken' && b.status !== 'taken') return 1
     if (a.status !== 'taken' && b.status === 'taken') return -1
 
@@ -258,7 +318,7 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {sortedMedications.some((med: any) => med.status !== 'taken') && (
+      {sortedMedications.some((med: TodayMedication) => med.status !== 'taken') && (
         <section className="card-medication">
           <div className="page-header">
             <div>
@@ -272,10 +332,10 @@ export default function Dashboard() {
           </div>
           <div className="mt-4 space-y-3">
             {sortedMedications
-              .filter((med: any) => med.status !== 'taken')
+              .filter((med: TodayMedication) => med.status !== 'taken')
               .slice(0, 3)
-              .map((med: any) => (
-                <div key={med.medicationId} className="flex flex-col gap-3 rounded-[22px] border border-white/50 bg-white/72 p-4 dark:border-white/8 dark:bg-white/5 md:flex-row md:items-center md:justify-between">
+              .map((med: TodayMedication) => (
+                <div key={`${med.medicationId}-${med.scheduledTime}`} className="flex flex-col gap-3 rounded-[22px] border border-white/50 bg-white/72 p-4 dark:border-white/8 dark:bg-white/5 md:flex-row md:items-center md:justify-between">
                   <div className="flex items-center gap-3">
                     <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-medication/12 text-medication">
                       <Clock size={18} />
@@ -285,7 +345,7 @@ export default function Dashboard() {
                       <p className="text-helper text-gray-text-secondary">{med.dosage}{med.dosageUnit} · {med.scheduledTime}</p>
                     </div>
                   </div>
-                  <button onClick={() => handleMarkTaken(med.medicationId, med.scheduledTime)} className="btn-medication h-10 rounded-full px-4 text-helper">
+                  <button onClick={() => handleMarkTaken(med)} className="btn-medication h-10 rounded-full px-4 text-helper">
                     已服用
                   </button>
                 </div>

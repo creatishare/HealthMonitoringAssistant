@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 
 import logger from './utils/logger';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
+import { getCorsOptions, securityHeaders } from './middleware/security.middleware';
 
 // 路由导入
 import authRoutes from './routes/auth.routes';
@@ -14,6 +15,7 @@ import medicationRoutes from './routes/medication.routes';
 import alertRoutes from './routes/alert.routes';
 import ocrRoutes from './routes/ocr.routes';
 import dashboardRoutes from './routes/dashboard.routes';
+import reportRoutes from './routes/report.routes';
 
 // 加载环境变量
 dotenv.config();
@@ -22,9 +24,11 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // 中间件
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.set('trust proxy', 1);
+app.use(securityHeaders);
+app.use(cors(getCorsOptions()));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // 请求日志
 app.use((req, res, next) => {
@@ -46,6 +50,7 @@ app.use('/medications', medicationRoutes);
 app.use('/alerts', alertRoutes);
 app.use('/ocr', ocrRoutes);
 app.use('/dashboard', dashboardRoutes);
+app.use('/reports', reportRoutes);
 
 // 404处理
 app.use(notFoundHandler);

@@ -1,4 +1,5 @@
 import PDFDocument from 'pdfkit';
+import fs from 'fs';
 
 import { ApiError } from '../middleware/error.middleware';
 import { getAlerts } from './alert.service';
@@ -74,6 +75,33 @@ const METRIC_LABELS: Array<{ key: keyof ReportRecord; label: string; unit?: stri
   { key: 'weight', label: '体重', unit: 'kg' },
   { key: 'tacrolimus', label: '他克莫司', unit: 'ng/mL' },
 ];
+
+const PDF_FONT_NAME = 'ChineseSans';
+const PDF_FONT_CANDIDATES = [
+  process.env.PDF_FONT_PATH,
+  '/Library/Fonts/Arial Unicode.ttf',
+  '/System/Library/Fonts/Supplemental/Arial Unicode.ttf',
+  '/System/Library/Fonts/STHeiti Medium.ttc',
+  '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+  '/usr/share/fonts/opentype/noto/NotoSansCJKsc-Regular.otf',
+  '/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc',
+  '/usr/share/fonts/truetype/arphic/uming.ttc',
+].filter(Boolean) as string[];
+
+function getChineseFontPath() {
+  return PDF_FONT_CANDIDATES.find((fontPath) => fs.existsSync(fontPath));
+}
+
+function setupPdfFonts(doc: PDFKit.PDFDocument) {
+  const fontPath = getChineseFontPath();
+
+  if (!fontPath) {
+    return;
+  }
+
+  doc.registerFont(PDF_FONT_NAME, fontPath);
+  doc.font(PDF_FONT_NAME);
+}
 
 function validateDateRange(startDate: string, endDate: string) {
   const start = new Date(startDate);
@@ -228,6 +256,7 @@ export async function generateFollowUpReportPdf(
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 40, size: 'A4' });
     const chunks: Buffer[] = [];
+    setupPdfFonts(doc);
 
     doc.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
     doc.on('end', () => resolve(Buffer.concat(chunks)));

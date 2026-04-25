@@ -1,7 +1,47 @@
 import prisma from '../config/database';
-import { MedicationFrequency, MedicationStatus } from '@prisma/client';
+import { MedicationFrequency } from '@prisma/client';
 import { AppError } from '../utils/errors';
 import logger from '../utils/logger';
+
+const APP_TIME_ZONE = 'Asia/Shanghai';
+const APP_TIME_ZONE_OFFSET = '+08:00';
+
+function getAppDateString(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: APP_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  const day = parts.find((part) => part.type === 'day')?.value;
+
+  return `${year}-${month}-${day}`;
+}
+
+function getAppDateTime(date: string, hours: number, minutes: number) {
+  const hourText = hours.toString().padStart(2, '0');
+  const minuteText = minutes.toString().padStart(2, '0');
+  return new Date(`${date}T${hourText}:${minuteText}:00.000${APP_TIME_ZONE_OFFSET}`);
+}
+
+function addAppDays(date: string, days: number) {
+  const value = getAppDateTime(date, 0, 0);
+  value.setUTCDate(value.getUTCDate() + days);
+  return getAppDateString(value);
+}
+
+function getAppDateRange(date = getAppDateString()) {
+  const tomorrow = addAppDays(date, 1);
+
+  return {
+    date,
+    start: getAppDateTime(date, 0, 0),
+    end: getAppDateTime(tomorrow, 0, 0),
+  };
+}
 
 // 获取用药列表
 export async function getMedications(userId: string, status?: string) {
@@ -185,10 +225,7 @@ export async function resumeMedication(userId: string, medicationId: string) {
 
 // 获取今日用药
 export async function getTodayMedications(userId: string) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const todayRange = getAppDateRange();
 
   // 获取所有活跃的用药
   const medications = await prisma.medication.findMany({
@@ -202,14 +239,15 @@ export async function getTodayMedications(userId: string) {
 
   for (const med of medications) {
     // 根据频率判断今天是否需要服药
-    const shouldTakeToday = checkShouldTakeToday(med.frequency, med.createdAt);
+    const shouldTakeToday = checkShouldTakeToday(med.frequency, med.createdAt, todayRange.date);
 
     if (!shouldTakeToday) continue;
 
     for (const time of med.reminderTimes) {
-      const scheduledTime = new Date(today);
       // 使用UTC小时和分钟
-      scheduledTime.setHours(time.getUTCHours(), time.getUTCMinutes(), 0, 0);
+      const hours = time.getUTCHours();
+      const minutes = time.getUTCMinutes();
+      const scheduledTime = getAppDateTime(todayRange.date, hours, minutes);
 
       // 查找是否已有记录
       const existingLog = await prisma.medicationLog.findFirst({
@@ -224,14 +262,15 @@ export async function getTodayMedications(userId: string) {
       });
 
       // 使用UTC方法格式化时间
-      const hours = time.getUTCHours().toString().padStart(2, '0');
-      const minutes = time.getUTCMinutes().toString().padStart(2, '0');
+      const hoursText = hours.toString().padStart(2, '0');
+      const minutesText = minutes.toString().padStart(2, '0');
       todayMedications.push({
         medicationId: med.id,
         name: med.name,
         dosage: med.dosage,
         dosageUnit: med.dosageUnit,
-        scheduledTime: `${hours}:${minutes}`,
+        scheduledTime: `${hoursText}:${minutesText}`,
+        scheduledAt: scheduledTime.toISOString(),
         status: existingLog?.status || 'pending',
         logId: existingLog?.id,
       });
@@ -242,16 +281,22 @@ export async function getTodayMedications(userId: string) {
   todayMedications.sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
 
   return {
-    date: today.toISOString().split('T')[0],
+    date: todayRange.date,
     medications: todayMedications,
   };
 }
 
 // 检查今天是否需要服药
-function checkShouldTakeToday(frequency: MedicationFrequency, createdAt: Date): boolean {
-  const today = new Date();
+function checkShouldTakeToday(
+  frequency: MedicationFrequency,
+  createdAt: Date,
+  todayDate = getAppDateString()
+): boolean {
+  const todayStart = getAppDateTime(todayDate, 0, 0);
+  const createdDate = getAppDateString(createdAt);
+  const createdStart = getAppDateTime(createdDate, 0, 0);
   const daysSinceCreated = Math.floor(
-    (today.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24)
+    (todayStart.getTime() - createdStart.getTime()) / (1000 * 60 * 60 * 24)
   );
 
   switch (frequency) {
@@ -262,7 +307,7 @@ function checkShouldTakeToday(frequency: MedicationFrequency, createdAt: Date): 
     case 'every_other_day':
       return daysSinceCreated % 2 === 0;
     case 'weekly':
-      return today.getDay() === createdAt.getDay();
+      return daysSinceCreated % 7 === 0;
     default:
       return true;
   }
@@ -288,26 +333,56 @@ export async function recordMedication(
     throw new AppError('药品不存在', 404, '00003');
   }
 
-  const log = await prisma.medicationLog.create({
-    data: {
+  const scheduledTime = new Date(data.scheduledTime);
+  const existingLog = await prisma.medicationLog.findFirst({
+    where: {
       userId,
       medicationId: data.medicationId,
-      scheduledTime: new Date(data.scheduledTime),
-      actualTime: data.actualTime ? new Date(data.actualTime) : null,
-      status: data.status,
-      skipReason: data.skipReason,
-      notes: data.notes,
-    },
-    include: {
-      medication: {
-        select: {
-          name: true,
-          dosage: true,
-          dosageUnit: true,
-        },
+      scheduledTime: {
+        gte: scheduledTime,
+        lt: new Date(scheduledTime.getTime() + 60000),
       },
     },
   });
+
+  const logData = {
+    actualTime: data.actualTime ? new Date(data.actualTime) : null,
+    status: data.status,
+    skipReason: data.skipReason,
+    notes: data.notes,
+  };
+
+  const log = existingLog
+    ? await prisma.medicationLog.update({
+        where: { id: existingLog.id },
+        data: logData,
+        include: {
+          medication: {
+            select: {
+              name: true,
+              dosage: true,
+              dosageUnit: true,
+            },
+          },
+        },
+      })
+    : await prisma.medicationLog.create({
+        data: {
+          userId,
+          medicationId: data.medicationId,
+          scheduledTime,
+          ...logData,
+        },
+        include: {
+          medication: {
+            select: {
+              name: true,
+              dosage: true,
+              dosageUnit: true,
+            },
+          },
+        },
+      });
 
   logger.info(`记录服药: ${log.id}, 状态: ${data.status}`);
 
@@ -334,14 +409,11 @@ export async function getMedicationLogs(
   }
 
   if (date) {
-    const startDate = new Date(date);
-    startDate.setHours(0, 0, 0, 0);
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + 1);
+    const range = getAppDateRange(date);
 
     where.scheduledTime = {
-      gte: startDate,
-      lt: endDate,
+      gte: range.start,
+      lt: range.end,
     };
   }
 

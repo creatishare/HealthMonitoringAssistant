@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Pill, Clock, ChevronRight, Pause, Play, CheckCircle, Calendar, Trash2 } from 'lucide-react'
+import { Bell, Check, Clock, MoreVertical, Pencil, Pill, Plus, Trash2 } from 'lucide-react'
 import { medicationApi } from '../services/api'
 import toast from 'react-hot-toast'
 
@@ -21,16 +21,65 @@ interface TodayMedication {
   dosage: number
   dosageUnit: string
   scheduledTime: string
+  scheduledAt?: string
   status: 'pending' | 'taken' | 'missed' | 'skipped'
   logId?: string
 }
 
 const frequencyText: Record<string, string> = {
-  once_daily: '每日1次',
-  twice_daily: '每日2次',
-  three_daily: '每日3次',
+  once_daily: '每日一次',
+  twice_daily: '每日两次',
+  three_daily: '每日三次',
   every_other_day: '隔日一次',
   weekly: '每周一次',
+}
+
+const categoryText = [
+  { keywords: ['环孢素', '他克莫司', '雷帕', '西罗莫司', '吗替麦考酚', '麦考酚', '泼尼松', '甲泼尼龙'], label: '免疫抑制剂' },
+  { keywords: ['碳酸氢钠', '钙', '铁', '叶酸', '骨化三醇', '维生素'], label: '辅助用药' },
+  { keywords: ['降压', '洛尔', '地平', '沙坦', '普利'], label: '血压管理' },
+  { keywords: ['胰岛素', '二甲双胍', '阿卡波糖'], label: '血糖管理' },
+]
+
+const medToneClasses = [
+  'border-l-primary',
+  'border-l-success',
+  'border-l-warning',
+  'border-l-danger',
+  'border-l-medication',
+]
+
+function getLocalScheduledAt(scheduledTime: string) {
+  const [hours, minutes] = scheduledTime.split(':').map(Number)
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0).toISOString()
+}
+
+function getTimeLabel(time: string) {
+  const hour = Number(time.split(':')[0])
+  if (hour < 11) return '早晨'
+  if (hour < 14) return '中午'
+  if (hour < 18) return '下午'
+  return '晚间'
+}
+
+function getMedicationCategory(name: string) {
+  return categoryText.find((category) => category.keywords.some((keyword) => name.includes(keyword)))?.label || '常规用药'
+}
+
+function groupTodayMedications(todayMeds: TodayMedication[]) {
+  const groups = new Map<string, TodayMedication[]>()
+
+  todayMeds
+    .slice()
+    .sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime))
+    .forEach((med) => {
+      const list = groups.get(med.scheduledTime) || []
+      list.push(med)
+      groups.set(med.scheduledTime, list)
+    })
+
+  return Array.from(groups.entries()).map(([time, meds]) => ({ time, meds }))
 }
 
 export default function Medications() {
@@ -39,11 +88,16 @@ export default function Medications() {
   const [todayMeds, setTodayMeds] = useState<TodayMedication[]>([])
   const [loading, setLoading] = useState(false)
   const [todayLoading, setTodayLoading] = useState(false)
+  const [actionMenuId, setActionMenuId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchMedications()
     fetchTodayMedications()
   }, [])
+
+  const todayGroups = useMemo(() => groupTodayMedications(todayMeds), [todayMeds])
+  const takenCount = todayMeds.filter((med) => med.status === 'taken').length
+  const activeCount = medications.filter((med) => med.status === 'active').length
 
   const fetchMedications = async () => {
     setLoading(true)
@@ -73,12 +127,12 @@ export default function Medications() {
     try {
       await medicationApi.recordLog({
         medicationId: med.medicationId,
-        scheduledTime: new Date(`${new Date().toISOString().split('T')[0]}T${med.scheduledTime}:00`).toISOString(),
+        scheduledTime: med.scheduledAt || getLocalScheduledAt(med.scheduledTime),
         status: 'taken',
         actualTime: new Date().toISOString(),
       })
       toast.success(`已记录 ${med.name} ${med.scheduledTime} 服用`)
-      fetchTodayMedications() // 刷新今日用药状态
+      fetchTodayMedications()
     } catch (error) {
       toast.error('标记失败，请重试')
     }
@@ -89,6 +143,7 @@ export default function Medications() {
       await medicationApi.pause(id)
       toast.success('已暂停提醒')
       fetchMedications()
+      fetchTodayMedications()
     } catch (error) {
       toast.error('操作失败')
     }
@@ -99,179 +154,219 @@ export default function Medications() {
       await medicationApi.resume(id)
       toast.success('已恢复提醒')
       fetchMedications()
+      fetchTodayMedications()
     } catch (error) {
       toast.error('操作失败')
     }
   }
 
+  const handleToggleStatus = (med: Medication) => {
+    if (med.status === 'active') {
+      handlePause(med.id)
+      return
+    }
+
+    handleResume(med.id)
+  }
+
   const handleDelete = async (id: string) => {
-    if (window.confirm('确定要删除该用药提醒吗？此操作不可恢复。')) {
-      try {
-        await medicationApi.delete(id)
-        toast.success('已删除用药提醒')
-        fetchMedications()
-        fetchTodayMedications() // 刷新今日用药
-      } catch (error) {
-        toast.error('删除失败，请重试')
-      }
+    setActionMenuId(null)
+
+    if (!window.confirm('确定要删除该用药提醒吗？此操作不可恢复。')) {
+      return
+    }
+
+    try {
+      await medicationApi.delete(id)
+      toast.success('已删除用药提醒')
+      fetchMedications()
+      fetchTodayMedications()
+    } catch (error) {
+      toast.error('删除失败，请重试')
     }
   }
 
   return (
-    <div className="space-y-4">
-      {/* 今日用药区域 */}
-      <div className="card-medication">
-        <div className="flex items-center gap-2 mb-3">
-          <Calendar size={18} className="text-medication" />
-          <h2 className="text-card-title font-medium text-medication">今日用药</h2>
-        </div>
-        {todayLoading ? (
-          <div className="flex justify-center py-4">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-medication"></div>
+    <div className="page-shell">
+      <div>
+        <h1 className="text-title text-gray-text-primary">用药管理</h1>
+        <p className="mt-2 text-helper text-gray-text-secondary">设置您的用药提醒</p>
+      </div>
+
+      <section className="card p-5 md:p-7">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Clock size={20} className="text-primary" />
+            <h2 className="text-card-title text-gray-text-primary">今日用药计划</h2>
           </div>
-        ) : todayMeds.length === 0 ? (
-          <p className="text-small text-gray-secondary py-2">今日暂无用药安排</p>
+          <p className="text-helper text-gray-text-secondary">{takenCount}/{todayMeds.length} 已服用</p>
+        </div>
+
+        {todayLoading ? (
+          <div className="flex justify-center py-10">
+            <div className="h-7 w-7 animate-spin rounded-full border-b-2 border-primary" />
+          </div>
+        ) : todayGroups.length === 0 ? (
+          <div className="py-10 text-center">
+            <Pill size={42} className="mx-auto text-gray-disabled" />
+            <p className="mt-3 text-helper text-gray-text-secondary">今日暂无用药安排</p>
+          </div>
         ) : (
-          <div className="space-y-2">
-            {todayMeds.map((med, index) => (
-              <div
-                key={`${med.medicationId}-${med.scheduledTime}-${index}`}
-                className="flex items-center justify-between py-2"
-              >
-                <div className="flex items-center gap-3">
-                  {med.status === 'taken' ? (
-                    <CheckCircle size={18} className="text-success" />
-                  ) : (
-                    <Clock size={18} className="text-medication" />
-                  )}
-                  <div>
-                    <p className="text-body text-gray-text-primary">{med.name}</p>
-                    <p className="text-small text-gray-secondary">
-                      {med.dosage}{med.dosageUnit} · {med.scheduledTime}
-                    </p>
+          <div className="relative mt-6 space-y-6 pl-7">
+            <div className="absolute bottom-2 left-[10px] top-2 w-px bg-gray-border" />
+            {todayGroups.map((group) => {
+              const groupTaken = group.meds.every((med) => med.status === 'taken')
+
+              return (
+                <div key={group.time} className="relative">
+                  <div className={`absolute -left-[34px] top-0 flex h-6 w-6 items-center justify-center rounded-full border ${groupTaken ? 'border-success bg-success text-white' : 'border-gray-border bg-gray-bg text-gray-text-helper'}`}>
+                    {groupTaken ? <Check size={14} /> : null}
+                  </div>
+
+                  <div className="mb-3 flex items-center gap-3">
+                    <span className="text-body font-semibold text-gray-text-primary">{group.time}</span>
+                    <span className="text-helper text-gray-text-secondary">{getTimeLabel(group.time)}</span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {group.meds.map((med) => {
+                      const isTaken = med.status === 'taken'
+
+                      return (
+                        <div
+                          key={`${med.medicationId}-${med.scheduledTime}`}
+                          className={`flex items-center justify-between gap-3 rounded-[18px] px-4 py-3 ${isTaken ? 'bg-success/10' : 'bg-primary/5'}`}
+                        >
+                          <div className="min-w-0">
+                            <p className={`truncate text-body font-semibold ${isTaken ? 'text-success' : 'text-gray-text-primary'}`}>{med.name}</p>
+                            <p className="text-helper text-gray-text-secondary">{med.dosage}{med.dosageUnit}</p>
+                          </div>
+                          {isTaken ? (
+                            <span className="inline-flex shrink-0 items-center gap-1 text-helper font-medium text-success">
+                              <Check size={15} />
+                              已服
+                            </span>
+                          ) : (
+                            <button onClick={() => handleMarkTaken(med)} className="inline-flex h-9 shrink-0 items-center gap-2 rounded-button border border-gray-border bg-white/80 px-3 text-helper font-medium text-gray-text-primary shadow-sm transition-colors hover:border-success/40 hover:text-success dark:bg-white/5">
+                              <Check size={15} />
+                              服用
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
-                {med.status === 'taken' ? (
-                  <span className="text-small px-2 py-1 rounded bg-green-100 text-success">
-                    已服
-                  </span>
-                ) : (
-                  <button
-                    onClick={() => handleMarkTaken(med)}
-                    className="text-small px-3 py-1.5 rounded bg-medication text-white hover:bg-medication/90 transition-colors"
-                  >
-                    已服用
-                  </button>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
-      </div>
+      </section>
 
-      {/* 用药列表标题 */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-page-title font-semibold text-gray-text-primary">用药管理</h1>
-        <button
-          onClick={() => navigate('/medications/new')}
-          className="btn-medication flex items-center gap-1 px-4 py-2"
-        >
-          <Plus size={18} />
-          添加
-        </button>
-      </div>
+      <button
+        onClick={() => navigate('/medications/new')}
+        className="flex min-h-[190px] w-full flex-col items-center justify-center rounded-card border-2 border-dashed border-primary/30 bg-primary/5 p-6 text-center transition-colors hover:border-primary/50 hover:bg-primary/10"
+      >
+        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/15 text-primary">
+          <Plus size={26} />
+        </span>
+        <span className="mt-4 text-body font-semibold text-gray-text-primary">添加新药物</span>
+        <span className="mt-1 text-helper text-gray-text-secondary">设置用药名称、剂量和提醒时间</span>
+      </button>
 
-      {loading ? (
-        <div className="flex justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-medication"></div>
+      <section className="card p-5 md:p-7">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Pill size={20} className="text-primary" />
+            <h2 className="text-card-title text-gray-text-primary">我的药物</h2>
+          </div>
+          <p className="text-helper text-gray-text-secondary">共 {medications.length} 种</p>
         </div>
-      ) : medications.length === 0 ? (
-        <div className="card text-center py-12">
-          <Pill size={48} className="text-gray-disabled mx-auto mb-4" />
-          <p className="text-gray-secondary">暂无用药提醒</p>
-          <button
-            onClick={() => navigate('/medications/new')}
-            className="text-medication mt-2"
-          >
-            添加用药提醒
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {medications.map((med) => (
-            <div key={med.id} className="card">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-medication-light rounded-full flex items-center justify-center">
-                    <Pill size={20} className="text-medication" />
+
+        {loading ? (
+          <div className="flex justify-center py-10">
+            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
+          </div>
+        ) : medications.length === 0 ? (
+          <div className="py-10 text-center">
+            <Pill size={46} className="mx-auto text-gray-disabled" />
+            <p className="mt-3 text-helper text-gray-text-secondary">暂无用药提醒</p>
+          </div>
+        ) : (
+          <div className="mt-5 space-y-4">
+            {medications.map((med, index) => {
+              const isActive = med.status === 'active'
+              const toneClass = medToneClasses[index % medToneClasses.length]
+
+              return (
+                <div key={med.id} className={`relative rounded-[22px] border border-gray-border bg-white/54 p-4 shadow-sm transition-colors dark:bg-white/5 ${toneClass} border-l-4`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <button onClick={() => navigate(`/medications/${med.id}/edit`)} className="min-w-0 flex-1 text-left">
+                      <p className="truncate text-body font-semibold text-gray-text-primary">{med.name}</p>
+                      <p className="mt-0.5 text-helper text-gray-text-secondary">{getMedicationCategory(med.name)}</p>
+                    </button>
+                    <button onClick={() => setActionMenuId(actionMenuId === med.id ? null : med.id)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-text-secondary transition-colors hover:bg-primary/10 hover:text-primary" aria-label="更多操作">
+                      <MoreVertical size={18} />
+                    </button>
                   </div>
-                  <div>
-                    <p className="text-body font-medium text-gray-text-primary">{med.name}</p>
-                    <p className="text-small text-gray-secondary mt-0.5">
-                      {med.specification} · {med.dosage}{med.dosageUnit}
-                    </p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <Clock size={14} className="text-gray-helper" />
-                      <span className="text-small text-gray-secondary">
-                        {frequencyText[med.frequency]} · {med.reminderTimes.join(', ')}
-                      </span>
+
+                  {actionMenuId === med.id && (
+                    <div className="absolute right-4 top-12 z-10 w-32 rounded-[16px] border border-gray-border bg-gray-card p-1 shadow-card backdrop-blur-xl">
+                      <button
+                        onClick={() => {
+                          setActionMenuId(null)
+                          navigate(`/medications/${med.id}/edit`)
+                        }}
+                        className="flex w-full items-center gap-2 rounded-[12px] px-3 py-2 text-left text-helper text-gray-text-primary transition-colors hover:bg-primary/10"
+                      >
+                        <Pencil size={15} />
+                        编辑
+                      </button>
+                      <button
+                        onClick={() => handleDelete(med.id)}
+                        className="flex w-full items-center gap-2 rounded-[12px] px-3 py-2 text-left text-helper text-danger transition-colors hover:bg-red-50/80 dark:hover:bg-red-950/20"
+                      >
+                        <Trash2 size={15} />
+                        删除
+                      </button>
+                    </div>
+                  )}
+
+                  <p className="mt-3 text-body font-medium text-gray-text-primary">
+                    {med.specification || `${med.dosage}${med.dosageUnit}`} · {frequencyText[med.frequency] || med.frequency}
+                  </p>
+
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <div className="flex flex-wrap gap-2">
+                      {med.reminderTimes.map((time) => (
+                        <span key={time} className="inline-flex items-center gap-1 rounded-full bg-gray-bg px-2.5 py-1 text-small text-gray-text-secondary dark:bg-white/8">
+                          <Clock size={13} />
+                          {time}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-3">
+                      <Bell size={18} className={isActive ? 'text-primary' : 'text-gray-text-helper'} />
+                      <button
+                        onClick={() => handleToggleStatus(med)}
+                        className={`h-7 w-12 rounded-full p-0.5 transition-colors ${isActive ? 'bg-primary' : 'bg-gray-disabled/50'}`}
+                        aria-label={isActive ? '暂停提醒' : '恢复提醒'}
+                      >
+                        <span className={`block h-6 w-6 rounded-full bg-white shadow-md transition-transform ${isActive ? 'translate-x-5' : 'translate-x-0'}`} />
+                      </button>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {med.status === 'active' ? (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handlePause(med.id)
-                      }}
-                      className="p-2 text-gray-secondary hover:text-warning"
-                    >
-                      <Pause size={18} />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleResume(med.id)
-                      }}
-                      className="p-2 text-gray-secondary hover:text-success"
-                    >
-                      <Play size={18} />
-                    </button>
-                  )}
-                  <button
-                    onClick={() => navigate(`/medications/${med.id}/edit`)}
-                    className="p-2 text-gray-secondary hover:text-primary"
-                  >
-                    <ChevronRight size={20} />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDelete(med.id)
-                    }}
-                    className="p-2 text-gray-secondary hover:text-danger"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-              </div>
-              <div className="mt-3 pt-3 border-t border-gray-border flex justify-between items-center">
-                <span
-                  className={`text-small px-2 py-1 rounded ${
-                    med.status === 'active'
-                      ? 'bg-green-100 text-success'
-                      : 'bg-gray-100 text-gray-secondary'
-                  }`}
-                >
-                  {med.status === 'active' ? '进行中' : '已暂停'}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+              )
+            })}
+          </div>
+        )}
+
+        {medications.length > 0 && (
+          <p className="mt-4 text-center text-small text-gray-text-helper">{activeCount} 种药物正在提醒</p>
+        )}
+      </section>
     </div>
   )
 }

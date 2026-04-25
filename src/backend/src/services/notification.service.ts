@@ -12,6 +12,7 @@ import Util, { RuntimeOptions } from '@alicloud/tea-util';
 import Credential, { Config as CredentialConfig } from '@alicloud/credentials';
 import { AppError } from '../utils/errors';
 import logger from '../utils/logger';
+import { maskPhone } from '../utils/privacy';
 
 interface SMSConfig {
   accessKeyId: string;
@@ -105,17 +106,18 @@ function getAliyunErrorMessage(error: unknown): string {
 }
 
 function logAliyunError(action: string, phone: string, error: unknown): void {
+  const maskedPhone = maskPhone(phone);
   if (typeof error === 'object' && error !== null) {
     const errorWithData = error as { message?: string; data?: Record<string, unknown> };
     logger.error(`阿里云短信接口异常: ${action}`, {
-      phone,
+      phone: maskedPhone,
       message: errorWithData.message,
       data: errorWithData.data,
     });
     return;
   }
 
-  logger.error(`阿里云短信接口异常: ${action}`, { phone, error: String(error) });
+  logger.error(`阿里云短信接口异常: ${action}`, { phone: maskedPhone, error: String(error) });
 }
 
 function isAliyunSuccess(data: AliyunCommonResponse): boolean {
@@ -128,11 +130,11 @@ async function sendSMS(
   templateParam: Record<string, string>
 ): Promise<boolean> {
   if (!smsConfig.accessKeyId || !smsConfig.accessKeySecret) {
-    logger.info(`[SMS模拟] 发送到 ${phone}: 模板=${template}, 参数=${JSON.stringify(templateParam)}`);
+    logger.info(`[SMS模拟] 发送到 ${maskPhone(phone)}: 模板=${template}, 参数=${JSON.stringify(templateParam)}`);
     return true;
   }
 
-  logger.warn('普通短信模板发送尚未接入阿里云官方 SDK', { phone, template, templateParam });
+  logger.warn('普通短信模板发送尚未接入阿里云官方 SDK', { phone: maskPhone(phone), template, templateParam });
   return false;
 }
 
@@ -142,7 +144,7 @@ export async function sendVerificationCode(phone: string): Promise<VerificationS
     const min = Math.pow(10, length - 1);
     const max = Math.pow(10, length) - 1;
     const verifyCode = Math.floor(min + Math.random() * (max - min + 1)).toString();
-    logger.info(`[SMS模拟] 发送验证码到 ${phone}: ${verifyCode}`);
+    logger.info(`[SMS模拟] 发送验证码到 ${maskPhone(phone)}: ${verifyCode}`);
     return {
       success: true,
       verifyCode,
@@ -181,7 +183,7 @@ export async function sendVerificationCode(phone: string): Promise<VerificationS
 
     if (!isAliyunSuccess(data)) {
       logger.error('验证码短信发送失败', {
-        phone,
+        phone: maskPhone(phone),
         code: data.code,
         message: data.message,
         requestId: data.requestId,
