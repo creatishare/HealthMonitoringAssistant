@@ -15,6 +15,8 @@ RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debia
     fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
+RUN test -f /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc
+
 # 复制依赖文件
 COPY package*.json ./
 COPY prisma ./prisma/

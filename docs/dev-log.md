@@ -41,7 +41,17 @@
        - `getAlerts()` 和 `getUnreadAlertCount()` 查询前都会先执行同步，首页红点和消息中心列表都会触发补账。
      - `checkMissedMedications()` 改为复用同一同步逻辑，保留 worker 入口兼容。
 
-3. **“我的”页面重构 + 功能入口补齐**
+3. **修复线上点击“服用”提示成功但状态不变**
+   - 线上复现：
+     - `GET /api/medications/today` 返回的今日用药没有 `scheduledAt` 字段，说明线上后端仍是旧接口形态。
+     - 前端用浏览器本地时区兜底生成 `2026-04-25T00:00:00.000Z` 后，`POST /medications/logs` 会返回成功，但旧后端今日列表实际按 `2026-04-25T08:00:00.000Z` 查找，所以仍显示 pending。
+   - 方案：
+     - `src/frontend/src/pages/Medications.tsx`
+     - `src/frontend/src/pages/Dashboard.tsx`
+     - 如果后端返回 `scheduledAt`，优先使用后端精确时间。
+     - 如果旧后端没有 `scheduledAt`，前端兜底改为按 `Asia/Shanghai` 日期 + UTC 同一提醒时刻生成，例如 `08:00` → `2026-04-25T08:00:00.000Z`，兼容旧后端查询方式。
+
+4. **“我的”页面重构 + 功能入口补齐**
    - `src/frontend/src/pages/Profile.tsx`
      - 改成截图风格：个人卡、健康档案摘要、功能入口列表。
      - 新增入口：数据导出、提醒设置、分享给医生、隐私与安全、帮助中心、意见反馈。
@@ -56,7 +66,7 @@
    - `src/frontend/src/services/api.ts`
      - 新增 `userApi.getProfile/updateProfile`、`authApi.changePassword`。
 
-4. **报告导出 API + PDF 中文乱码修复**
+5. **报告导出 API + PDF 中文乱码修复**
    - 新增后端接口：
      - `src/backend/src/controllers/report.controller.ts`
      - `src/backend/src/routes/report.routes.ts`
@@ -73,8 +83,13 @@
    - Docker 字体补充：
      - `src/backend/Dockerfile` 增加 `fonts-noto-cjk`
      - `infrastructure/docker/Dockerfile.backend` 增加 `font-noto-cjk`
+   - 2026-04-25 线上复测：
+     - 报告接口已生效，但下载 PDF 只有约 2KB，`strings report.pdf | rg "BaseFont|ToUnicode"` 显示仍是 `/Helvetica` + `/WinAnsiEncoding`，确认容器没有成功加载中文字体。
+     - `src/backend/src/services/report.service.ts` 改为找不到中文字体时直接返回 500，不再悄悄生成乱码 PDF。
+     - `docker-compose.yml` 为 backend 显式设置 `PDF_FONT_PATH=/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc`。
+     - `src/backend/Dockerfile` 增加字体文件存在性检查；必须 `docker compose build --no-cache backend`，仅 restart 不会把新增字体装进旧镜像。
 
-5. **“用药”页面 UI 重构**
+6. **“用药”页面 UI 重构**
    - `src/frontend/src/pages/Medications.tsx`
      - 改为截图风格三段式：
        1. “今日用药计划”时间轴，按提醒时间分组，展示 `已服/服用`。
@@ -83,7 +98,7 @@
      - 三点菜单保留“编辑 / 删除”。
      - 暂停/恢复提醒后会刷新今日计划和列表。
 
-6. **“健康记录”页面 UI 重构**
+7. **“健康记录”页面 UI 重构**
    - `src/frontend/src/pages/Records.tsx`
      - 改为截图风格工作台：
        1. “智能识别检测报告”卡片，含“拍照识别 / 上传图片”入口。

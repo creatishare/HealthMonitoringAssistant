@@ -67,10 +67,30 @@ export function getRecommendedMetrics(userType?: UserType | null, primaryDisease
   }
 }
 
-function getLocalScheduledAt(scheduledTime: string) {
+function getAppDateString(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+
+  const year = parts.find((part) => part.type === 'year')?.value
+  const month = parts.find((part) => part.type === 'month')?.value
+  const day = parts.find((part) => part.type === 'day')?.value
+
+  return `${year}-${month}-${day}`
+}
+
+function getFallbackScheduledAt(scheduledTime: string) {
   const [hours, minutes] = scheduledTime.split(':').map(Number)
-  const now = new Date()
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0).toISOString()
+  const [year, month, day] = getAppDateString().split('-').map(Number)
+  // 兼容未返回 scheduledAt 的旧后端：旧逻辑用 UTC 日期中的同一时刻匹配日志。
+  return new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0)).toISOString()
+}
+
+function getScheduledAt(med: TodayMedication) {
+  return med.scheduledAt || getFallbackScheduledAt(med.scheduledTime)
 }
 
 function getMillisecondsUntilNextDay() {
@@ -186,7 +206,7 @@ export default function Dashboard() {
     try {
       await medicationApi.recordLog({
         medicationId: med.medicationId,
-        scheduledTime: med.scheduledAt || getLocalScheduledAt(med.scheduledTime),
+        scheduledTime: getScheduledAt(med),
         status: 'taken',
         actualTime: new Date().toISOString(),
       })

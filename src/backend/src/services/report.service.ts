@@ -82,20 +82,32 @@ const PDF_FONT_CANDIDATES = [
   process.env.PDF_FONT_PATH,
   '/Library/Fonts/Arial Unicode.ttf',
   '/System/Library/Fonts/Supplemental/Arial Unicode.ttf',
+  '/System/Library/Fonts/Arial Unicode.ttf',
   '/System/Library/Fonts/STHeiti Medium.ttc',
+  '/System/Library/Fonts/Supplemental/STHeiti Medium.ttc',
   '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+  '/usr/share/fonts/opentype/noto/NotoSansCJKsc-Regular.ttc',
+  '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otc',
   '/usr/share/fonts/opentype/noto/NotoSansCJKsc-Regular.otf',
   '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otf',
   '/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc',
+  '/usr/share/fonts/noto-cjk/NotoSansCJKsc-Regular.ttc',
   '/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.otf',
+  '/usr/share/fonts/noto-cjk/NotoSansCJKsc-Regular.otf',
   '/usr/share/fonts/noto/NotoSansCJK-Regular.ttc',
+  '/usr/share/fonts/noto/NotoSansCJKsc-Regular.ttc',
   '/usr/share/fonts/noto/NotoSansCJK-Regular.otf',
+  '/usr/share/fonts/noto/NotoSansCJKsc-Regular.otf',
   '/usr/share/fonts/truetype/arphic/uming.ttc',
 ].filter(Boolean) as string[];
 
 function setupPdfFonts(doc: PDFKit.PDFDocument) {
+  const missingFontPaths: string[] = [];
+  const failedFontPaths: string[] = [];
+
   for (const fontPath of PDF_FONT_CANDIDATES) {
     if (!fs.existsSync(fontPath)) {
+      missingFontPaths.push(fontPath);
       continue;
     }
 
@@ -105,11 +117,23 @@ function setupPdfFonts(doc: PDFKit.PDFDocument) {
       logger.info(`PDF中文字体加载成功: ${fontPath}`);
       return;
     } catch (error) {
+      failedFontPaths.push(fontPath);
       logger.warn(`PDF中文字体加载失败: ${fontPath}`, error);
     }
   }
 
-  logger.warn('未找到可用中文字体，PDF中文可能显示异常。可通过 PDF_FONT_PATH 指定字体文件。');
+  logger.error('未找到可用中文字体，已拒绝生成乱码 PDF', {
+    configuredFontPath: process.env.PDF_FONT_PATH,
+    checkedPaths: PDF_FONT_CANDIDATES,
+    missingFontPaths,
+    failedFontPaths,
+  });
+
+  throw new ApiError(
+    '服务器缺少可用中文字体，无法生成健康报告。请重建后端镜像并安装 fonts-noto-cjk，或通过 PDF_FONT_PATH 指定字体文件。',
+    500,
+    '05001'
+  );
 }
 
 function validateDateRange(startDate: string, endDate: string) {

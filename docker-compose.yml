@@ -46,6 +46,7 @@ services:
       REDIS_URL: redis://redis:6379
       PORT: 3001
       NODE_ENV: production
+      PDF_FONT_PATH: ${PDF_FONT_PATH:-/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc}
     volumes:
       - backend_uploads:/app/uploads
     depends_on:
