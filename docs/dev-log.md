@@ -26,9 +26,22 @@
      - `src/frontend/src/pages/Medications.tsx`
        - 点击服用同样使用后端返回的 `scheduledAt`。
      - `src/frontend/src/stores/dashboardStore.ts`
-       - medication 类型新增 `scheduledAt?: string`。
+     - medication 类型新增 `scheduledAt?: string`。
 
-2. **“我的”页面重构 + 功能入口补齐**
+2. **修复消息中心不生成过期用药提醒**
+   - 根因：
+     - 旧逻辑依赖 `reminderWorker` 在提醒时间点创建 `MedicationLog(status=missed)`，消息中心只会把已有的 missed 日志转成预警。
+     - 如果 worker 未运行、部署重启、或错过 08:00 这一轮扫描，晚上打开消息中心时没有任何补偿逻辑，因此不会出现提醒。
+   - 方案：
+     - `src/backend/src/services/alert.service.ts`
+       - 新增 `syncMissedMedicationAlerts(userId)`。
+       - 读取用户今日应服药计划，按 `Asia/Shanghai` 应用日期计算计划时间。
+       - 对已超过计划时间 30 分钟且没有日志的项目自动创建 `MedicationLog(status=missed)`。
+       - 对 missed 但没有预警的日志补建 medication warning alert，且通过日志关联避免重复预警。
+       - `getAlerts()` 和 `getUnreadAlertCount()` 查询前都会先执行同步，首页红点和消息中心列表都会触发补账。
+     - `checkMissedMedications()` 改为复用同一同步逻辑，保留 worker 入口兼容。
+
+3. **“我的”页面重构 + 功能入口补齐**
    - `src/frontend/src/pages/Profile.tsx`
      - 改成截图风格：个人卡、健康档案摘要、功能入口列表。
      - 新增入口：数据导出、提醒设置、分享给医生、隐私与安全、帮助中心、意见反馈。
@@ -43,7 +56,7 @@
    - `src/frontend/src/services/api.ts`
      - 新增 `userApi.getProfile/updateProfile`、`authApi.changePassword`。
 
-3. **报告导出 API + PDF 中文乱码修复**
+4. **报告导出 API + PDF 中文乱码修复**
    - 新增后端接口：
      - `src/backend/src/controllers/report.controller.ts`
      - `src/backend/src/routes/report.routes.ts`
@@ -61,7 +74,7 @@
      - `src/backend/Dockerfile` 增加 `fonts-noto-cjk`
      - `infrastructure/docker/Dockerfile.backend` 增加 `font-noto-cjk`
 
-4. **“用药”页面 UI 重构**
+5. **“用药”页面 UI 重构**
    - `src/frontend/src/pages/Medications.tsx`
      - 改为截图风格三段式：
        1. “今日用药计划”时间轴，按提醒时间分组，展示 `已服/服用`。
@@ -70,7 +83,7 @@
      - 三点菜单保留“编辑 / 删除”。
      - 暂停/恢复提醒后会刷新今日计划和列表。
 
-5. **“健康记录”页面 UI 重构**
+6. **“健康记录”页面 UI 重构**
    - `src/frontend/src/pages/Records.tsx`
      - 改为截图风格工作台：
        1. “智能识别检测报告”卡片，含“拍照识别 / 上传图片”入口。

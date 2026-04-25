@@ -1,7 +1,58 @@
 import prisma from '../config/database';
-import { AlertLevel, AlertType, HealthRecord, DrugConcentrationRecord, MedicationLog } from '@prisma/client';
+import { AlertLevel, AlertType, HealthRecord, DrugConcentrationRecord, MedicationFrequency } from '@prisma/client';
 import { AppError } from '../utils/errors';
 import logger from '../utils/logger';
+
+const APP_TIME_ZONE = 'Asia/Shanghai';
+const APP_TIME_ZONE_OFFSET = '+08:00';
+const MISSED_MEDICATION_GRACE_MINUTES = 30;
+
+function getAppDateString(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: APP_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  const day = parts.find((part) => part.type === 'day')?.value;
+
+  return `${year}-${month}-${day}`;
+}
+
+function getAppDateTime(date: string, hours: number, minutes: number) {
+  const hourText = hours.toString().padStart(2, '0');
+  const minuteText = minutes.toString().padStart(2, '0');
+  return new Date(`${date}T${hourText}:${minuteText}:00.000${APP_TIME_ZONE_OFFSET}`);
+}
+
+function shouldTakeMedicationToday(
+  frequency: MedicationFrequency,
+  createdAt: Date,
+  todayDate = getAppDateString()
+) {
+  const todayStart = getAppDateTime(todayDate, 0, 0);
+  const createdDate = getAppDateString(createdAt);
+  const createdStart = getAppDateTime(createdDate, 0, 0);
+  const daysSinceCreated = Math.floor(
+    (todayStart.getTime() - createdStart.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  switch (frequency) {
+    case 'once_daily':
+    case 'twice_daily':
+    case 'three_daily':
+      return true;
+    case 'every_other_day':
+      return daysSinceCreated % 2 === 0;
+    case 'weekly':
+      return daysSinceCreated % 7 === 0;
+    default:
+      return true;
+  }
+}
 
 // 预警规则定义
 interface AlertRule {
@@ -166,6 +217,8 @@ export async function getAlerts(
     pageSize?: number;
   }
 ) {
+  await syncMissedMedicationAlerts(userId);
+
   const { level, isRead, page = 1, pageSize = 20 } = options;
 
   const where: any = { userId };
@@ -216,6 +269,8 @@ export async function getAlerts(
 
 // 获取未读预警数量
 export async function getUnreadAlertCount(userId: string) {
+  await syncMissedMedicationAlerts(userId);
+
   const unreadCount = await prisma.alert.groupBy({
     by: ['level'],
     where: { userId, isRead: false },
@@ -277,15 +332,94 @@ export async function deleteAlert(userId: string, alertId: string) {
 
 // 检查漏服药物并创建预警
 export async function checkMissedMedications(userId: string) {
-  const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+  return syncMissedMedicationAlerts(userId);
+}
 
-  // 查找30分钟前计划服药但状态为missed且没有预警的记录
+// 补齐今天已过提醒时间但没有日志的漏服提醒，避免依赖定时 worker 的单点触发
+export async function syncMissedMedicationAlerts(userId: string) {
+  const now = new Date();
+  const todayDate = getAppDateString(now);
+  const cutoff = new Date(now.getTime() - MISSED_MEDICATION_GRACE_MINUTES * 60 * 1000);
+
+  const medications = await prisma.medication.findMany({
+    where: {
+      userId,
+      status: 'active',
+    },
+  });
+
+  const newlyCreatedAlerts = [];
+
+  for (const medication of medications) {
+    if (!shouldTakeMedicationToday(medication.frequency, medication.createdAt, todayDate)) {
+      continue;
+    }
+
+    for (const reminderTime of medication.reminderTimes) {
+      const scheduledTime = getAppDateTime(
+        todayDate,
+        reminderTime.getUTCHours(),
+        reminderTime.getUTCMinutes()
+      );
+
+      if (scheduledTime > cutoff) {
+        continue;
+      }
+
+      let log = await prisma.medicationLog.findFirst({
+        where: {
+          userId,
+          medicationId: medication.id,
+          scheduledTime: {
+            gte: scheduledTime,
+            lt: new Date(scheduledTime.getTime() + 60000),
+          },
+        },
+        include: {
+          medication: true,
+          alerts: true,
+        },
+      });
+
+      if (!log) {
+        log = await prisma.medicationLog.create({
+          data: {
+            userId,
+            medicationId: medication.id,
+            scheduledTime,
+            status: 'missed',
+          },
+          include: {
+            medication: true,
+            alerts: true,
+          },
+        });
+      }
+
+      if (log.status !== 'missed' || log.alerts.length > 0) {
+        continue;
+      }
+
+      const alert = await createAlert(userId, {
+        level: 'warning',
+        type: 'medication',
+        message: `您已错过${log.medication.name}的服药时间，请尽快补服或咨询医生`,
+        suggestion: '规律服药对控制病情非常重要',
+        medicationId: log.medicationId,
+        medicationLogId: log.id,
+      });
+
+      newlyCreatedAlerts.push(alert);
+    }
+  }
+
+  // 兼容旧逻辑：如果已有 missed 日志但还没有预警，也一并补上
   const missedLogs = await prisma.medicationLog.findMany({
     where: {
       userId,
       status: 'missed',
       scheduledTime: {
-        lte: thirtyMinutesAgo,
+        lte: cutoff,
       },
       alerts: {
         none: {},
@@ -295,8 +429,6 @@ export async function checkMissedMedications(userId: string) {
       medication: true,
     },
   });
-
-  const alerts = [];
 
   for (const log of missedLogs) {
     const alert = await createAlert(userId, {
@@ -308,8 +440,8 @@ export async function checkMissedMedications(userId: string) {
       medicationLogId: log.id,
     });
 
-    alerts.push(alert);
+    newlyCreatedAlerts.push(alert);
   }
 
-  return alerts;
+  return newlyCreatedAlerts;
 }

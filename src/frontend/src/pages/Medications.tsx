@@ -247,7 +247,7 @@ export default function Medications() {
                               已服
                             </span>
                           ) : (
-                            <button onClick={() => handleMarkTaken(med)} className="inline-flex h-9 shrink-0 items-center gap-2 rounded-button border border-gray-border bg-white/80 px-3 text-helper font-medium text-gray-text-primary shadow-sm transition-colors hover:border-success/40 hover:text-success dark:bg-white/5">
+                            <button onClick={() => handleMarkTaken(med)} className="inline-flex h-9 shrink-0 items-center gap-2 rounded-button bg-primary px-4 text-helper font-semibold text-white shadow-[0_8px_18px_rgba(0,145,160,0.24)] transition-all hover:-translate-y-0.5 hover:bg-primary-dark hover:shadow-[0_10px_22px_rgba(0,145,160,0.3)] active:translate-y-0">
                               <Check size={15} />
                               服用
                             </button>

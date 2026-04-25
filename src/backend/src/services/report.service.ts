@@ -6,6 +6,7 @@ import { getAlerts } from './alert.service';
 import { getHealthRecords, getRecentMetrics } from './health-record.service';
 import { getTodayMedications } from './medication.service';
 import { getUserProfile } from './user.service';
+import logger from '../utils/logger';
 
 interface ReportMetric {
   key: string;
@@ -84,23 +85,31 @@ const PDF_FONT_CANDIDATES = [
   '/System/Library/Fonts/STHeiti Medium.ttc',
   '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
   '/usr/share/fonts/opentype/noto/NotoSansCJKsc-Regular.otf',
+  '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otf',
   '/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc',
+  '/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.otf',
+  '/usr/share/fonts/noto/NotoSansCJK-Regular.ttc',
+  '/usr/share/fonts/noto/NotoSansCJK-Regular.otf',
   '/usr/share/fonts/truetype/arphic/uming.ttc',
 ].filter(Boolean) as string[];
 
-function getChineseFontPath() {
-  return PDF_FONT_CANDIDATES.find((fontPath) => fs.existsSync(fontPath));
-}
-
 function setupPdfFonts(doc: PDFKit.PDFDocument) {
-  const fontPath = getChineseFontPath();
+  for (const fontPath of PDF_FONT_CANDIDATES) {
+    if (!fs.existsSync(fontPath)) {
+      continue;
+    }
 
-  if (!fontPath) {
-    return;
+    try {
+      doc.registerFont(PDF_FONT_NAME, fontPath);
+      doc.font(PDF_FONT_NAME);
+      logger.info(`PDF中文字体加载成功: ${fontPath}`);
+      return;
+    } catch (error) {
+      logger.warn(`PDF中文字体加载失败: ${fontPath}`, error);
+    }
   }
 
-  doc.registerFont(PDF_FONT_NAME, fontPath);
-  doc.font(PDF_FONT_NAME);
+  logger.warn('未找到可用中文字体，PDF中文可能显示异常。可通过 PDF_FONT_PATH 指定字体文件。');
 }
 
 function validateDateRange(startDate: string, endDate: string) {

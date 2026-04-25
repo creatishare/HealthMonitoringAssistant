@@ -83,6 +83,29 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
+async function getApiErrorMessage(error: any, fallback: string) {
+  const status = error?.response?.status
+  const data = error?.response?.data
+
+  if (data instanceof Blob) {
+    try {
+      const text = await data.text()
+      const parsed = JSON.parse(text)
+      if (parsed?.message) return parsed.message
+    } catch {
+      // Keep the fallback below if the blob is not JSON.
+    }
+  }
+
+  if (data?.message) return data.message
+  if (status === 401) return '登录已过期，请重新登录'
+  if (status === 404) return '报告接口不存在，请确认后端已部署最新版本'
+  if (status === 500) return '报告生成失败，请查看后端日志'
+  if (!error?.response) return '无法连接服务器，请检查后端服务'
+
+  return fallback
+}
+
 export default function Profile() {
   const navigate = useNavigate()
   const { logout, user } = useAuthStore()
@@ -147,7 +170,7 @@ export default function Profile() {
       downloadBlob(report.blob, report.filename)
       toast.success('报告已生成')
     } catch (error) {
-      toast.error('导出失败，请稍后重试')
+      toast.error(await getApiErrorMessage(error, '导出失败，请稍后重试'))
     } finally {
       setExporting(false)
     }
@@ -176,7 +199,7 @@ export default function Profile() {
       }
     } catch (error: any) {
       if (error?.name !== 'AbortError') {
-        toast.error('分享失败，请稍后重试')
+        toast.error(await getApiErrorMessage(error, '分享失败，请稍后重试'))
       }
     } finally {
       setExporting(false)
