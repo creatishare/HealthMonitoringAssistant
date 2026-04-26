@@ -6,6 +6,7 @@ import logger from '../utils/logger';
 const APP_TIME_ZONE = 'Asia/Shanghai';
 const APP_TIME_ZONE_OFFSET = '+08:00';
 const MISSED_MEDICATION_GRACE_MINUTES = 30;
+const MEDICATION_ALERT_DISMISSED_MARKER = '[medication-alert-dismissed]';
 
 function getAppDateString(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -52,6 +53,32 @@ function shouldTakeMedicationToday(
     default:
       return true;
   }
+}
+
+function hasDismissedMedicationAlert(notes?: string | null) {
+  return notes?.includes(MEDICATION_ALERT_DISMISSED_MARKER) ?? false;
+}
+
+async function markMedicationAlertDismissed(medicationLogId?: string | null) {
+  if (!medicationLogId) {
+    return;
+  }
+
+  const log = await prisma.medicationLog.findUnique({
+    where: { id: medicationLogId },
+    select: { notes: true },
+  });
+
+  if (!log || hasDismissedMedicationAlert(log.notes)) {
+    return;
+  }
+
+  await prisma.medicationLog.update({
+    where: { id: medicationLogId },
+    data: {
+      notes: log.notes ? `${log.notes}\n${MEDICATION_ALERT_DISMISSED_MARKER}` : MEDICATION_ALERT_DISMISSED_MARKER,
+    },
+  });
 }
 
 // 预警规则定义
@@ -325,9 +352,42 @@ export async function deleteAlert(userId: string, alertId: string) {
     throw new AppError('预警不存在', 404, '00003');
   }
 
+  if (alert.type === 'medication') {
+    await markMedicationAlertDismissed(alert.medicationLogId);
+  }
+
   await prisma.alert.delete({
     where: { id: alertId },
   });
+}
+
+// 删除所有已读预警
+export async function deleteReadAlerts(userId: string) {
+  const readMedicationAlerts = await prisma.alert.findMany({
+    where: {
+      userId,
+      isRead: true,
+      type: 'medication',
+      medicationLogId: { not: null },
+    },
+    select: { medicationLogId: true },
+  });
+
+  const medicationLogIds = Array.from(
+    new Set(
+      readMedicationAlerts
+        .map((alert) => alert.medicationLogId)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+
+  await Promise.all(medicationLogIds.map((id) => markMedicationAlertDismissed(id)));
+
+  const result = await prisma.alert.deleteMany({
+    where: { userId, isRead: true },
+  });
+
+  return result.count;
 }
 
 // 检查漏服药物并创建预警
@@ -396,7 +456,7 @@ export async function syncMissedMedicationAlerts(userId: string) {
         });
       }
 
-      if (log.status !== 'missed' || log.alerts.length > 0) {
+      if (log.status !== 'missed' || log.alerts.length > 0 || hasDismissedMedicationAlert(log.notes)) {
         continue;
       }
 
@@ -421,6 +481,10 @@ export async function syncMissedMedicationAlerts(userId: string) {
       scheduledTime: {
         lte: cutoff,
       },
+      OR: [
+        { notes: null },
+        { NOT: { notes: { contains: MEDICATION_ALERT_DISMISSED_MARKER } } },
+      ],
       alerts: {
         none: {},
       },

@@ -94,6 +94,7 @@ export const alertApi = {
   markAsRead: (id: string) => api.put(`/alerts/${id}/read`),
   markAllAsRead: () => api.put('/alerts/read-all'),
   delete: (id: string) => api.delete(`/alerts/${id}`),
+  deleteRead: () => api.delete('/alerts/read'),
 }
 
 export const dashboardApi = {

@@ -48,6 +48,7 @@ export default function Alerts() {
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [unreadCount, setUnreadCount] = useState({ critical: 0, warning: 0, info: 0, total: 0 })
   const [loading, setLoading] = useState(false)
+  const hasReadAlerts = alerts.some((alert) => alert.isRead)
 
   useEffect(() => {
     fetchAlerts()
@@ -99,10 +100,23 @@ export default function Alerts() {
   const handleDelete = async (id: string) => {
     try {
       await alertApi.delete(id)
+      toast.success('已删除')
       fetchAlerts()
       fetchUnreadCount()
     } catch (error) {
       toast.error('删除失败')
+    }
+  }
+
+  const handleDeleteRead = async () => {
+    try {
+      const response: any = await alertApi.deleteRead()
+      const count = response.data?.count ?? 0
+      toast.success(count > 0 ? `已删除${count}条已读消息` : '暂无已读消息')
+      fetchAlerts()
+      fetchUnreadCount()
+    } catch (error) {
+      toast.error('删除已读消息失败')
     }
   }
 
@@ -122,15 +136,26 @@ export default function Alerts() {
           </button>
           <h1 className="text-page-title font-semibold text-gray-text-primary">预警中心</h1>
         </div>
-        {unreadCount.total > 0 && (
-          <button
-            onClick={handleMarkAllAsRead}
-            className="text-small text-primary flex items-center gap-1"
-          >
-            <CheckCircle size={16} />
-            全部已读
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {hasReadAlerts && (
+            <button
+              onClick={handleDeleteRead}
+              className="flex items-center gap-1 text-small text-gray-text-secondary"
+            >
+              <Trash2 size={16} />
+              删除已读
+            </button>
+          )}
+          {unreadCount.total > 0 && (
+            <button
+              onClick={handleMarkAllAsRead}
+              className="flex items-center gap-1 text-small text-primary"
+            >
+              <CheckCircle size={16} />
+              全部已读
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 未读统计 */}

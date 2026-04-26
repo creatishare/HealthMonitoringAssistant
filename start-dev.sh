@@ -31,6 +31,34 @@ export PATH="$HOME/.local/bin:$PATH"
 # 日志文件
 BACKEND_LOG="$PROJECT_ROOT/backend.log"
 
+get_database_url() {
+    if [ -n "${DATABASE_URL:-}" ]; then
+        echo "$DATABASE_URL"
+        return
+    fi
+
+    if [ -f "$BACKEND_DIR/.env" ]; then
+        grep -E '^DATABASE_URL=' "$BACKEND_DIR/.env" | head -n 1 | sed -E 's/^DATABASE_URL=//; s/^"//; s/"$//'
+    fi
+}
+
+get_pg_check_url() {
+    local database_url="$1"
+
+    echo "$database_url" | sed -E 's/[?&]schema=[^&"]*//; s/\?&/?/; s/[?&]$//'
+}
+
+postgres_ready() {
+    local database_url
+    database_url="$(get_database_url)"
+
+    if [ -n "$database_url" ]; then
+        pg_isready -d "$(get_pg_check_url "$database_url")" >/dev/null 2>&1
+    else
+        pg_isready -h localhost -p 5432 >/dev/null 2>&1
+    fi
+}
+
 # 显示帮助
 show_help() {
     echo -e "${BLUE}肾衰竭健康监测应用 - 本地开发工具${NC}"
@@ -58,10 +86,10 @@ check_status() {
     echo ""
 
     # PostgreSQL
-    if pg_isready -h localhost -p 5432 >/dev/null 2>&1; then
-        echo -e "${GREEN}✓ PostgreSQL${NC}  运行中 (localhost:5432)"
+    if postgres_ready; then
+        echo -e "${GREEN}✓ PostgreSQL${NC}  运行中 (项目数据库可连接)"
     else
-        echo -e "${RED}✗ PostgreSQL${NC}  未运行"
+        echo -e "${RED}✗ PostgreSQL${NC}  未运行或项目数据库不可连接"
     fi
 
     # Redis
@@ -112,11 +140,13 @@ start_services() {
 
     # 1. 检查 PostgreSQL
     echo -e "${YELLOW}[1/5] 检查 PostgreSQL...${NC}"
-    if ! pg_isready -h localhost -p 5432 >/dev/null 2>&1; then
-        echo -e "${RED}  PostgreSQL 未运行，请执行: brew services start postgresql@14${NC}"
+    if ! postgres_ready; then
+        echo -e "${RED}  PostgreSQL 未运行或项目数据库不可连接${NC}"
+        echo -e "${YELLOW}  请先确认服务已启动: brew services start postgresql@14${NC}"
+        echo -e "${YELLOW}  如服务已启动但仍失败，请确认数据库存在: createdb health_monitoring${NC}"
         exit 1
     fi
-    echo -e "${GREEN}  PostgreSQL 运行中${NC}"
+    echo -e "${GREEN}  PostgreSQL 运行中，项目数据库可连接${NC}"
 
     # 2. 检查 Redis
     echo -e "${YELLOW}[2/5] 检查 Redis...${NC}"

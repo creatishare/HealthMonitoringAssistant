@@ -115,3 +115,24 @@ export async function deleteAlert(req: Request, res: Response, next: NextFunctio
     next(error);
   }
 }
+
+// 删除所有已读预警
+export async function deleteReadAlerts(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      throw new ApiError('未登录', 401, '01007');
+    }
+
+    const count = await alertService.deleteReadAlerts(userId);
+
+    res.status(200).json({
+      code: 200,
+      message: '删除成功',
+      data: { count },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
