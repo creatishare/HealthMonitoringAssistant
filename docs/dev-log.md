@@ -93,6 +93,7 @@
      - `report.service.ts` 增加自动字体发现：递归扫描 `/usr/share/fonts`、`/usr/local/share/fonts` 等目录，优先选择 Noto Sans CJK SC / Noto Sans CJK / Source Han Sans / WenQuanYi。
      - 生产环境默认只使用开源/Linux 字体候选；macOS 的 Arial Unicode / STHeiti 仅作为本地开发兜底，避免把专有字体作为生产依赖。
      - `infrastructure/docker/Dockerfile.backend` 同步增加 Noto CJK 字体构建检查。
+     - 线上日志出现 `this.font.createSubset is not a function`，确认 PDFKit 打开了 `.ttc` 字体集合而不是集合内具体字体；已为 `.ttc/.otc` 增加 face name 尝试（优先 `NotoSansCJKsc-Regular`）。
 
 6. **“用药”页面 UI 重构**
    - `src/frontend/src/pages/Medications.tsx`

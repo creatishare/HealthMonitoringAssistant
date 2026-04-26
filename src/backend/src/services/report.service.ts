@@ -188,6 +188,38 @@ function getPdfFontCandidates() {
     .sort((a, b) => scoreFontPath(b) - scoreFontPath(a));
 }
 
+function getFontCollectionFaces(fontPath: string) {
+  const normalized = fontPath.toLowerCase();
+
+  if (!normalized.endsWith('.ttc') && !normalized.endsWith('.otc')) {
+    return [undefined];
+  }
+
+  if (normalized.includes('notosanscjk')) {
+    return [
+      'NotoSansCJKsc-Regular',
+      'NotoSansCJK-Regular',
+      'NotoSansCJKtc-Regular',
+      'NotoSansCJKjp-Regular',
+      'NotoSansCJKkr-Regular',
+    ];
+  }
+
+  if (normalized.includes('uming')) {
+    return ['AR PL UMing CN', 'AR PL UMing HK', 'AR PL UMing TW'];
+  }
+
+  if (normalized.includes('wqy')) {
+    return ['WenQuanYi Zen Hei', 'WenQuanYi Micro Hei'];
+  }
+
+  if (normalized.includes('stheiti')) {
+    return ['STHeitiSC-Medium', 'STHeitiTC-Medium'];
+  }
+
+  return [undefined];
+}
+
 function setupPdfFonts(doc: PDFKit.PDFDocument) {
   const missingFontPaths: string[] = [];
   const failedFontPaths: string[] = [];
@@ -199,14 +231,16 @@ function setupPdfFonts(doc: PDFKit.PDFDocument) {
       continue;
     }
 
-    try {
-      doc.registerFont(PDF_FONT_NAME, fontPath);
-      doc.font(PDF_FONT_NAME);
-      logger.info(`PDF中文字体加载成功: ${fontPath}`);
-      return;
-    } catch (error) {
-      failedFontPaths.push(fontPath);
-      logger.warn(`PDF中文字体加载失败: ${fontPath}`, error);
+    for (const faceName of getFontCollectionFaces(fontPath)) {
+      try {
+        doc.registerFont(PDF_FONT_NAME, fontPath, faceName);
+        doc.font(PDF_FONT_NAME);
+        logger.info(`PDF中文字体加载成功: ${fontPath}${faceName ? ` (${faceName})` : ''}`);
+        return;
+      } catch (error) {
+        failedFontPaths.push(`${fontPath}${faceName ? ` (${faceName})` : ''}`);
+        logger.warn(`PDF中文字体加载失败: ${fontPath}${faceName ? ` (${faceName})` : ''}`, error);
+      }
     }
   }
 
