@@ -29,7 +29,7 @@
 
 - **心率字段临时方案**：`/records` 新 UI 中心率暂存到 `HealthRecord.notes`，格式为 `心率：72次/分`，最近记录从 notes 提取展示。若后续需要心率趋势/统计，需新增 Prisma 字段并迁移。
 - **PDF 中文排查**：若重新导出的 PDF 仍乱码，先确认后端是否已重启并加载 `src/backend/src/services/report.service.ts` 最新代码；正常 PDF 应嵌入 `ArialUnicodeMS` / `NotoSansCJK`，不应只有 `/Helvetica`。
-- **PDF 字体部署**：如果 PDF 只有约 2KB 且 `strings report.pdf | rg "BaseFont|ToUnicode"` 显示 `/Helvetica` / `/WinAnsiEncoding`，说明容器未加载中文字体。必须 `docker compose build --no-cache backend` 重建镜像，不能只 restart；`docker-compose.yml` 已设置默认 `PDF_FONT_PATH=/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc`。
+- **PDF 字体部署**：如果 PDF 只有约 2KB 且 `strings report.pdf | rg "BaseFont|ToUnicode"` 显示 `/Helvetica` / `/WinAnsiEncoding`，说明容器未加载中文字体。必须 `docker compose build --no-cache backend` 重建镜像，不能只 restart；`docker-compose.yml` 已设置默认 `PDF_FONT_PATH=/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc`。`report.service.ts` 会递归扫描 `/usr/share/fonts` 并优先使用 Noto/Source Han/WenQuanYi，生产环境不要依赖 Arial Unicode、STHeiti、微软雅黑、苹方等专有字体。
 - **用药漏服预警**：不要只依赖 `reminderWorker`。`src/backend/src/services/alert.service.ts` 的 `syncMissedMedicationAlerts()` 会在消息列表/未读数查询前按 Asia/Shanghai 日期补建今天已超时 30 分钟的 missed 日志和 medication alert。
 - **用药“服用”时间兼容**：新后端应返回 `scheduledAt`，前端直接回传。若线上旧后端没有 `scheduledAt`，`Dashboard.tsx` / `Medications.tsx` 会兜底用 Asia/Shanghai 日期 + UTC 同一提醒时刻（如 `08:00` → `T08:00:00.000Z`），避免写入成功但今日列表查不到。
 

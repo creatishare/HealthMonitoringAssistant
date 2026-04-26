@@ -15,7 +15,7 @@ RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debia
     fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
-RUN test -f /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc
+RUN find /usr/share/fonts -iname '*NotoSansCJK*' -print -quit | grep .
 
 # 复制依赖文件
 COPY package*.json ./

@@ -78,13 +78,7 @@ const METRIC_LABELS: Array<{ key: keyof ReportRecord; label: string; unit?: stri
 ];
 
 const PDF_FONT_NAME = 'ChineseSans';
-const PDF_FONT_CANDIDATES = [
-  process.env.PDF_FONT_PATH,
-  '/Library/Fonts/Arial Unicode.ttf',
-  '/System/Library/Fonts/Supplemental/Arial Unicode.ttf',
-  '/System/Library/Fonts/Arial Unicode.ttf',
-  '/System/Library/Fonts/STHeiti Medium.ttc',
-  '/System/Library/Fonts/Supplemental/STHeiti Medium.ttc',
+const OPEN_SOURCE_PDF_FONT_CANDIDATES = [
   '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
   '/usr/share/fonts/opentype/noto/NotoSansCJKsc-Regular.ttc',
   '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otc',
@@ -98,14 +92,108 @@ const PDF_FONT_CANDIDATES = [
   '/usr/share/fonts/noto/NotoSansCJKsc-Regular.ttc',
   '/usr/share/fonts/noto/NotoSansCJK-Regular.otf',
   '/usr/share/fonts/noto/NotoSansCJKsc-Regular.otf',
+  '/usr/share/fonts/opentype/source-han-sans/SourceHanSansSC-Regular.otf',
+  '/usr/share/fonts/opentype/source-han-sans/SourceHanSansCN-Regular.otf',
   '/usr/share/fonts/truetype/arphic/uming.ttc',
+];
+const LOCAL_DEV_SYSTEM_FONT_CANDIDATES = [
+  '/Library/Fonts/Arial Unicode.ttf',
+  '/System/Library/Fonts/Supplemental/Arial Unicode.ttf',
+  '/System/Library/Fonts/Arial Unicode.ttf',
+  '/System/Library/Fonts/STHeiti Medium.ttc',
+  '/System/Library/Fonts/Supplemental/STHeiti Medium.ttc',
+];
+const PDF_FONT_CANDIDATES = [
+  process.env.PDF_FONT_PATH,
+  ...OPEN_SOURCE_PDF_FONT_CANDIDATES,
+  ...(process.env.NODE_ENV === 'production' ? [] : LOCAL_DEV_SYSTEM_FONT_CANDIDATES),
 ].filter(Boolean) as string[];
+const PDF_FONT_SEARCH_DIRS = [
+  '/usr/share/fonts',
+  '/usr/local/share/fonts',
+  '/Library/Fonts',
+  '/System/Library/Fonts',
+  '/System/Library/Fonts/Supplemental',
+];
+
+function scoreFontPath(fontPath: string) {
+  const normalized = fontPath.toLowerCase();
+  const scores = [
+    { pattern: 'notosanscjksc-regular', score: 100 },
+    { pattern: 'notosanscjk-regular', score: 95 },
+    { pattern: 'sourcehansanssc-regular', score: 90 },
+    { pattern: 'sourcehansanscn-regular', score: 88 },
+    { pattern: 'notosanssc-regular', score: 85 },
+    { pattern: 'wqy', score: 70 },
+    { pattern: 'uming', score: 65 },
+    { pattern: 'arial unicode', score: 60 },
+    { pattern: 'stheiti', score: 55 },
+  ];
+
+  const match = scores.find(({ pattern }) => normalized.includes(pattern));
+  if (!match) {
+    return 0;
+  }
+
+  if (normalized.endsWith('.otf') || normalized.endsWith('.ttf')) {
+    return match.score + 5;
+  }
+
+  return match.score;
+}
+
+function collectFontPaths(dir: string, depth = 0): string[] {
+  if (depth > 4 || !fs.existsSync(dir)) {
+    return [];
+  }
+
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch (error) {
+    logger.warn(`读取字体目录失败: ${dir}`, error);
+    return [];
+  }
+
+  const fontPaths: string[] = [];
+
+  for (const entry of entries) {
+    const entryPath = `${dir}/${entry.name}`;
+
+    if (entry.isDirectory()) {
+      fontPaths.push(...collectFontPaths(entryPath, depth + 1));
+      continue;
+    }
+
+    if (!entry.isFile()) {
+      continue;
+    }
+
+    if (!/\.(otf|ttf|ttc|otc)$/i.test(entry.name)) {
+      continue;
+    }
+
+    if (scoreFontPath(entryPath) > 0) {
+      fontPaths.push(entryPath);
+    }
+  }
+
+  return fontPaths;
+}
+
+function getPdfFontCandidates() {
+  const discoveredFonts = PDF_FONT_SEARCH_DIRS.flatMap((dir) => collectFontPaths(dir));
+  return Array.from(new Set([...PDF_FONT_CANDIDATES, ...discoveredFonts]))
+    .filter(Boolean)
+    .sort((a, b) => scoreFontPath(b) - scoreFontPath(a));
+}
 
 function setupPdfFonts(doc: PDFKit.PDFDocument) {
   const missingFontPaths: string[] = [];
   const failedFontPaths: string[] = [];
+  const fontCandidates = getPdfFontCandidates();
 
-  for (const fontPath of PDF_FONT_CANDIDATES) {
+  for (const fontPath of fontCandidates) {
     if (!fs.existsSync(fontPath)) {
       missingFontPaths.push(fontPath);
       continue;
@@ -124,7 +212,7 @@ function setupPdfFonts(doc: PDFKit.PDFDocument) {
 
   logger.error('未找到可用中文字体，已拒绝生成乱码 PDF', {
     configuredFontPath: process.env.PDF_FONT_PATH,
-    checkedPaths: PDF_FONT_CANDIDATES,
+    checkedPaths: fontCandidates,
     missingFontPaths,
     failedFontPaths,
   });

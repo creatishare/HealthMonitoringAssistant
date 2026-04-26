@@ -88,6 +88,11 @@
      - `src/backend/src/services/report.service.ts` 改为找不到中文字体时直接返回 500，不再悄悄生成乱码 PDF。
      - `docker-compose.yml` 为 backend 显式设置 `PDF_FONT_PATH=/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc`。
      - `src/backend/Dockerfile` 增加字体文件存在性检查；必须 `docker compose build --no-cache backend`，仅 restart 不会把新增字体装进旧镜像。
+   - 2026-04-26 继续修复：
+     - 线上返回 `05001`，说明保护逻辑生效但容器仍未找到可注册字体。
+     - `report.service.ts` 增加自动字体发现：递归扫描 `/usr/share/fonts`、`/usr/local/share/fonts` 等目录，优先选择 Noto Sans CJK SC / Noto Sans CJK / Source Han Sans / WenQuanYi。
+     - 生产环境默认只使用开源/Linux 字体候选；macOS 的 Arial Unicode / STHeiti 仅作为本地开发兜底，避免把专有字体作为生产依赖。
+     - `infrastructure/docker/Dockerfile.backend` 同步增加 Noto CJK 字体构建检查。
 
 6. **“用药”页面 UI 重构**
    - `src/frontend/src/pages/Medications.tsx`
