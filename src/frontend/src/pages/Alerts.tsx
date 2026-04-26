@@ -17,22 +17,28 @@ const levelConfig = {
   critical: {
     icon: AlertTriangle,
     color: 'text-danger',
-    bgColor: 'bg-red-50',
-    borderColor: 'border-danger',
+    cardBg: 'bg-red-50/90 dark:bg-red-950/25',
+    chipBg: 'bg-red-100/80 dark:bg-red-950/50',
+    statBg: 'bg-red-50 dark:bg-red-950/25',
+    borderColor: 'border-danger/80',
     label: '严重',
   },
   warning: {
     icon: AlertTriangle,
     color: 'text-warning',
-    bgColor: 'bg-yellow-50',
-    borderColor: 'border-warning',
+    cardBg: 'bg-yellow-50/90 dark:bg-yellow-950/25',
+    chipBg: 'bg-yellow-100/80 dark:bg-yellow-950/50',
+    statBg: 'bg-yellow-50 dark:bg-yellow-950/25',
+    borderColor: 'border-warning/80',
     label: '警告',
   },
   info: {
     icon: Info,
     color: 'text-primary',
-    bgColor: 'bg-blue-50',
-    borderColor: 'border-primary',
+    cardBg: 'bg-blue-50/90 dark:bg-primary/10',
+    chipBg: 'bg-blue-100/80 dark:bg-primary/15',
+    statBg: 'bg-blue-50 dark:bg-primary/10',
+    borderColor: 'border-primary/80',
     label: '提示',
   },
 }
@@ -129,17 +135,17 @@ export default function Alerts() {
 
       {/* 未读统计 */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-red-50 p-3 rounded-lg text-center">
+        <div className={`${levelConfig.critical.statBg} rounded-lg p-3 text-center`}>
           <p className="text-metric text-danger">{unreadCount.critical}</p>
-          <p className="text-small text-gray-secondary">严重</p>
+          <p className="text-small text-gray-text-secondary">严重</p>
         </div>
-        <div className="bg-yellow-50 p-3 rounded-lg text-center">
+        <div className={`${levelConfig.warning.statBg} rounded-lg p-3 text-center`}>
           <p className="text-metric text-warning">{unreadCount.warning}</p>
-          <p className="text-small text-gray-secondary">警告</p>
+          <p className="text-small text-gray-text-secondary">警告</p>
         </div>
-        <div className="bg-blue-50 p-3 rounded-lg text-center">
+        <div className={`${levelConfig.info.statBg} rounded-lg p-3 text-center`}>
           <p className="text-metric text-primary">{unreadCount.info}</p>
-          <p className="text-small text-gray-secondary">提示</p>
+          <p className="text-small text-gray-text-secondary">提示</p>
         </div>
       </div>
 
@@ -151,7 +157,7 @@ export default function Alerts() {
       ) : alerts.length === 0 ? (
         <div className="card text-center py-12">
           <CheckCircle size={48} className="text-success mx-auto mb-4" />
-          <p className="text-gray-secondary">暂无预警</p>
+          <p className="text-gray-text-secondary">暂无预警</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -162,22 +168,22 @@ export default function Alerts() {
             return (
               <div
                 key={alert.id}
-                className={`card border-l-4 ${config.borderColor} ${config.bgColor} ${
-                  alert.isRead ? 'opacity-60' : ''
+                className={`rounded-card border border-gray-border p-4 shadow-card backdrop-blur-xl md:p-5 border-l-4 ${config.borderColor} ${config.cardBg} ${
+                  alert.isRead ? 'brightness-95 dark:brightness-90' : ''
                 }`}
               >
                 <div className="flex items-start gap-3">
                   <Icon size={20} className={config.color} />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span className={`text-small px-2 py-0.5 rounded ${config.bgColor} ${config.color}`}>
+                      <span className={`rounded px-2 py-0.5 text-small font-medium ${config.chipBg} ${config.color}`}>
                         {config.label}
                       </span>
-                      <span className="text-small text-gray-helper">{formatDate(alert.createdAt)}</span>
+                      <span className="text-small text-gray-text-helper">{formatDate(alert.createdAt)}</span>
                     </div>
                     <p className="text-body text-gray-text-primary mt-2">{alert.message}</p>
                     {alert.suggestion && (
-                      <p className="text-small text-gray-secondary mt-1">{alert.suggestion}</p>
+                      <p className="mt-1 text-small text-gray-text-secondary">{alert.suggestion}</p>
                     )}
                   </div>
                 </div>
@@ -193,7 +199,7 @@ export default function Alerts() {
                   )}
                   <button
                     onClick={() => handleDelete(alert.id)}
-                    className="text-small text-gray-secondary flex items-center gap-1"
+                    className="flex items-center gap-1 text-small text-gray-text-secondary"
                   >
                     <Trash2 size={14} />
                     删除

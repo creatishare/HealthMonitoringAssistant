@@ -413,9 +413,11 @@ type: 修改描述
 4. **BottomSelector截断**：`z-50` 不够，需 `z-[60]`；`max-h-[70vh]` 需改为 `max-h-[60vh]` + `pb-20`
 5. **隐私政策路由**：必须放在认证路由**之外**，否则未登录用户点击会跳转到登录页
 6. **Tailwind 不存在 `w-13`**：Tailwind v3 内置只有 `w-12`(48px) 和 `w-14`(56px)，写了 `w-13` 不会生成 CSS，元素宽度为 0。Toggle 开关用 `w-12` + `translate-x-5` 组合。
-7. **PDF 中文乱码**：`pdfkit` 默认 Helvetica 不支持中文。必须在 `report.service.ts` 注册中文字体；生产 Docker 必须安装 CJK 字体。若用户重新导出仍乱码，优先重启后端并检查 PDF 是否还只有 `/Helvetica`。
+7. **PDF 中文乱码**：`pdfkit` 默认 Helvetica 不支持中文。必须在 `report.service.ts` 注册中文字体；生产 Docker 必须安装 CJK 字体。若用户重新导出仍乱码，优先检查 PDF 是否还只有 `/Helvetica`。Debian 的 `fonts-noto-cjk` 常是 `.ttc` 字体集合，PDFKit 注册时需要指定 face（如 `NotoSansCJKsc-Regular`），否则可能报 `this.font.createSubset is not a function`。
 8. **用药提醒跨天状态**：不要让前端用 `new Date().toISOString().split('T')[0]` 拼当天服药记录。后端 `getTodayMedications()` 已返回 `scheduledAt`，前端应直接回传。
 9. **健康记录心率**：当前数据库没有 `heartRate`，新 Records UI 先将心率写到 notes。不要误以为已有独立字段。
+10. **Docker Compose .env 解析**：`.env` 密钥不能拆成多行。若 `docker compose` 报 `unexpected character "/" in variable name`，通常是上一行变量值换行导致密钥片段变成“变量名”；修成 `KEY=value` 单行或加引号。
+11. **PDF 字体日志排查顺序**：先触发一次导出，再看 `docker compose logs backend | grep -i "PDF\\|字体\\|font\\|Noto"`；没触发导出时没有字体日志是正常的。用 `docker compose exec backend sh -lc 'find /usr/share/fonts -iname "*NotoSansCJK*"'` 判断字体是否在容器内。
 
 ### 设计决策记录
 - **不做AI大模型调用**：健康洞察使用纯本地规则引擎，规避医疗政策风险
@@ -424,6 +426,7 @@ type: 修改描述
 
 ### 部署相关
 - **Docker 前端缓存**：`docker-compose up -d --build` 不会重新构建已缓存的前端镜像。必须先 `docker rmi healthmonitoringassistant_frontend:latest`，再 `docker-compose build --no-cache frontend`
+- **Docker 后端字体缓存**：PDF 字体相关修复必须 `docker compose build --no-cache backend && docker compose up -d backend`。只 `restart` 不会安装新字体，也不会更新 Dockerfile 检查。
 
 ---
 

@@ -94,6 +94,13 @@
      - 生产环境默认只使用开源/Linux 字体候选；macOS 的 Arial Unicode / STHeiti 仅作为本地开发兜底，避免把专有字体作为生产依赖。
      - `infrastructure/docker/Dockerfile.backend` 同步增加 Noto CJK 字体构建检查。
      - 线上日志出现 `this.font.createSubset is not a function`，确认 PDFKit 打开了 `.ttc` 字体集合而不是集合内具体字体；已为 `.ttc/.otc` 增加 face name 尝试（优先 `NotoSansCJKsc-Regular`）。
+   - 踩坑记录：
+     - `docker compose exec` 报 `.env unexpected character "/" in variable name` 时，不是容器问题，是 `.env` 某个密钥被换行拆成了独立一行；必须保持 `KEY=value` 单行或给 value 加引号。
+     - `docker compose ps` 为空时，说明当前 compose 项目下没有服务在跑；如果网站仍可访问，要用 `docker ps` 确认是否跑在另一套目录/项目名下。
+     - `docker compose logs backend | grep "PDF"` 没输出不代表字体正常，只有触发一次报告导出后才会执行字体加载。
+     - PDF 乱码的快速判断：`strings report.pdf | rg "BaseFont|ToUnicode"`。只有 `/Helvetica` + `/WinAnsiEncoding` 基本就是未嵌入中文字体；正常应有 `NotoSansCJK...`、`Identity-H`、`ToUnicode`。
+     - Debian `fonts-noto-cjk` 常安装为 `.ttc` 字体集合（如 `/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc`），PDFKit 注册时需要指定集合内字体 face；否则可能报 `this.font.createSubset is not a function`。
+     - 生产字体版权：优先 Noto CJK / Source Han / WenQuanYi 等开源字体；不要把 Arial Unicode、STHeiti、微软雅黑、苹方等专有系统字体复制进镜像或作为生产依赖。
 
 6. **“用药”页面 UI 重构**
    - `src/frontend/src/pages/Medications.tsx`
