@@ -209,7 +209,7 @@ export default function Profile() {
   const actions = [
     { icon: Download, title: '数据导出', description: '导出健康记录报告', tone: 'text-primary bg-primary/10', onClick: handleExport },
     { icon: Bell, title: '提醒设置', description: '自定义提醒时间和方式', tone: 'text-success bg-success/10', onClick: () => navigate('/reminder-settings') },
-    { icon: Share2, title: '分享给医生', description: '生成健康报告分享', tone: 'text-warning bg-warning/10', onClick: handleShare },
+    { icon: Share2, title: '分享给医生', description: '生成健康记录报告', tone: 'text-warning bg-warning/10', onClick: handleShare },
     { icon: Shield, title: '隐私与安全', description: '数据保护和账号安全', tone: 'text-danger bg-danger/10', onClick: () => navigate('/privacy-security') },
     { icon: HelpCircle, title: '帮助中心', description: '使用指南和常见问题', tone: 'text-medication bg-medication/10', onClick: () => navigate('/help-center') },
     { icon: MessageSquare, title: '意见反馈', description: '帮助我们做得更好', tone: 'text-primary bg-primary/10', onClick: () => setActivePanel(activePanel === 'feedback' ? null : 'feedback') },

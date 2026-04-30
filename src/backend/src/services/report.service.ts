@@ -51,6 +51,19 @@ interface ReportRecord {
   notes?: string | null;
 }
 
+interface TrendPoint {
+  date: string;
+  value: number;
+}
+
+interface ChartMetricConfig {
+  key: keyof ReportRecord;
+  label: string;
+  unit: string;
+  color: string;
+  referenceRange?: [number, number];
+}
+
 export interface FollowUpReportData {
   dateRange: {
     startDate: string;
@@ -76,6 +89,24 @@ const METRIC_LABELS: Array<{ key: keyof ReportRecord; label: string; unit?: stri
   { key: 'weight', label: '体重', unit: 'kg' },
   { key: 'tacrolimus', label: '他克莫司', unit: 'ng/mL' },
 ];
+
+const CHART_METRICS: ChartMetricConfig[] = [
+  { key: 'creatinine', label: '肌酐', unit: 'μmol/L', color: '#2563EB', referenceRange: [44, 133] },
+  { key: 'urea', label: '尿素氮', unit: 'mmol/L', color: '#0891B2', referenceRange: [2.6, 7.5] },
+  { key: 'potassium', label: '血钾', unit: 'mmol/L', color: '#DC2626', referenceRange: [3.5, 5.3] },
+  { key: 'hemoglobin', label: '血红蛋白', unit: 'g/L', color: '#9333EA', referenceRange: [110, 160] },
+  { key: 'weight', label: '体重', unit: 'kg', color: '#16A34A' },
+  { key: 'bloodPressureSystolic', label: '收缩压', unit: 'mmHg', color: '#EA580C', referenceRange: [90, 140] },
+  { key: 'bloodPressureDiastolic', label: '舒张压', unit: 'mmHg', color: '#F59E0B', referenceRange: [60, 90] },
+  { key: 'urineVolume', label: '尿量', unit: 'mL', color: '#0D9488' },
+  { key: 'tacrolimus', label: '他克莫司', unit: 'ng/mL', color: '#7C3AED', referenceRange: [5, 15] },
+];
+
+const TEXT_COLOR = '#262626';
+const MUTED_COLOR = '#666666';
+const BORDER_COLOR = '#D9D9D9';
+const GRID_COLOR = '#E5E7EB';
+const WARNING_COLOR = '#DC2626';
 
 const PDF_FONT_NAME = 'ChineseSans';
 const OPEN_SOURCE_PDF_FONT_CANDIDATES = [
@@ -354,18 +385,242 @@ function formatRecordLines(records: ReportRecord[]) {
   });
 }
 
-function writeSection(doc: PDFKit.PDFDocument, title: string, lines: string[]) {
+function getSortedRecords(records: ReportRecord[]) {
+  return [...records].sort((a, b) => a.recordDate.localeCompare(b.recordDate));
+}
+
+function getMetricPoints(records: ReportRecord[], metric: ChartMetricConfig): TrendPoint[] {
+  return getSortedRecords(records)
+    .map((record) => {
+      const value = record[metric.key];
+      if (typeof value !== 'number' || Number.isNaN(value)) {
+        return null;
+      }
+
+      return {
+        date: record.recordDate,
+        value,
+      };
+    })
+    .filter((point): point is TrendPoint => point !== null);
+}
+
+function formatNumber(value: number) {
+  if (Number.isInteger(value)) {
+    return String(value);
+  }
+
+  return value.toFixed(1).replace(/\.0$/, '');
+}
+
+function formatChange(start: number, end: number, unit: string) {
+  const delta = end - start;
+  const sign = delta > 0 ? '+' : '';
+  const percent = start === 0 ? '' : `（${sign}${formatNumber((delta / start) * 100)}%）`;
+  return `${sign}${formatNumber(delta)} ${unit}${percent}`;
+}
+
+function getMetricStatus(value: number, metric: ChartMetricConfig) {
+  if (!metric.referenceRange) {
+    return '供趋势观察';
+  }
+
+  const [min, max] = metric.referenceRange;
+  if (value < min) {
+    return `低于参考范围 ${min}-${max}`;
+  }
+  if (value > max) {
+    return `高于参考范围 ${min}-${max}`;
+  }
+
+  return `在参考范围 ${min}-${max} 内`;
+}
+
+function buildDoctorSummaryLines(reportData: FollowUpReportData) {
+  const records = reportData.records;
+  if (records.length === 0) {
+    return ['所选时间范围内暂无健康记录，建议复诊前补充近期化验单、血压、体重、尿量等数据。'];
+  }
+
+  const lines = [
+    `本报告覆盖 ${reportData.dateRange.startDate} 至 ${reportData.dateRange.endDate}，共 ${records.length} 条健康记录。`,
+  ];
+
+  const notableMetrics = CHART_METRICS.map((metric) => {
+    const points = getMetricPoints(records, metric);
+    if (points.length === 0) {
+      return null;
+    }
+
+    const latest = points[points.length - 1];
+    const first = points[0];
+    const latestStatus = getMetricStatus(latest.value, metric);
+    const trend =
+      points.length >= 2
+        ? `；较区间首条记录变化 ${formatChange(first.value, latest.value, metric.unit)}`
+        : '';
+
+    return `${metric.label}：最新 ${formatNumber(latest.value)} ${metric.unit}（${latest.date}），${latestStatus}${trend}`;
+  }).filter((line): line is string => line !== null);
+
+  lines.push(...notableMetrics.slice(0, 6));
+
+  if (reportData.alerts.length > 0) {
+    lines.push(`当前有 ${reportData.alerts.length} 条未读预警，建议复诊时结合病史和用药情况一起查看。`);
+  } else {
+    lines.push('当前无未读预警。');
+  }
+
+  return lines;
+}
+
+function ensureSpace(doc: PDFKit.PDFDocument, height: number) {
+  if (doc.y + height > doc.page.height - doc.page.margins.bottom) {
+    doc.addPage();
+    doc.font(PDF_FONT_NAME).fillColor(TEXT_COLOR);
+  }
+}
+
+function writeSectionTitle(doc: PDFKit.PDFDocument, title: string) {
+  ensureSpace(doc, 44);
   doc.moveDown();
-  doc.fontSize(16).text(title, { underline: true });
+  doc.font(PDF_FONT_NAME).fillColor(TEXT_COLOR).fontSize(16).text(title, { underline: true });
   doc.moveDown(0.5);
-  doc.fontSize(11);
+}
+
+function writeSection(doc: PDFKit.PDFDocument, title: string, lines: string[]) {
+  writeSectionTitle(doc, title);
+  doc.font(PDF_FONT_NAME).fillColor(TEXT_COLOR).fontSize(11);
 
   lines.forEach((line) => {
+    ensureSpace(doc, 34);
     doc.text(`• ${line}`, {
       width: 500,
       align: 'left',
     });
     doc.moveDown(0.3);
+  });
+}
+
+function drawNoDataBox(doc: PDFKit.PDFDocument, title: string, message: string) {
+  ensureSpace(doc, 84);
+  const x = doc.page.margins.left;
+  const y = doc.y;
+  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+
+  doc.roundedRect(x, y, width, 56, 6).lineWidth(0.8).strokeColor(BORDER_COLOR).stroke();
+  doc.fillColor(TEXT_COLOR).fontSize(12).text(title, x + 12, y + 10);
+  doc.fillColor(MUTED_COLOR).fontSize(10).text(message, x + 12, y + 31, { width: width - 24 });
+  doc.y = y + 64;
+  doc.fillColor(TEXT_COLOR).strokeColor(TEXT_COLOR);
+}
+
+function drawLineChart(doc: PDFKit.PDFDocument, metric: ChartMetricConfig, points: TrendPoint[]) {
+  if (points.length === 0) {
+    drawNoDataBox(doc, metric.label, '暂无可绘制数据');
+    return;
+  }
+
+  const chartHeight = 150;
+  const headerHeight = 30;
+  const bottomLabelHeight = 24;
+  const totalHeight = headerHeight + chartHeight + bottomLabelHeight + 14;
+  ensureSpace(doc, totalHeight);
+
+  const x = doc.page.margins.left;
+  const y = doc.y;
+  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const plotX = x + 42;
+  const plotY = y + headerHeight;
+  const plotWidth = width - 58;
+  const plotHeight = chartHeight - 26;
+  const values = points.map((point) => point.value);
+  const rangeValues = metric.referenceRange ? [...values, ...metric.referenceRange] : values;
+  const minValue = Math.min(...rangeValues);
+  const maxValue = Math.max(...rangeValues);
+  const padding = maxValue === minValue ? Math.max(1, Math.abs(maxValue) * 0.1) : (maxValue - minValue) * 0.12;
+  const yMin = minValue - padding;
+  const yMax = maxValue + padding;
+  const latest = points[points.length - 1];
+  const first = points[0];
+  const chartSummary =
+    points.length >= 2
+      ? `最新 ${formatNumber(latest.value)} ${metric.unit}，变化 ${formatChange(first.value, latest.value, metric.unit)}`
+      : `最新 ${formatNumber(latest.value)} ${metric.unit}`;
+
+  doc.roundedRect(x, y, width, totalHeight - 8, 6).lineWidth(0.8).strokeColor(BORDER_COLOR).stroke();
+  doc.fillColor(TEXT_COLOR).fontSize(12).text(`${metric.label}趋势`, x + 12, y + 10);
+  doc.fillColor(MUTED_COLOR).fontSize(9).text(chartSummary, x + 112, y + 12, { width: width - 124, align: 'right' });
+
+  for (let i = 0; i <= 3; i += 1) {
+    const gridY = plotY + (plotHeight / 3) * i;
+    const value = yMax - ((yMax - yMin) / 3) * i;
+    doc.moveTo(plotX, gridY).lineTo(plotX + plotWidth, gridY).lineWidth(0.4).strokeColor(GRID_COLOR).stroke();
+    doc.fillColor(MUTED_COLOR).fontSize(8).text(formatNumber(value), x + 4, gridY - 5, { width: 34, align: 'right' });
+  }
+
+  const mapX = (index: number) => plotX + (points.length === 1 ? plotWidth / 2 : (plotWidth / (points.length - 1)) * index);
+  const mapY = (value: number) => plotY + plotHeight - ((value - yMin) / (yMax - yMin)) * plotHeight;
+
+  if (metric.referenceRange) {
+    const [min, max] = metric.referenceRange;
+    const refTop = mapY(max);
+    const refBottom = mapY(min);
+    doc.rect(plotX, refTop, plotWidth, Math.max(1, refBottom - refTop)).fillOpacity(0.08).fill('#16A34A').fillOpacity(1);
+    doc.fillColor('#16A34A').fontSize(8).text(`参考 ${min}-${max}`, plotX + plotWidth - 74, refTop - 10, { width: 74, align: 'right' });
+  }
+
+  doc.moveTo(plotX, plotY).lineTo(plotX, plotY + plotHeight).lineTo(plotX + plotWidth, plotY + plotHeight);
+  doc.lineWidth(0.8).strokeColor('#9CA3AF').stroke();
+
+  points.forEach((point, index) => {
+    const px = mapX(index);
+    const py = mapY(point.value);
+    if (index === 0) {
+      doc.moveTo(px, py);
+    } else {
+      doc.lineTo(px, py);
+    }
+  });
+  doc.lineWidth(1.8).strokeColor(metric.color).stroke();
+
+  points.forEach((point, index) => {
+    const px = mapX(index);
+    const py = mapY(point.value);
+    doc.circle(px, py, 2.4).fillColor(metric.color).fill();
+  });
+
+  const outOfRangeLatest =
+    metric.referenceRange && (latest.value < metric.referenceRange[0] || latest.value > metric.referenceRange[1]);
+  if (outOfRangeLatest) {
+    doc.fillColor(WARNING_COLOR).fontSize(9).text('最新值超出参考范围', x + 12, y + totalHeight - 24, { width: 160 });
+  }
+
+  const firstDate = points[0].date.slice(5);
+  const lastDate = latest.date.slice(5);
+  doc.fillColor(MUTED_COLOR).fontSize(8).text(firstDate, plotX, plotY + plotHeight + 6, { width: 50 });
+  doc.text(lastDate, plotX + plotWidth - 50, plotY + plotHeight + 6, { width: 50, align: 'right' });
+
+  doc.y = y + totalHeight;
+  doc.fillColor(TEXT_COLOR).strokeColor(TEXT_COLOR);
+}
+
+function writeTrendCharts(doc: PDFKit.PDFDocument, reportData: FollowUpReportData) {
+  writeSectionTitle(doc, '三、指标趋势图');
+
+  const metricsWithData = CHART_METRICS.map((metric) => ({
+    metric,
+    points: getMetricPoints(reportData.records, metric),
+  })).filter(({ points }) => points.length > 0);
+
+  if (metricsWithData.length === 0) {
+    drawNoDataBox(doc, '指标趋势图', '所选时间范围内暂无可绘制的指标数据。');
+    return;
+  }
+
+  metricsWithData.slice(0, 8).forEach(({ metric, points }) => {
+    drawLineChart(doc, metric, points);
+    doc.moveDown(0.2);
   });
 }
 
@@ -417,19 +672,21 @@ export async function generateFollowUpReportPdf(
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    doc.fontSize(20).text('健康监测助手复诊报告', { align: 'center' });
+    doc.font(PDF_FONT_NAME).fillColor(TEXT_COLOR).fontSize(20).text('健康监测助手复诊报告', { align: 'center' });
     doc.moveDown(0.5);
     doc.fontSize(11).text(`导出时间：${reportData.generatedAt.split('T')[0]}`, { align: 'center' });
     doc.text(`统计区间：${startDate} 至 ${endDate}`, { align: 'center' });
 
     writeSection(doc, '一、基础档案', formatProfileLines(reportData.profile));
-    writeSection(doc, '二、最近关键指标', formatMetricLines(reportData.recentMetrics));
-    writeSection(doc, '三、最近未读预警', formatAlertLines(reportData.alerts));
-    writeSection(doc, '四、今日用药摘要', formatMedicationLines(reportData.medications));
-    writeSection(doc, '五、区间健康记录摘要', formatRecordLines(reportData.records));
+    writeSection(doc, '二、医生阅读摘要', buildDoctorSummaryLines(reportData));
+    writeTrendCharts(doc, reportData);
+    writeSection(doc, '四、最近关键指标', formatMetricLines(reportData.recentMetrics));
+    writeSection(doc, '五、最近未读预警', formatAlertLines(reportData.alerts));
+    writeSection(doc, '六、今日用药摘要', formatMedicationLines(reportData.medications));
+    writeSection(doc, '七、区间原始记录明细', formatRecordLines(reportData.records));
 
     doc.moveDown();
-    doc.fontSize(10).fillColor('gray').text('说明：本报告仅用于复诊资料整理与回顾，不构成医疗诊断建议。', {
+    doc.font(PDF_FONT_NAME).fontSize(10).fillColor('gray').text('说明：本报告仅用于复诊资料整理与回顾，不构成医疗诊断建议。图表中的参考范围仅作数据标记，具体解读请以医生意见为准。', {
       align: 'left',
     });
 
