@@ -477,23 +477,32 @@ function buildDoctorSummaryLines(reportData: FollowUpReportData) {
 function ensureSpace(doc: PDFKit.PDFDocument, height: number) {
   if (doc.y + height > doc.page.height - doc.page.margins.bottom) {
     doc.addPage();
-    doc.font(PDF_FONT_NAME).fillColor(TEXT_COLOR);
+    resetPdfCursor(doc);
   }
+}
+
+function resetPdfCursor(doc: PDFKit.PDFDocument) {
+  doc.x = doc.page.margins.left;
+  doc.font(PDF_FONT_NAME).fillColor(TEXT_COLOR).strokeColor(TEXT_COLOR);
 }
 
 function writeSectionTitle(doc: PDFKit.PDFDocument, title: string) {
   ensureSpace(doc, 44);
+  resetPdfCursor(doc);
   doc.moveDown();
-  doc.font(PDF_FONT_NAME).fillColor(TEXT_COLOR).fontSize(16).text(title, { underline: true });
+  doc.fontSize(16).text(title, doc.page.margins.left, doc.y, { underline: true });
   doc.moveDown(0.5);
+  resetPdfCursor(doc);
 }
 
 function writeSection(doc: PDFKit.PDFDocument, title: string, lines: string[]) {
   writeSectionTitle(doc, title);
-  doc.font(PDF_FONT_NAME).fillColor(TEXT_COLOR).fontSize(11);
+  resetPdfCursor(doc);
+  doc.fontSize(11);
 
   lines.forEach((line) => {
     ensureSpace(doc, 34);
+    resetPdfCursor(doc);
     doc.text(`• ${line}`, {
       width: 500,
       align: 'left',
@@ -512,7 +521,7 @@ function drawNoDataBox(doc: PDFKit.PDFDocument, title: string, message: string) 
   doc.fillColor(TEXT_COLOR).fontSize(12).text(title, x + 12, y + 10);
   doc.fillColor(MUTED_COLOR).fontSize(10).text(message, x + 12, y + 31, { width: width - 24 });
   doc.y = y + 64;
-  doc.fillColor(TEXT_COLOR).strokeColor(TEXT_COLOR);
+  resetPdfCursor(doc);
 }
 
 function drawLineChart(doc: PDFKit.PDFDocument, metric: ChartMetricConfig, points: TrendPoint[]) {
@@ -602,7 +611,7 @@ function drawLineChart(doc: PDFKit.PDFDocument, metric: ChartMetricConfig, point
   doc.text(lastDate, plotX + plotWidth - 50, plotY + plotHeight + 6, { width: 50, align: 'right' });
 
   doc.y = y + totalHeight;
-  doc.fillColor(TEXT_COLOR).strokeColor(TEXT_COLOR);
+  resetPdfCursor(doc);
 }
 
 function writeTrendCharts(doc: PDFKit.PDFDocument, reportData: FollowUpReportData) {
@@ -620,6 +629,7 @@ function writeTrendCharts(doc: PDFKit.PDFDocument, reportData: FollowUpReportDat
 
   metricsWithData.slice(0, 8).forEach(({ metric, points }) => {
     drawLineChart(doc, metric, points);
+    resetPdfCursor(doc);
     doc.moveDown(0.2);
   });
 }
