@@ -8,6 +8,8 @@ const JWT_EXPIRES_IN_RAW = process.env.JWT_EXPIRES_IN || '24h';
 const JWT_REFRESH_EXPIRES_IN_RAW = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 const JWT_EXPIRES_IN = JWT_EXPIRES_IN_RAW as jwt.SignOptions['expiresIn'];
 const JWT_REFRESH_EXPIRES_IN = JWT_REFRESH_EXPIRES_IN_RAW as jwt.SignOptions['expiresIn'];
+const ACCESS_TOKEN_TYPE = 'access';
+const REFRESH_TOKEN_TYPE = 'refresh';
 let warnedAboutDevSecret = false;
 
 export interface TokenPayload {
@@ -19,6 +21,11 @@ export interface TokenResponse {
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
+}
+
+export interface VerifiedRefreshToken {
+  userId: string;
+  jti: string;
 }
 
 function getJwtSecret(): string {
@@ -56,9 +63,22 @@ function parseDurationSeconds(value: string, defaultSeconds: number): number {
   return amount * multipliers[unit];
 }
 
+function isJwtPayload(payload: string | jwt.JwtPayload): payload is jwt.JwtPayload {
+  return typeof payload === 'object' && payload !== null;
+}
+
+function getRequiredStringClaim(payload: jwt.JwtPayload, claim: string): string {
+  const value = payload[claim];
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error(`Invalid token claim: ${claim}`);
+  }
+
+  return value;
+}
+
 // 生成访问令牌
 export function generateAccessToken(payload: TokenPayload): string {
-  return jwt.sign(payload, getJwtSecret(), {
+  return jwt.sign({ ...payload, type: ACCESS_TOKEN_TYPE }, getJwtSecret(), {
     expiresIn: JWT_EXPIRES_IN,
   });
 }
@@ -85,36 +105,66 @@ export async function generateRefreshToken(
     },
   });
 
-  return jwt.sign({ userId, jti }, getJwtSecret(), {
+  return jwt.sign({ userId, jti, type: REFRESH_TOKEN_TYPE }, getJwtSecret(), {
     expiresIn: JWT_REFRESH_EXPIRES_IN,
   });
 }
 
 // 验证访问令牌
 export function verifyAccessToken(token: string): TokenPayload {
-  return jwt.verify(token, getJwtSecret()) as TokenPayload;
+  const decoded = jwt.verify(token, getJwtSecret());
+
+  if (!isJwtPayload(decoded)) {
+    throw new Error('Invalid access token');
+  }
+
+  const tokenType = decoded.type;
+  if (tokenType !== undefined && tokenType !== ACCESS_TOKEN_TYPE) {
+    throw new Error('Invalid access token type');
+  }
+
+  return {
+    userId: getRequiredStringClaim(decoded, 'userId'),
+    phone: getRequiredStringClaim(decoded, 'phone'),
+  };
 }
 
 // 验证刷新令牌
-export async function verifyRefreshToken(token: string): Promise<TokenPayload> {
-  const decoded = jwt.verify(token, getJwtSecret()) as { userId: string; jti: string };
+export async function verifyRefreshToken(token: string): Promise<VerifiedRefreshToken> {
+  const decoded = jwt.verify(token, getJwtSecret());
 
-  // 检查令牌是否被吊销
-  const refreshToken = await prisma.refreshToken.findUnique({
-    where: { tokenJti: decoded.jti },
-  });
-
-  if (!refreshToken || refreshToken.isRevoked || refreshToken.expiresAt < new Date()) {
+  if (!isJwtPayload(decoded)) {
     throw new Error('Invalid refresh token');
   }
 
-  return { userId: decoded.userId, phone: '' };
+  if (decoded.type !== REFRESH_TOKEN_TYPE) {
+    throw new Error('Invalid refresh token type');
+  }
+
+  const userId = getRequiredStringClaim(decoded, 'userId');
+  const jti = getRequiredStringClaim(decoded, 'jti');
+
+  // 检查令牌是否被吊销
+  const refreshToken = await prisma.refreshToken.findUnique({
+    where: { tokenJti: jti },
+  });
+
+  if (
+    !refreshToken ||
+    refreshToken.userId !== userId ||
+    refreshToken.isRevoked ||
+    refreshToken.expiresAt < new Date()
+  ) {
+    throw new Error('Invalid refresh token');
+  }
+
+  return { userId, jti };
 }
 
 // 吊销刷新令牌
 export async function revokeRefreshToken(jti: string): Promise<void> {
-  await prisma.refreshToken.update({
-    where: { tokenJti: jti },
+  await prisma.refreshToken.updateMany({
+    where: { tokenJti: jti, isRevoked: false },
     data: {
       isRevoked: true,
       revokedAt: new Date(),

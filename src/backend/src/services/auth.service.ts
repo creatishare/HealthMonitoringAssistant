@@ -1,6 +1,11 @@
 import prisma from '../config/database';
 import { hashPassword, verifyPassword, validatePasswordStrength } from '../utils/password';
-import { generateTokenPair, revokeRefreshToken, revokeAllUserRefreshTokens } from '../utils/jwt';
+import {
+  generateTokenPair,
+  revokeRefreshToken,
+  revokeAllUserRefreshTokens,
+  verifyRefreshToken,
+} from '../utils/jwt';
 import { isValidPhone, isValidVerificationCode } from '../utils/validators';
 import { AppError } from '../utils/errors';
 import logger from '../utils/logger';
@@ -169,14 +174,14 @@ export async function login(
 export async function logout(userId: string, refreshToken?: string) {
   if (refreshToken) {
     try {
-      const decoded = JSON.parse(
-        Buffer.from(refreshToken.split('.')[1], 'base64').toString()
-      );
-      if (decoded.jti) {
-        await revokeRefreshToken(decoded.jti);
+      const verifiedToken = await verifyRefreshToken(refreshToken);
+      if (verifiedToken.userId === userId) {
+        await revokeRefreshToken(verifiedToken.jti);
+      } else {
+        logger.warn(`登出刷新令牌用户不匹配: requestUser=${userId}, tokenUser=${verifiedToken.userId}`);
       }
     } catch (error) {
-      logger.warn('解析刷新令牌失败', error);
+      logger.warn('刷新令牌吊销失败', error);
     }
   }
 
@@ -190,35 +195,34 @@ export async function refreshTokens(
   userAgent?: string
 ) {
   try {
-    // 解析刷新令牌
-    const decoded = JSON.parse(
-      Buffer.from(refreshToken.split('.')[1], 'base64').toString()
-    );
-
-    if (!decoded.jti || !decoded.userId) {
-      throw new AppError('无效的刷新令牌', 401, '01009');
-    }
-
-    // 检查令牌是否被吊销
-    const tokenRecord = await prisma.refreshToken.findUnique({
-      where: { tokenJti: decoded.jti },
-    });
-
-    if (!tokenRecord || tokenRecord.isRevoked || tokenRecord.expiresAt < new Date()) {
-      throw new AppError('刷新令牌已过期或无效', 401, '01009');
-    }
-
-    // 吊销旧令牌
-    await revokeRefreshToken(decoded.jti);
+    const verifiedToken = await verifyRefreshToken(refreshToken);
 
     // 获取用户信息
     const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
+      where: { id: verifiedToken.userId },
       include: { profile: true },
     });
 
     if (!user || user.status !== 'active') {
       throw new AppError('用户不存在或已被冻结', 403, '01008');
+    }
+
+    // 原子吊销旧令牌，避免同一 refresh token 被并发重复轮换。
+    const revokeResult = await prisma.refreshToken.updateMany({
+      where: {
+        tokenJti: verifiedToken.jti,
+        userId: verifiedToken.userId,
+        isRevoked: false,
+        expiresAt: { gte: new Date() },
+      },
+      data: {
+        isRevoked: true,
+        revokedAt: new Date(),
+      },
+    });
+
+    if (revokeResult.count !== 1) {
+      throw new AppError('刷新令牌已过期或无效', 401, '01009');
     }
 
     // 生成新令牌

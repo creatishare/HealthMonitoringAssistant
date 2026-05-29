@@ -5,22 +5,21 @@
 
 ---
 
-## 2026-05-29 — 代码审计待办补充 + OCR 所有权修复
+## 2026-05-29 — 代码审计待办补充 + OCR 所有权修复 + Refresh Token 加固
 
 ### 今日完成
 
 1. **补充下一轮开发待办**
    - 更新 `docs/next-agent-todos.md`：
      - 将 2026-05-28 代码审计发现的问题整理为可执行任务包。
-     - 调整推荐执行顺序，当前建议下一步优先：
-       1. `P0-04 Refresh Token 签名验证与轮换加固`
-       2. `P0-01 生产 Redis 验证码存储`
-       3. `P0-05 生产限流改为 Redis/共享存储`
-       4. `P1-07 日期/时区工具统一`
-       5. `P1-08 健康记录输入校验与趋势指标白名单`
-       6. `P1-01 健康洞察接入日常数据`
-   - 新增待办覆盖：
-     - Refresh Token 当前刷新逻辑需签名验证和 token 类型校验。
+    - 调整推荐执行顺序，当前建议下一步优先：
+      1. `P0-01 生产 Redis 验证码存储`
+      2. `P0-05 生产限流改为 Redis/共享存储`
+      3. `P1-07 日期/时区工具统一`
+      4. `P1-08 健康记录输入校验与趋势指标白名单`
+      5. `P1-01 健康洞察接入日常数据`
+   - 新增/更新待办覆盖：
+     - Refresh Token 签名验证与轮换加固已于本日完成。
      - 验证码与限流仍是进程内 Map，生产多实例/重启不可靠。
      - Dashboard/趋势/部分前端日期仍用 UTC `toISOString()`，与用药模块 Asia/Shanghai 日期逻辑不一致。
      - 健康记录创建/更新与趋势 metrics 需要输入校验和白名单。
@@ -42,6 +41,24 @@
    - 结果：
      - 不属于当前用户的 `imageId` 会按“不存在”处理，与 `getOCRResult()` / `confirmOCRResult()` 的所有权校验保持一致。
 
+3. **完成 `P0-04 Refresh Token 签名验证与轮换加固`**
+   - 问题：
+     - `src/backend/src/services/auth.service.ts` 的刷新逻辑手动 base64 解 payload 后查 DB，没有先做 JWT 签名验证。
+     - 旧 refresh token 没有 token 类型声明，刷新接口无法明确区分 access / refresh token。
+   - 修复：
+     - `src/backend/src/utils/jwt.ts`
+       - access token 新增 `type: "access"`，refresh token 新增 `type: "refresh"`。
+       - `verifyAccessToken()` 校验 token 类型，拒绝 refresh token 冒用 access token。
+       - `verifyRefreshToken()` 改为先 `jwt.verify()` 校验签名，再校验 `type`、`userId`、`jti`、DB 记录、用户一致性、过期和吊销状态。
+       - `revokeRefreshToken()` 改为幂等 `updateMany`，避免登出时因重复吊销抛 Prisma 异常。
+     - `src/backend/src/services/auth.service.ts`
+       - `refreshTokens()` 复用 `verifyRefreshToken()`。
+       - 先校验用户存在且状态为 `active`，再原子吊销旧 token 并签发新 token。
+       - 并发或重复使用旧 refresh token 时，旧 token 只能成功轮换一次。
+       - `logout()` 不再手动解 payload，只吊销通过签名验证且属于当前用户的 refresh token。
+   - 注意：
+     - 部署后，旧版未带 `type: "refresh"` 的 refresh token 会刷新失败，用户可能需要重新登录；这是本次安全加固的预期结果。
+
 ### 验证情况
 
 - 后端构建通过：
@@ -51,8 +68,9 @@
 
 ### 当前注意点 / 下次优先
 
-1. **下一个任务建议先做 `P0-04 Refresh Token 签名验证与轮换加固`**
-   - 当前 `auth.service.ts` 的刷新逻辑手动 base64 解 payload 后查 DB，应改为先 `jwt.verify()` 校验签名，再校验 jti、过期、吊销状态和用户状态。
+1. **下一个任务建议先做 `P0-01 生产 Redis 验证码存储`**
+   - 验证码仍在 `auth.service.ts` 的进程内 Map 中，多实例部署和后端重启都会丢失。
+   - 后续可与 `P0-05 生产限流改为 Redis/共享存储` 共享 Redis 连接与生产降级策略。
 
 2. **生产化 P0 仍未完成**
    - 验证码仍在内存 Map。
@@ -65,6 +83,8 @@
      - `docs/dev-log.md`
      - `src/backend/src/controllers/ocr.controller.ts`
      - `src/backend/src/services/ocr.service.ts`
+     - `src/backend/src/services/auth.service.ts`
+     - `src/backend/src/utils/jwt.ts`
    - 工作区原本已有 Dashboard、Charts、Profile、dashboardStore、alert/dashboard/report service 等移植风险与报告相关改动。后续 agent 应基于现有状态继续开发，不要误认为这些都是本轮 OCR 修复产生的改动。
 
 ---
