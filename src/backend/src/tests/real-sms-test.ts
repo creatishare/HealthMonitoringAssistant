@@ -58,7 +58,7 @@ async function main() {
     console.log(`BizId: ${result.bizId || '无'}`);
     console.log(`OutId: ${result.outId || '无'}`);
     if (result.verifyCode) {
-      console.log(`返回的验证码(服务端): ${result.verifyCode}`);
+      console.log('服务端返回了验证码（已隐藏，不写入日志）');
     }
     console.log('');
   } catch (err: any) {

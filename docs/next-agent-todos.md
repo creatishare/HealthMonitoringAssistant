@@ -26,17 +26,16 @@
 
 ## 推荐执行顺序
 
-1. P0-01 生产 Redis 验证码存储
-2. P0-05 生产限流改为 Redis/共享存储
-3. P1-07 日期/时区工具统一
-4. P1-08 健康记录输入校验与趋势指标白名单
-5. P1-01 健康洞察接入日常数据
-6. P1-02 统一健康记录录入体验
-7. P1-03 移植用户个人基线引导
-8. P1-04 健康记录字段扩展 migration
-9. P1-05 移植风险规则抽离与报告接入
-10. P1-06 预警动作化
-11. P0-02 HTTPS 与域名生产化
+1. P0-05 生产限流改为 Redis/共享存储
+2. P1-07 日期/时区工具统一
+3. P1-08 健康记录输入校验与趋势指标白名单
+4. P1-01 健康洞察接入日常数据
+5. P1-02 统一健康记录录入体验
+6. P1-03 移植用户个人基线引导
+7. P1-04 健康记录字段扩展 migration
+8. P1-05 移植风险规则抽离与报告接入
+9. P1-06 预警动作化
+10. P0-02 HTTPS 与域名生产化
 
 ---
 
@@ -492,7 +491,7 @@
 
 ---
 
-## P0-01 生产 Redis 验证码存储
+## P0-01 生产 Redis 验证码存储 — 已完成
 
 ### 用户价值
 
@@ -535,6 +534,18 @@
 - 验证成功后验证码删除。
 - 过期验证码不可用。
 - `cd src/backend && npm run build` 通过。
+
+### 完成记录
+
+2026-05-29 已完成：
+
+- 新增 `src/backend/src/config/redis.ts`，生产环境要求可用 `REDIS_URL`，开发环境 Redis 不可用时回退内存。
+- 新增 `src/backend/src/services/verification-code-store.ts`，按 `phone + type` 存取验证码，Redis key 使用 SHA-256 后缀避免明文手机号入 key。
+- `auth.service.ts` 改为通过 store 检查发送间隔、保存验证码、验证后删除验证码。
+- 未配置短信服务时，生产环境验证码接口明确失败；非生产环境保留模拟验证码流程，且不再把 OTP 写入日志。
+- 已更新 `.env.example`、`src/backend/.env.example`、`docs/quick-deploy.md`。
+- `cd src/backend && npm run build` 通过。
+- Smoke test 确认：开发环境 Redis 不可用时回退内存；生产环境 Redis 不可用时抛 `AppError(statusCode=503, code=01011)`。
 
 ### 避坑
 

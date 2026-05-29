@@ -140,11 +140,15 @@ async function sendSMS(
 
 export async function sendVerificationCode(phone: string): Promise<VerificationSendResult> {
   if (!smsConfig.accessKeyId || !smsConfig.accessKeySecret) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new AppError('短信服务未配置', 500, '01010');
+    }
+
     const length = smsConfig.verificationCodeLength;
     const min = Math.pow(10, length - 1);
     const max = Math.pow(10, length) - 1;
     const verifyCode = Math.floor(min + Math.random() * (max - min + 1)).toString();
-    logger.info(`[SMS模拟] 发送验证码到 ${maskPhone(phone)}: ${verifyCode}`);
+    logger.info(`[SMS模拟] 发送验证码到 ${maskPhone(phone)}`);
     return {
       success: true,
       verifyCode,

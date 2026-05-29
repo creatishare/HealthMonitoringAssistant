@@ -5,22 +5,22 @@
 
 ---
 
-## 2026-05-29 — 代码审计待办补充 + OCR 所有权修复 + Refresh Token 加固
+## 2026-05-29 — 代码审计待办补充 + OCR 所有权修复 + Refresh Token 加固 + Redis 验证码存储
 
 ### 今日完成
 
 1. **补充下一轮开发待办**
    - 更新 `docs/next-agent-todos.md`：
      - 将 2026-05-28 代码审计发现的问题整理为可执行任务包。
-    - 调整推荐执行顺序，当前建议下一步优先：
-      1. `P0-01 生产 Redis 验证码存储`
-      2. `P0-05 生产限流改为 Redis/共享存储`
-      3. `P1-07 日期/时区工具统一`
-      4. `P1-08 健康记录输入校验与趋势指标白名单`
-      5. `P1-01 健康洞察接入日常数据`
+     - 调整推荐执行顺序，当前建议下一步优先：
+       1. `P0-05 生产限流改为 Redis/共享存储`
+       2. `P1-07 日期/时区工具统一`
+       3. `P1-08 健康记录输入校验与趋势指标白名单`
+       4. `P1-01 健康洞察接入日常数据`
    - 新增/更新待办覆盖：
      - Refresh Token 签名验证与轮换加固已于本日完成。
-     - 验证码与限流仍是进程内 Map，生产多实例/重启不可靠。
+     - 验证码 Redis 存储已于本日完成。
+     - 限流仍是进程内 Map，生产多实例/重启不可靠。
      - Dashboard/趋势/部分前端日期仍用 UTC `toISOString()`，与用药模块 Asia/Shanghai 日期逻辑不一致。
      - 健康记录创建/更新与趋势 metrics 需要输入校验和白名单。
      - 他克莫司固定 `5-15 ng/mL` 仍残留在 `RecordForm.tsx`、`RecordDetail.tsx`、`drug-concentration.service.ts`。
@@ -59,21 +59,45 @@
    - 注意：
      - 部署后，旧版未带 `type: "refresh"` 的 refresh token 会刷新失败，用户可能需要重新登录；这是本次安全加固的预期结果。
 
+4. **完成 `P0-01 生产 Redis 验证码存储`**
+   - 问题：
+     - `src/backend/src/services/auth.service.ts` 使用进程内 `Map` 保存验证码，后端重启或多实例部署会导致未过期验证码失效或不共享。
+     - 开发/模拟短信路径会把验证码写入日志，不符合安全清单。
+   - 修复：
+     - 新增 `src/backend/src/config/redis.ts`
+       - 提供懒连接 Redis client。
+       - 生产环境要求 `REDIS_URL` 可用，连接失败会抛错；开发环境 Redis 不可用时回退内存存储。
+     - 新增 `src/backend/src/services/verification-code-store.ts`
+       - 提供 `setVerificationCode()` / `getVerificationCode()` / `deleteVerificationCode()`。
+       - Redis key 按 `phone + type` 做 SHA-256 后缀，不把明文手机号直接写入 key。
+       - Redis TTL 与验证码有效期一致；内存 fallback 也会按 `expiresAt` 清理。
+     - `src/backend/src/services/auth.service.ts`
+       - 发送频率检查改为读取验证码 store。
+       - 验证码保存改为写入 Redis/store。
+       - 注册、重置密码验证成功后立即删除验证码。
+       - 非生产且未配置短信服务时，保留“先请求验证码，再输入任意合法 6 位码”的本地测试体验。
+     - `src/backend/src/services/notification.service.ts`
+       - 生产环境未配置短信服务时明确报错。
+       - 模拟短信和开发 fallback 不再把 OTP 明文写入日志。
+     - 更新 `.env.example`、`src/backend/.env.example`、`docs/quick-deploy.md`、`docs/next-agent-todos.md`。
+
 ### 验证情况
 
 - 后端构建通过：
   ```bash
   cd src/backend && npm run build
   ```
+- 验证码 store smoke test 通过：
+  - 开发环境 Redis 不可用时，可快速回退内存，`set/get/delete` 正常。
+  - 生产环境 Redis 不可用时，返回 `AppError(statusCode=503, code=01011)`，不会静默回退内存。
 
 ### 当前注意点 / 下次优先
 
-1. **下一个任务建议先做 `P0-01 生产 Redis 验证码存储`**
-   - 验证码仍在 `auth.service.ts` 的进程内 Map 中，多实例部署和后端重启都会丢失。
-   - 后续可与 `P0-05 生产限流改为 Redis/共享存储` 共享 Redis 连接与生产降级策略。
+1. **下一个任务建议先做 `P0-05 生产限流改为 Redis/共享存储`**
+   - `security.middleware.ts` 的 `rateLimitBuckets` 仍是进程内 Map，多实例部署和后端重启会导致限流失效。
+   - 可复用本次新增的 `src/backend/src/config/redis.ts`。
 
 2. **生产化 P0 仍未完成**
-   - 验证码仍在内存 Map。
    - 限流仍在内存 Map。
    - 文档要求 HttpOnly Cookie，但前端实际使用 localStorage 存 token；这是后续安全加固方向。
 
@@ -85,6 +109,13 @@
      - `src/backend/src/services/ocr.service.ts`
      - `src/backend/src/services/auth.service.ts`
      - `src/backend/src/utils/jwt.ts`
+     - `src/backend/src/config/redis.ts`
+     - `src/backend/src/services/verification-code-store.ts`
+     - `src/backend/src/services/notification.service.ts`
+     - `src/backend/package.json`
+     - `.env.example`
+     - `src/backend/.env.example`
+     - `docs/quick-deploy.md`
    - 工作区原本已有 Dashboard、Charts、Profile、dashboardStore、alert/dashboard/report service 等移植风险与报告相关改动。后续 agent 应基于现有状态继续开发，不要误认为这些都是本轮 OCR 修复产生的改动。
 
 ---

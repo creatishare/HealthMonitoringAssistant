@@ -14,13 +14,15 @@ import {
   sendVerificationCode as sendSMSCode,
   verifySmsCode,
   getSMSConfig,
+  isSMSServiceAvailable,
 } from './notification.service';
-
-// 验证码存储（生产环境应使用Redis）
-const verificationCodes = new Map<
-  string,
-  { code: string; bizId?: string; expiresAt: number }
->();
+import {
+  deleteVerificationCode,
+  ensureVerificationCodeStoreAvailable,
+  getVerificationCode,
+  setVerificationCode,
+  VerificationCodeType,
+} from './verification-code-store';
 
 function formatAuthUser(user: any) {
   return {
@@ -31,16 +33,27 @@ function formatAuthUser(user: any) {
   };
 }
 
-async function validateVerificationCode(phone: string, code: string) {
-  const config = getSMSConfig();
+function canUseDevelopmentVerificationCodeBypass() {
+  return process.env.NODE_ENV !== 'production' && !isSMSServiceAvailable();
+}
 
-  // 先检查本地存储（用于模拟模式或快速验证）
-  const codeData = verificationCodes.get(phone);
+async function validateVerificationCode(
+  phone: string,
+  type: VerificationCodeType,
+  code: string
+) {
+  const config = getSMSConfig();
+  const codeData = await getVerificationCode(phone, type);
+  const codeNotExpired = Boolean(codeData && Date.now() <= codeData.expiresAt);
+
   if (
     codeData &&
-    codeData.code === code &&
-    Date.now() <= codeData.expiresAt
+    codeNotExpired &&
+    (codeData.code === code ||
+      (canUseDevelopmentVerificationCodeBypass() &&
+        isValidVerificationCode(code, config.verificationCodeLength)))
   ) {
+    await deleteVerificationCode(phone, type);
     return true;
   }
 
@@ -48,6 +61,7 @@ async function validateVerificationCode(phone: string, code: string) {
   if (codeData?.bizId) {
     const serverValid = await verifySmsCode(phone, code);
     if (serverValid) {
+      await deleteVerificationCode(phone, type);
       return true;
     }
   }
@@ -74,9 +88,6 @@ export async function register(
     throw new AppError(passwordCheck.message || '密码不符合要求', 400, '00002');
   }
 
-  // 验证验证码
-  await validateVerificationCode(phone, verificationCode);
-
   // 检查手机号是否已注册
   const existingUser = await prisma.user.findUnique({
     where: { phone },
@@ -85,6 +96,9 @@ export async function register(
   if (existingUser) {
     throw new AppError('手机号已注册', 409, '01005');
   }
+
+  // 验证验证码
+  await validateVerificationCode(phone, 'register', verificationCode);
 
   // 哈希密码
   const passwordHash = await hashPassword(password);
@@ -104,9 +118,6 @@ export async function register(
       profile: true,
     },
   });
-
-  // 清除验证码
-  verificationCodes.delete(phone);
 
   // 生成令牌
   const tokens = await generateTokenPair(
@@ -252,7 +263,7 @@ export async function sendVerificationCode(
   const config = getSMSConfig();
 
   // 检查是否频繁发送
-  const existingCode = verificationCodes.get(phone);
+  const existingCode = await getVerificationCode(phone, type);
   if (existingCode) {
     const sendTime = existingCode.expiresAt - config.verificationValidTimeSeconds * 1000;
     const elapsed = Date.now() - sendTime;
@@ -272,6 +283,8 @@ export async function sendVerificationCode(
     throw new AppError('手机号未注册', 400, '01006');
   }
 
+  await ensureVerificationCodeStoreAvailable();
+
   // 调用短信服务
   let smsResult = await sendSMSCode(phone);
   let verifyCode = smsResult.verifyCode;
@@ -279,7 +292,7 @@ export async function sendVerificationCode(
   // 开发环境回退：阿里云失败时自动生成模拟验证码，确保本地测试可用
   if ((!smsResult.success || !verifyCode) && process.env.NODE_ENV === 'development') {
     verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
-    logger.warn(`[开发回退] 阿里云短信发送失败，使用模拟验证码: ${maskPhone(phone)} => ${verifyCode}`);
+    logger.warn(`阿里云短信发送失败，开发环境使用模拟验证码: ${maskPhone(phone)}`);
     smsResult = { success: true, verifyCode };
   }
 
@@ -287,13 +300,13 @@ export async function sendVerificationCode(
     throw new AppError('验证码发送失败', 500, '01010');
   }
 
-  // 保存验证码
-  const expiresAt = Date.now() + config.verificationValidTimeSeconds * 1000;
-  verificationCodes.set(phone, {
-    code: verifyCode,
-    bizId: smsResult.bizId,
-    expiresAt,
-  });
+  await setVerificationCode(
+    phone,
+    type,
+    verifyCode,
+    config.verificationValidTimeSeconds,
+    smsResult.bizId
+  );
 
   logger.info(`验证码已发送: ${maskPhone(phone)}`);
 
@@ -362,9 +375,6 @@ export async function resetPassword(
     throw new AppError(passwordCheck.message || '密码不符合要求', 400, '00002');
   }
 
-  // 验证验证码
-  await validateVerificationCode(phone, verificationCode);
-
   // 查找用户
   const user = await prisma.user.findUnique({
     where: { phone },
@@ -373,6 +383,9 @@ export async function resetPassword(
   if (!user) {
     throw new AppError('手机号未注册', 400, '01006');
   }
+
+  // 验证验证码
+  await validateVerificationCode(phone, 'reset-password', verificationCode);
 
   // 哈希新密码
   const newPasswordHash = await hashPassword(newPassword);
@@ -385,9 +398,6 @@ export async function resetPassword(
 
   // 吊销所有刷新令牌（让用户重新登录）
   await revokeAllUserRefreshTokens(user.id);
-
-  // 清除验证码
-  verificationCodes.delete(phone);
 
   logger.info(`用户重置密码成功: ${maskPhone(phone)}`);
 }
