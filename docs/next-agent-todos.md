@@ -26,16 +26,15 @@
 
 ## 推荐执行顺序
 
-1. P0-05 生产限流改为 Redis/共享存储
-2. P1-07 日期/时区工具统一
-3. P1-08 健康记录输入校验与趋势指标白名单
-4. P1-01 健康洞察接入日常数据
-5. P1-02 统一健康记录录入体验
-6. P1-03 移植用户个人基线引导
-7. P1-04 健康记录字段扩展 migration
-8. P1-05 移植风险规则抽离与报告接入
-9. P1-06 预警动作化
-10. P0-02 HTTPS 与域名生产化
+1. P1-07 日期/时区工具统一
+2. P1-08 健康记录输入校验与趋势指标白名单
+3. P1-01 健康洞察接入日常数据
+4. P1-02 统一健康记录录入体验
+5. P1-03 移植用户个人基线引导
+6. P1-04 健康记录字段扩展 migration
+7. P1-05 移植风险规则抽离与报告接入
+8. P1-06 预警动作化
+9. P0-02 HTTPS 与域名生产化
 
 ---
 
@@ -61,13 +60,15 @@
 
 **完成记录**：2026-05-29 已修复。`src/backend/src/utils/jwt.ts` 为 access/refresh JWT 增加 `type` 声明，`verifyRefreshToken()` 先校验签名和类型，再校验 `jti`、DB 记录、过期/吊销和用户一致性；`src/backend/src/services/auth.service.ts` 改为复用该验证逻辑，并在刷新时原子吊销旧 token 后签发新 token。`cd src/backend && npm run build` 通过。
 
-### P0-05 生产限流改为 Redis/共享存储
+### P0-05 生产限流改为 Redis/共享存储 — 已完成
 
 **问题**：验证码和认证限流使用进程内 Map，多副本部署或重启后失效。
 
 **建议**：验证码存储和限流桶统一接入 Redis。生产环境 Redis 连接失败应明确报错，不应静默退回内存。
 
 **验收标准**：后端重启后未过期验证码仍可验证；多实例共享发送频率限制。
+
+**完成记录**：2026-05-29 已修复。`src/backend/src/middleware/security.middleware.ts` 的 `createRateLimiter()` 在生产环境改用 Redis Lua 脚本原子执行 `INCR + PTTL/PEXPIRE` 固定窗口限流，key 使用 SHA-256 后缀避免明文手机号/IP 入 key；开发环境保留内存 Map。生产 Redis 不可用时返回 503，不静默放行或回退。`cd src/backend && npm run build` 通过；smoke test 确认开发环境第三次请求返回 429、生产 Redis 不可用时返回 503。
 
 ### P1-07 日期/时区工具统一
 

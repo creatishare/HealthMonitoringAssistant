@@ -5,7 +5,7 @@
 
 ---
 
-## 2026-05-29 — 代码审计待办补充 + OCR 所有权修复 + Refresh Token 加固 + Redis 验证码存储
+## 2026-05-29 — 代码审计待办补充 + OCR 所有权修复 + Refresh Token 加固 + Redis 验证码/限流
 
 ### 今日完成
 
@@ -13,14 +13,13 @@
    - 更新 `docs/next-agent-todos.md`：
      - 将 2026-05-28 代码审计发现的问题整理为可执行任务包。
      - 调整推荐执行顺序，当前建议下一步优先：
-       1. `P0-05 生产限流改为 Redis/共享存储`
-       2. `P1-07 日期/时区工具统一`
-       3. `P1-08 健康记录输入校验与趋势指标白名单`
-       4. `P1-01 健康洞察接入日常数据`
+       1. `P1-07 日期/时区工具统一`
+       2. `P1-08 健康记录输入校验与趋势指标白名单`
+       3. `P1-01 健康洞察接入日常数据`
    - 新增/更新待办覆盖：
      - Refresh Token 签名验证与轮换加固已于本日完成。
      - 验证码 Redis 存储已于本日完成。
-     - 限流仍是进程内 Map，生产多实例/重启不可靠。
+     - 生产限流 Redis/共享存储已于本日完成。
      - Dashboard/趋势/部分前端日期仍用 UTC `toISOString()`，与用药模块 Asia/Shanghai 日期逻辑不一致。
      - 健康记录创建/更新与趋势 metrics 需要输入校验和白名单。
      - 他克莫司固定 `5-15 ng/mL` 仍残留在 `RecordForm.tsx`、`RecordDetail.tsx`、`drug-concentration.service.ts`。
@@ -81,6 +80,18 @@
        - 模拟短信和开发 fallback 不再把 OTP 明文写入日志。
      - 更新 `.env.example`、`src/backend/.env.example`、`docs/quick-deploy.md`、`docs/next-agent-todos.md`。
 
+5. **完成 `P0-05 生产限流改为 Redis/共享存储`**
+   - 问题：
+     - `src/backend/src/middleware/security.middleware.ts` 的 `rateLimitBuckets` 使用进程内 `Map`，多实例部署时验证码/登录/刷新等认证限流不共享。
+     - 后端重启会清空限流桶，攻击流量可绕过固定窗口计数。
+   - 修复：
+     - `createRateLimiter()` 在生产环境改用 Redis 固定窗口限流。
+       - 使用 Redis Lua 脚本原子执行 `INCR` + `PTTL` / `PEXPIRE`，保持原有窗口语义。
+       - 超限时继续返回 `429`，并设置 `Retry-After`。
+       - Redis key 对 `method + route + identity` 做 SHA-256，不把明文手机号/IP 写入 key。
+     - 开发环境继续使用内存 Map，保持本地启动成本低。
+     - 生产环境 Redis 不可用时返回 `503`，不会静默回退或放行。
+
 ### 验证情况
 
 - 后端构建通过：
@@ -90,15 +101,17 @@
 - 验证码 store smoke test 通过：
   - 开发环境 Redis 不可用时，可快速回退内存，`set/get/delete` 正常。
   - 生产环境 Redis 不可用时，返回 `AppError(statusCode=503, code=01011)`，不会静默回退内存。
+- 限流 smoke test 通过：
+  - 开发环境同一 key 第三次请求返回 `429`，前两次正常进入 `next()`。
+  - 生产环境 Redis 不可用时返回 `503`，不会进入 `next()`。
 
 ### 当前注意点 / 下次优先
 
-1. **下一个任务建议先做 `P0-05 生产限流改为 Redis/共享存储`**
-   - `security.middleware.ts` 的 `rateLimitBuckets` 仍是进程内 Map，多实例部署和后端重启会导致限流失效。
-   - 可复用本次新增的 `src/backend/src/config/redis.ts`。
+1. **下一个任务建议先做 `P1-07 日期/时区工具统一`**
+   - 用药模块已经按 Asia/Shanghai 处理部分日期，Dashboard 今日打卡、趋势查询和部分前端页面仍有 UTC `toISOString()` 用法。
+   - 建议先统一工具函数和调用点，再做健康记录输入校验。
 
 2. **生产化 P0 仍未完成**
-   - 限流仍在内存 Map。
    - 文档要求 HttpOnly Cookie，但前端实际使用 localStorage 存 token；这是后续安全加固方向。
 
 3. **不要回滚已有未提交改动**
@@ -116,6 +129,7 @@
      - `.env.example`
      - `src/backend/.env.example`
      - `docs/quick-deploy.md`
+     - `src/backend/src/middleware/security.middleware.ts`
    - 工作区原本已有 Dashboard、Charts、Profile、dashboardStore、alert/dashboard/report service 等移植风险与报告相关改动。后续 agent 应基于现有状态继续开发，不要误认为这些都是本轮 OCR 修复产生的改动。
 
 ---

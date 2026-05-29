@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { CorsOptions } from 'cors';
+import crypto from 'crypto';
+import { getRedisClient } from '../config/redis';
+import logger from '../utils/logger';
 
 type RateLimitKeyGenerator = (req: Request) => string;
 
@@ -23,6 +26,10 @@ const DEFAULT_ALLOWED_DEV_ORIGINS = [
 ];
 
 const rateLimitBuckets = new Map<string, RateLimitBucket>();
+
+function isProduction(): boolean {
+  return process.env.NODE_ENV === 'production';
+}
 
 function getConfiguredOrigins(): string[] {
   return (process.env.CORS_ORIGIN || '')
@@ -66,34 +73,120 @@ export function securityHeaders(_req: Request, res: Response, next: NextFunction
   next();
 }
 
-export function createRateLimiter(options: RateLimitOptions): RequestHandler {
-  return (req, res, next) => {
-    const now = Date.now();
-    const baseKey = options.keyGenerator?.(req) || req.ip || 'unknown';
-    const key = `${req.method}:${req.baseUrl}${req.path}:${baseKey}`;
-    const bucket = rateLimitBuckets.get(key);
+function getRateLimitKey(req: Request, options: RateLimitOptions): string {
+  const baseKey = options.keyGenerator?.(req) || req.ip || 'unknown';
+  const rawKey = `${req.method}:${req.baseUrl}${req.path}:${baseKey}`;
+  const hashedKey = crypto.createHash('sha256').update(rawKey).digest('hex');
+  return `rate-limit:${hashedKey}`;
+}
 
-    if (!bucket || bucket.resetAt <= now) {
-      rateLimitBuckets.set(key, {
-        count: 1,
-        resetAt: now + options.windowMs,
-      });
+function sendRateLimitExceeded(res: Response, retryAfterMs: number, message: string): void {
+  const retryAfterSeconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
+  res.setHeader('Retry-After', String(retryAfterSeconds));
+  res.status(429).json({
+    code: 429,
+    message,
+    data: null,
+  });
+}
+
+function sendRateLimitUnavailable(res: Response): void {
+  res.status(503).json({
+    code: 503,
+    message: '请求限流服务暂不可用，请稍后再试',
+    data: null,
+  });
+}
+
+async function consumeRedisRateLimit(
+  key: string,
+  windowMs: number
+): Promise<{ count: number; resetInMs: number }> {
+  const redis = await getRedisClient();
+  if (!redis) {
+    throw new Error('Redis unavailable');
+  }
+
+  const result = await redis.eval(
+    `
+      local current = redis.call("INCR", KEYS[1])
+      local ttl = redis.call("PTTL", KEYS[1])
+      if current == 1 or ttl < 0 then
+        redis.call("PEXPIRE", KEYS[1], ARGV[1])
+        ttl = tonumber(ARGV[1])
+      end
+      return { current, ttl }
+    `,
+    1,
+    key,
+    String(windowMs)
+  );
+
+  if (
+    !Array.isArray(result) ||
+    typeof result[0] !== 'number' ||
+    typeof result[1] !== 'number'
+  ) {
+    throw new Error('Invalid Redis rate limit response');
+  }
+
+  return {
+    count: result[0],
+    resetInMs: result[1],
+  };
+}
+
+function consumeMemoryRateLimit(
+  key: string,
+  windowMs: number
+): { count: number; resetInMs: number } {
+  const now = Date.now();
+  const bucket = rateLimitBuckets.get(key);
+
+  if (!bucket || bucket.resetAt <= now) {
+    rateLimitBuckets.set(key, {
+      count: 1,
+      resetAt: now + windowMs,
+    });
+    return {
+      count: 1,
+      resetInMs: windowMs,
+    };
+  }
+
+  bucket.count += 1;
+  return {
+    count: bucket.count,
+    resetInMs: bucket.resetAt - now,
+  };
+}
+
+export function createRateLimiter(options: RateLimitOptions): RequestHandler {
+  return async (req, res, next) => {
+    const key = getRateLimitKey(req, options);
+
+    try {
+      const result = isProduction()
+        ? await consumeRedisRateLimit(key, options.windowMs)
+        : consumeMemoryRateLimit(key, options.windowMs);
+
+      if (result.count > options.max) {
+        sendRateLimitExceeded(res, result.resetInMs, options.message);
+        return;
+      }
+
       next();
       return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error('请求限流检查失败', { message });
+
+      if (isProduction()) {
+        sendRateLimitUnavailable(res);
+        return;
+      }
     }
 
-    if (bucket.count >= options.max) {
-      const retryAfterSeconds = Math.ceil((bucket.resetAt - now) / 1000);
-      res.setHeader('Retry-After', String(retryAfterSeconds));
-      res.status(429).json({
-        code: 429,
-        message: options.message,
-        data: null,
-      });
-      return;
-    }
-
-    bucket.count += 1;
     next();
   };
 }
