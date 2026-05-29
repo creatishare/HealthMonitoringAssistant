@@ -11,7 +11,7 @@
 - **当前阶段**: MVP v1.0.0 已完成，功能增强阶段，内测前
 - **目标用户**: 肾衰竭患者、肾移植术后患者、其他肾病患者
 - **核心定位**: 健康数据记录与管理工具，**不提供医疗诊断**
-- **最近开发方向**: Dashboard 指标个性化展示（进行中）、付费商业化方案（规划中）
+- **最近开发方向**: 肾移植术后风险提示增强（个人基线 + 趋势 + 红旗规则）、复诊报告字段扩展、付费商业化方案（规划中）
 
 ---
 
@@ -138,6 +138,28 @@ throw new AppError('手机号已注册', 409, '00001')  // message, statusCode, 
 - **新增分析维度**：在 `ruleEngine.ts` 添加检测函数 → 在 `engine.ts` 中编排 → 在 `HealthInsights.tsx` 中添加展示区块
 - **红线**：禁止添加任何诊断建议、用药剂量调整、疾病推测
 
+### 5.4 肾移植术后风险提示原则
+
+当前项目已开始支持肾移植用户的“个人基线 + 趋势变化 + 红旗规则”提示，但仍是第一版。
+
+已落地：
+- Dashboard API 返回 `hasTransplant`、`transplantDate`、`baselineCreatinine`。
+- Dashboard 对肾移植用户默认核心指标为：肌酐、他克莫司、收缩压。
+- 肌酐较个人基线上升 `>10%` 显示黄色提醒，`>25%` 显示红色提醒。
+- 最近 3 次肌酐连续上升显示趋势提醒。
+- 他克莫司不再使用写死的 `5-15 ng/mL` 通用范围，页面和 PDF 均提示以移植医生设定目标范围为准。
+
+未落地：
+- `eGFR`、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV 病毒载量。
+- 他克莫司医生目标范围配置。
+- 稳定期连续 3 次检查结果中位数自动生成个人基线。
+- 按术后阶段（1 月内、1-3 月、3-12 月、1 年后）生成复查频率提醒。
+
+医疗红线：
+- 只能做风险提示、复查提醒和联系医生提醒。
+- 禁止输出排异、感染、药物毒性等诊断结论。
+- 禁止给出免疫抑制剂调药建议。
+
 ---
 
 ## 6. 开放待办 (按优先级)
@@ -174,7 +196,8 @@ throw new AppError('手机号已注册', 409, '00001')  // message, statusCode, 
 - 配置 HTTPS + 域名
 
 ### P1 - 功能增强
-- **Dashboard 指标趋势个性化展示** — 根据 `userType`（肾衰竭/肾移植/其他）+ `primaryDisease`（糖尿病肾病/高血压肾病/慢性肾炎/其他）动态展示推荐关注指标。默认仅展示该类型核心指标，通过"更多"按钮展开全部 13 项。代码已部分实现（后端接口已加字段、前端逻辑已写），但交互体验未达预期，需重新设计后再合并。
+- ~~Dashboard 指标趋势个性化展示~~ — ✅ 已完成第一版（2026-05-18）：按 `userType` + `primaryDisease` 分为“核心 / 推荐 / 全部”，移除旧“更多/收起”。
+- **肾移植术后风险提示增强** — 当前仅支持肌酐个人基线 + 连续趋势 + 他克莫司目标范围提示。下一步需新增 eGFR、尿蛋白/肌酐比、BK/CMV、医生目标范围配置。
 - **商业化付费功能** — 内测通过后实施。完整方案见 `docs/billing-plan.md`。包含：Freemium订阅制（免费基础版 + 高级会员 ¥18/月 或 ¥158/年）、支付宝/微信支付集成、用量配额控制、订阅状态守卫。
 - 健康洞察接入每日打卡数据（血压、体重）
 - 检查报告到期提醒（基于用户类型 + 上次检查日期）
@@ -184,22 +207,38 @@ throw new AppError('手机号已注册', 409, '00001')  // message, statusCode, 
 
 ---
 
-## 6. 当前未完成的代码改动（下次开发需知）
+## 6. 当前功能状态（下次开发需知）
 
-### 6.1 Dashboard 指标个性化展示（进行中，未达预期）
+### 6.1 Dashboard 指标个性化展示（第一版已完成）
 
 **涉及的文件**：
-- `src/backend/src/services/dashboard.service.ts` — 已在 `user` 对象中返回 `userType` 和 `primaryDisease`
-- `src/frontend/src/stores/dashboardStore.ts` — 已扩展类型，新增 `UserType` / `PrimaryDisease` 导出
-- `src/frontend/src/pages/Dashboard.tsx` — 已添加：
+- `src/backend/src/services/dashboard.service.ts` — 已在 `user` 对象中返回 `userType`、`primaryDisease`、`hasTransplant`、`transplantDate`、`baselineCreatinine`
+- `src/frontend/src/stores/dashboardStore.ts` — 已扩展类型，新增 `UserType` / `PrimaryDisease` 导出，并加入移植相关字段
+- `src/frontend/src/pages/Dashboard.tsx`
+- `src/frontend/src/pages/Charts.tsx`
+
+**已完成的修改**：
   - `ALL_METRICS` 常量（13 个指标：肌酐、尿素氮、血钾、尿酸、他克莫司、血红蛋白、血糖、体重、收缩压、舒张压、血钠、血磷、尿量）
   - `getRecommendedMetrics()` 函数（按 userType + primaryDisease 推荐）
-  - `showMoreMetrics` 状态 + "更多/收起"按钮
+  - `getCoreMetrics()` 函数（每类用户默认核心 3 项）
+  - `METRIC_SCOPE_OPTIONS` + `MetricScope`，用“核心 / 推荐 / 全部”替代旧“更多/收起”
   - 趋势数据查询已改为查询全部指标
+  - Charts 页同步同一套分层选择
 
-**问题记录**：
-- 用户反馈"更多"按钮交互未达预期（推荐指标太多，手机端仍然占满屏幕）
-- **下次开发方向**：需重新设计交互方案（如 Tab 分组：核心指标/全部指标、或按优先级仅展示 3 个核心 + 展开、或卡片式折叠）
+**肾移植特殊逻辑**：
+- 核心指标：肌酐、他克莫司、收缩压。
+- 移植用户趋势提醒不再强调通用正常范围，而是提示个人基线、连续变化和医生目标范围。
+- `getTransplantRiskReminder()` 会基于 `baselineCreatinine` 和近 30 天肌酐趋势输出灰/绿/黄/红提示。
+- 他克莫司目标范围不写死，必须由医生配置；目前仅展示趋势和免责声明。
+
+**验证**：
+- `cd src/frontend && npm run build` 通过。
+- `cd src/backend && npm run build` 通过。
+
+**下次开发方向**：
+- 新增移植相关正式字段：`eGFR`、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV、医生配置他克莫司目标范围。
+- 将移植风险规则抽成独立模块，避免继续堆在 `Dashboard.tsx`。
+- 将移植风险摘要写入 PDF 报告。
 
 ### 6.2 Dashboard 血压打卡卡片文字溢出 — 已修复
 
@@ -261,11 +300,11 @@ throw new AppError('手机号已注册', 409, '00001')  // message, statusCode, 
 | `src/services/api.ts` | Axios 封装、API 方法 |
 | `src/services/insights/engine.ts` | 健康洞察主入口 |
 | `src/stores/authStore.ts` | 认证状态 |
-| `src/stores/dashboardStore.ts` | Dashboard 数据（含 userType / primaryDisease） |
+| `src/stores/dashboardStore.ts` | Dashboard 数据（含 userType / primaryDisease / hasTransplant / transplantDate / baselineCreatinine） |
 | `src/stores/themeStore.ts` | 主题/深色模式 |
 | `src/components/common/Layout.tsx` | 页面布局 |
 | `src/components/common/BottomNav.tsx` | 底部导航 |
-| `src/pages/Dashboard.tsx` | 首页仪表盘（**指标个性化展示逻辑已部分实现，待继续**） |
+| `src/pages/Dashboard.tsx` | 首页仪表盘（指标分层、肾移植肌酐基线提示） |
 | `src/pages/MedicationForm.tsx` | 用药表单（含 BottomSelector） |
 | `src/pages/HealthInsights.tsx` | 健康洞察页面 |
 | `src/pages/PrivacyPolicy.tsx` | 隐私政策页面 |
@@ -291,6 +330,7 @@ throw new AppError('手机号已注册', 409, '00001')  // message, statusCode, 
 |------|------|
 | `CLAUDE.md` | **Agent 开发配置总览（必读）** |
 | `docs/developer-handbook.md` | **开发者手册（必读）**：架构约定、启动指南、待办 |
+| `docs/next-agent-todos.md` | **下个 Agent 串行待办**：近期优化任务包、范围、验收标准、避坑提示 |
 | `docs/billing-plan.md` | **付费商业化方案**：Freemium模式、支付集成、合规要求 |
 | `docs/architecture.md` | 系统架构设计 |
 | `docs/api-spec.md` | API 详细规范 |

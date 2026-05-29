@@ -4,6 +4,7 @@ import {
   Bell,
   ChevronRight,
   Download,
+  FileText,
   Heart,
   HelpCircle,
   LogOut,
@@ -35,6 +36,7 @@ interface UserProfile {
 }
 
 type InfoPanel = 'privacy' | 'help' | 'feedback' | null
+type ReportAction = 'download' | 'share' | null
 
 const primaryDiseaseText: Record<string, string> = {
   diabetic_nephropathy: '糖尿病肾病',
@@ -111,7 +113,7 @@ export default function Profile() {
   const { logout, user } = useAuthStore()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
-  const [exporting, setExporting] = useState(false)
+  const [reportAction, setReportAction] = useState<ReportAction>(null)
   const [activePanel, setActivePanel] = useState<InfoPanel>(null)
 
   useEffect(() => {
@@ -135,6 +137,11 @@ export default function Profile() {
   const trackDate = profile?.transplantDate || profile?.diagnosisDate || profile?.createdAt
   const trackedDays = getDaysSince(trackDate)
   const userTypeLabel = profile?.hasTransplant || profile?.userType === 'kidney_transplant' ? '肾移植术后' : profile?.userType === 'kidney_failure' ? '肾衰竭管理' : '健康监测'
+  const reportRange = getReportDateRange()
+  const isTransplantUser = profile?.hasTransplant || profile?.userType === 'kidney_transplant'
+  const reportItems = isTransplantUser
+    ? ['个人基线', '趋势偏移', '血药浓度', '复诊提醒']
+    : ['基础档案', '关键指标', '用药摘要', '未读预警']
 
   const profileItems = useMemo(
     () => [
@@ -164,7 +171,7 @@ export default function Profile() {
   }
 
   const handleExport = async () => {
-    setExporting(true)
+    setReportAction('download')
     try {
       const report = await buildReport()
       downloadBlob(report.blob, report.filename)
@@ -172,12 +179,12 @@ export default function Profile() {
     } catch (error) {
       toast.error(await getApiErrorMessage(error, '导出失败，请稍后重试'))
     } finally {
-      setExporting(false)
+      setReportAction(null)
     }
   }
 
   const handleShare = async () => {
-    setExporting(true)
+    setReportAction('share')
     try {
       const report = await buildReport()
       const file = new File([report.blob], report.filename, { type: 'application/pdf' })
@@ -202,14 +209,12 @@ export default function Profile() {
         toast.error(await getApiErrorMessage(error, '分享失败，请稍后重试'))
       }
     } finally {
-      setExporting(false)
+      setReportAction(null)
     }
   }
 
   const actions = [
-    { icon: Download, title: '数据导出', description: '导出健康记录报告', tone: 'text-primary bg-primary/10', onClick: handleExport },
     { icon: Bell, title: '提醒设置', description: '自定义提醒时间和方式', tone: 'text-success bg-success/10', onClick: () => navigate('/reminder-settings') },
-    { icon: Share2, title: '分享给医生', description: '生成健康记录报告', tone: 'text-warning bg-warning/10', onClick: handleShare },
     { icon: Shield, title: '隐私与安全', description: '数据保护和账号安全', tone: 'text-danger bg-danger/10', onClick: () => navigate('/privacy-security') },
     { icon: HelpCircle, title: '帮助中心', description: '使用指南和常见问题', tone: 'text-medication bg-medication/10', onClick: () => navigate('/help-center') },
     { icon: MessageSquare, title: '意见反馈', description: '帮助我们做得更好', tone: 'text-primary bg-primary/10', onClick: () => setActivePanel(activePanel === 'feedback' ? null : 'feedback') },
@@ -278,12 +283,63 @@ export default function Profile() {
         </div>
       </section>
 
+      <section className="card p-5 md:p-7">
+        <div className="flex items-start gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <FileText size={22} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="section-kicker">复诊资料</p>
+            <h2 className="mt-2 text-card-title text-gray-text-primary">近30天健康报告</h2>
+            <p className="mt-1 text-helper text-gray-text-secondary">
+              {reportRange.startDate} 至 {reportRange.endDate}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+          {reportItems.map((item) => (
+            <div key={item} className="rounded-[18px] border border-gray-border bg-white/54 px-3 py-3 text-center text-helper font-medium text-gray-text-primary dark:bg-white/5">
+              {item}
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 rounded-[18px] border border-primary/15 bg-primary/10 p-3 text-helper text-gray-text-secondary dark:bg-primary/10">
+          {isTransplantUser
+            ? '移植报告会突出个人基线、肌酐趋势和血药浓度记录；他克莫司目标范围、病毒载量和尿蛋白仍需以医生医嘱和化验结果为准。'
+            : '报告仅在你主动操作时生成。分享会调用当前设备的系统分享面板，不会自动发送给任何人。'}
+        </div>
+
+        <div className="mt-3 rounded-[18px] border border-gray-border bg-white/54 p-3 text-helper text-gray-text-secondary dark:bg-white/5">
+          分享会调用当前设备的系统分享面板，不会自动发送给任何人；导出的报告不能替代医生诊断。
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <button
+            onClick={handleExport}
+            disabled={reportAction != null}
+            className="btn-secondary w-full"
+          >
+            <Download size={18} />
+            {reportAction === 'download' ? '生成中' : '数据导出'}
+          </button>
+          <button
+            onClick={handleShare}
+            disabled={reportAction != null}
+            className="btn-primary w-full"
+          >
+            <Share2 size={18} />
+            {reportAction === 'share' ? '准备中' : '分享给医生'}
+          </button>
+        </div>
+      </section>
+
       <section className="card p-2">
         {actions.map((item) => (
           <button
             key={item.title}
             onClick={item.onClick}
-            disabled={exporting && (item.title === '数据导出' || item.title === '分享给医生')}
             className="flex w-full items-center justify-between rounded-[20px] px-3 py-4 text-left transition-colors hover:bg-white/70 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-white/5"
           >
             <div className="flex min-w-0 items-center gap-3">

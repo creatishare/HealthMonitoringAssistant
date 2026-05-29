@@ -10,6 +10,9 @@ interface DashboardData {
     greeting: string
     userType?: UserType | null
     primaryDisease?: PrimaryDisease | null
+    hasTransplant?: boolean | null
+    transplantDate?: string | null
+    baselineCreatinine?: number | null
   }
   today: {
     date: string

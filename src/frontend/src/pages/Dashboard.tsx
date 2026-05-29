@@ -50,20 +50,161 @@ export const ALL_METRICS = [
   { key: 'urineVolume', name: '尿量', unit: 'ml', color: '#3157C8' },
 ]
 
+export type MetricScope = 'core' | 'recommended' | 'all'
+
+export const METRIC_SCOPE_OPTIONS: Array<{ key: MetricScope; label: string }> = [
+  { key: 'core', label: '核心' },
+  { key: 'recommended', label: '推荐' },
+  { key: 'all', label: '全部' },
+]
+
 export function getRecommendedMetrics(userType?: UserType | null, primaryDisease?: PrimaryDisease | null): string[] {
   switch (userType) {
     case 'kidney_failure': {
       if (primaryDisease === 'diabetic_nephropathy') {
         return ['creatinine', 'urea', 'potassium', 'bloodSugar', 'weight', 'hemoglobin']
       }
+      if (primaryDisease === 'hypertensive_nephropathy') {
+        return ['creatinine', 'urea', 'potassium', 'bloodPressureSystolic', 'bloodPressureDiastolic', 'weight']
+      }
+      if (primaryDisease === 'chronic_glomerulonephritis') {
+        return ['creatinine', 'urea', 'potassium', 'urineVolume', 'weight', 'hemoglobin']
+      }
       return ['creatinine', 'urea', 'potassium', 'hemoglobin', 'weight']
     }
     case 'kidney_transplant':
-      return ['creatinine', 'tacrolimus', 'hemoglobin', 'uricAcid', 'weight', 'bloodPressureSystolic']
+      return ['creatinine', 'tacrolimus', 'bloodPressureSystolic', 'bloodPressureDiastolic', 'urineVolume', 'potassium', 'hemoglobin']
     case 'other':
       return ['creatinine', 'urea', 'uricAcid', 'weight', 'bloodPressureSystolic']
     default:
       return ['creatinine', 'urea', 'potassium', 'weight', 'hemoglobin']
+  }
+}
+
+export function getCoreMetrics(userType?: UserType | null, primaryDisease?: PrimaryDisease | null): string[] {
+  if (userType === 'kidney_transplant') {
+    return ['creatinine', 'tacrolimus', 'bloodPressureSystolic']
+  }
+
+  if (primaryDisease === 'diabetic_nephropathy') {
+    return ['creatinine', 'potassium', 'bloodSugar']
+  }
+
+  if (primaryDisease === 'hypertensive_nephropathy') {
+    return ['creatinine', 'bloodPressureSystolic', 'bloodPressureDiastolic']
+  }
+
+  return ['creatinine', 'urea', 'potassium']
+}
+
+export function getVisibleMetricsByScope(
+  scope: MetricScope,
+  userType?: UserType | null,
+  primaryDisease?: PrimaryDisease | null
+) {
+  const coreKeys = getCoreMetrics(userType, primaryDisease)
+  const recommendedKeys = getRecommendedMetrics(userType, primaryDisease)
+  const keys = scope === 'core' ? coreKeys : scope === 'recommended' ? recommendedKeys : ALL_METRICS.map((metric) => metric.key)
+  return ALL_METRICS.filter((metric) => keys.includes(metric.key))
+}
+
+function getMetricName(metricKey: string) {
+  return ALL_METRICS.find((metric) => metric.key === metricKey)?.name || metricKey
+}
+
+function getLatestMetricValue(data: TrendData[], metricKey: keyof TrendData) {
+  for (let index = data.length - 1; index >= 0; index -= 1) {
+    const value = data[index][metricKey]
+    if (typeof value === 'number') {
+      return value
+    }
+  }
+
+  return null
+}
+
+function getLatestMetricValues(data: TrendData[], metricKey: keyof TrendData, limit = 3) {
+  const values: number[] = []
+
+  for (let index = data.length - 1; index >= 0 && values.length < limit; index -= 1) {
+    const value = data[index][metricKey]
+    if (typeof value === 'number') {
+      values.unshift(value)
+    }
+  }
+
+  return values
+}
+
+function getTrendDirection(values: number[]) {
+  if (values.length < 3) return 'unknown'
+  const [first, second, third] = values
+  if (first < second && second < third) return 'rising'
+  if (first > second && second > third) return 'falling'
+  return 'mixed'
+}
+
+function getTransplantRiskReminder(
+  trendData: TrendData[],
+  baselineCreatinine?: number | null
+): { tone: 'green' | 'yellow' | 'red' | 'gray'; title: string; message: string } {
+  const latestCreatinine = getLatestMetricValue(trendData, 'creatinine')
+
+  if (!baselineCreatinine) {
+    return {
+      tone: 'gray',
+      title: '需要建立个人基线',
+      message: '移植后肌酐更适合与个人稳定基线比较。请在个人档案中填写稳定期基线肌酐，报告会更有参考价值。',
+    }
+  }
+
+  if (latestCreatinine == null) {
+    return {
+      tone: 'gray',
+      title: '缺少肌酐数据',
+      message: '近30天暂无肌酐记录，复诊前建议补充最近一次化验结果和报告日期。',
+    }
+  }
+
+  const changeRate = (latestCreatinine - baselineCreatinine) / baselineCreatinine
+  const changePercent = Math.round(changeRate * 100)
+  const creatinineTrend = getTrendDirection(getLatestMetricValues(trendData, 'creatinine', 3))
+
+  if (changeRate > 0.25) {
+    return {
+      tone: 'red',
+      title: '建议尽快联系移植医生',
+      message: `最近肌酐较个人基线上升约${changePercent}%，需要结合脱水、药物、感染、梗阻或排异等原因由医生进一步判断。`,
+    }
+  }
+
+  if (changeRate > 0.1 || creatinineTrend === 'rising') {
+    return {
+      tone: 'yellow',
+      title: '建议复查并观察趋势',
+      message: changeRate > 0.1
+        ? `最近肌酐较个人基线上升约${changePercent}%，建议按医嘱复查并关注连续变化。`
+        : '最近3次肌酐呈连续上升趋势，建议复诊时重点核对报告和用药情况。',
+    }
+  }
+
+  return {
+    tone: 'green',
+    title: '核心指标暂未见明显偏离',
+    message: '肌酐相对个人基线较稳定。血药浓度目标范围、病毒载量和尿蛋白仍需以医生配置和化验结果为准。',
+  }
+}
+
+function getRiskToneClass(tone: 'green' | 'yellow' | 'red' | 'gray') {
+  switch (tone) {
+    case 'red':
+      return 'border-danger/20 bg-red-50/85 text-danger dark:bg-red-950/25'
+    case 'yellow':
+      return 'border-warning/20 bg-yellow-50/85 text-warning dark:bg-yellow-950/20'
+    case 'green':
+      return 'border-success/20 bg-emerald-50/85 text-success dark:bg-emerald-950/20'
+    default:
+      return 'border-primary/15 bg-primary/10 text-primary dark:bg-primary/10'
   }
 }
 
@@ -107,7 +248,7 @@ export default function Dashboard() {
   const [trendData, setTrendData] = useState<TrendData[]>([])
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>([])
   const [trendLoading, setTrendLoading] = useState(false)
-  const [showMoreMetrics, setShowMoreMetrics] = useState(false)
+  const [metricScope, setMetricScope] = useState<MetricScope>('core')
   const [hasInitializedMetrics, setHasInitializedMetrics] = useState(false)
 
   useEffect(() => {
@@ -162,9 +303,8 @@ export default function Dashboard() {
   }, [fetchDashboard])
 
   useEffect(() => {
-    if (data?.user?.userType && !hasInitializedMetrics) {
-      const recommended = getRecommendedMetrics(data.user.userType, data.user.primaryDisease)
-      setSelectedMetrics(recommended)
+    if (data?.user && !hasInitializedMetrics) {
+      setSelectedMetrics(getCoreMetrics(data.user.userType, data.user.primaryDisease))
       setHasInitializedMetrics(true)
     }
   }, [data?.user?.userType, data?.user?.primaryDisease, hasInitializedMetrics])
@@ -238,8 +378,22 @@ export default function Dashboard() {
 
   const hasTrendData = trendData.length > 0 && selectedMetrics.some((m) => trendData.some((d) => d[m as keyof TrendData] !== undefined && d[m as keyof TrendData] !== null))
 
-  const recommended = getRecommendedMetrics(data?.user?.userType, data?.user?.primaryDisease)
-  const visibleMetrics = showMoreMetrics ? ALL_METRICS : ALL_METRICS.filter((m) => recommended.includes(m.key))
+  const coreMetricKeys = getCoreMetrics(data?.user?.userType, data?.user?.primaryDisease)
+  const visibleMetrics = getVisibleMetricsByScope(metricScope, data?.user?.userType, data?.user?.primaryDisease)
+  const missingCoreMetricNames = coreMetricKeys
+    .filter((metricKey) => !trendData.some((point) => point[metricKey as keyof TrendData] !== undefined && point[metricKey as keyof TrendData] !== null))
+    .map(getMetricName)
+  const trendReminder =
+    data?.user?.userType === 'kidney_transplant'
+      ? '移植术后趋势优先参考个人基线、连续变化和医生设定目标范围。'
+      : missingCoreMetricNames.length > 0
+      ? `近30天缺少${missingCoreMetricNames.slice(0, 3).join('、')}记录，复诊前建议核对报告日期。`
+      : selectedMetrics.length > 4
+        ? '当前图表包含多项指标，复诊沟通时可在图表页逐项查看。'
+        : '核心指标已有记录，建议持续观察同一周期内的变化。'
+  const transplantRiskReminder = data?.user?.userType === 'kidney_transplant'
+    ? getTransplantRiskReminder(trendData, data.user.baselineCreatinine)
+    : null
 
   const getMetricTone = (status?: 'normal' | 'warning' | 'critical') => {
     switch (status) {
@@ -413,6 +567,37 @@ export default function Dashboard() {
             </button>
           </div>
 
+          <div className="mt-4 grid grid-cols-3 gap-2 rounded-[18px] border border-gray-border bg-white/56 p-1 dark:bg-slate-900/30">
+            {METRIC_SCOPE_OPTIONS.map((option) => (
+              <button
+                key={option.key}
+                onClick={() => setMetricScope(option.key)}
+                className={`h-9 rounded-[14px] text-helper font-medium transition-all ${
+                  metricScope === option.key
+                    ? 'bg-primary text-white shadow-[0_10px_22px_rgba(62,99,221,0.18)]'
+                    : 'text-gray-text-secondary hover:text-primary'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-3 flex items-start gap-2 rounded-[18px] border border-primary/15 bg-primary/10 p-3 text-helper text-gray-text-secondary dark:bg-primary/10">
+            <Sparkles size={16} className="mt-0.5 shrink-0 text-primary" />
+            <p>{trendReminder}</p>
+          </div>
+
+          {transplantRiskReminder && (
+            <div className={`mt-3 flex items-start gap-3 rounded-[18px] border p-3 ${getRiskToneClass(transplantRiskReminder.tone)}`}>
+              <AlertTriangle size={17} className="mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-helper font-semibold">{transplantRiskReminder.title}</p>
+                <p className="mt-1 text-helper text-gray-text-secondary">{transplantRiskReminder.message}</p>
+              </div>
+            </div>
+          )}
+
           <div className="mt-4 flex flex-wrap gap-2">
             {visibleMetrics.map((metric) => (
               <button
@@ -424,9 +609,6 @@ export default function Dashboard() {
                 {metric.name}
               </button>
             ))}
-            <button onClick={() => setShowMoreMetrics((v) => !v)} className={`chip ${showMoreMetrics ? 'chip-active' : ''}`}>
-              {showMoreMetrics ? '收起' : '更多'}
-            </button>
           </div>
 
           <div className="mt-5 h-56 md:h-72">

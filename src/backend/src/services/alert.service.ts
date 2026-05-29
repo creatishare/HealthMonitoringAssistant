@@ -122,16 +122,28 @@ const metricAlertRules: AlertRule[] = [
     suggestionTemplate: '尿酸水平与饮食习惯相关，具体饮食调整建议请咨询医生或营养师',
   },
   {
-    id: 'creatinine_rise',
-    name: '肌酐突增',
+    id: 'creatinine_rise_critical',
+    name: '肌酐较基线明显升高',
     condition: (record: HealthRecord, context: { baseline?: number }) => {
       if (!record.creatinine || !context.baseline) return false;
-      return record.creatinine > context.baseline * 1.2;
+      return record.creatinine > context.baseline * 1.25;
+    },
+    level: 'critical',
+    type: 'metric',
+    messageTemplate: '肌酐较个人基线上升{percent}%，建议尽快联系移植医生',
+    suggestionTemplate: '肌酐升高原因需结合脱水、药物、感染、梗阻或排异等情况由医生判断，请勿自行调整免疫抑制剂',
+  },
+  {
+    id: 'creatinine_rise_warning',
+    name: '肌酐较基线上升',
+    condition: (record: HealthRecord, context: { baseline?: number }) => {
+      if (!record.creatinine || !context.baseline) return false;
+      return record.creatinine > context.baseline * 1.1 && record.creatinine <= context.baseline * 1.25;
     },
     level: 'warning',
     type: 'metric',
-    messageTemplate: '肌酐较基线上升{percent}%，建议及时就医复查',
-    suggestionTemplate: '肌酐升高可能表示肾功能恶化，请及时就医',
+    messageTemplate: '肌酐较个人基线上升{percent}%，建议复查并观察趋势',
+    suggestionTemplate: '请核对报告日期、饮水和血压记录，并按医嘱复查；请勿自行调整免疫抑制剂',
   },
   {
     id: 'low_hemoglobin',

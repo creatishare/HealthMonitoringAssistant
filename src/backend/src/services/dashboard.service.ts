@@ -102,6 +102,9 @@ export async function getDashboardData(userId: string) {
       greeting,
       userType: user.profile?.userType,
       primaryDisease: user.profile?.primaryDisease,
+      hasTransplant: user.profile?.hasTransplant,
+      transplantDate: user.profile?.transplantDate?.toISOString().split('T')[0],
+      baselineCreatinine: user.profile?.baselineCreatinine,
     },
     today: {
       date: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }),

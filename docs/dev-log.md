@@ -5,6 +5,196 @@
 
 ---
 
+## 2026-05-29 — 代码审计待办补充 + OCR 所有权修复
+
+### 今日完成
+
+1. **补充下一轮开发待办**
+   - 更新 `docs/next-agent-todos.md`：
+     - 将 2026-05-28 代码审计发现的问题整理为可执行任务包。
+     - 调整推荐执行顺序，当前建议下一步优先：
+       1. `P0-04 Refresh Token 签名验证与轮换加固`
+       2. `P0-01 生产 Redis 验证码存储`
+       3. `P0-05 生产限流改为 Redis/共享存储`
+       4. `P1-07 日期/时区工具统一`
+       5. `P1-08 健康记录输入校验与趋势指标白名单`
+       6. `P1-01 健康洞察接入日常数据`
+   - 新增待办覆盖：
+     - Refresh Token 当前刷新逻辑需签名验证和 token 类型校验。
+     - 验证码与限流仍是进程内 Map，生产多实例/重启不可靠。
+     - Dashboard/趋势/部分前端日期仍用 UTC `toISOString()`，与用药模块 Asia/Shanghai 日期逻辑不一致。
+     - 健康记录创建/更新与趋势 metrics 需要输入校验和白名单。
+     - 他克莫司固定 `5-15 ng/mL` 仍残留在 `RecordForm.tsx`、`RecordDetail.tsx`、`drug-concentration.service.ts`。
+     - `ProfileEdit.tsx` 仍直接 `fetch('/api/users/profile')`，需改用统一 `userApi`。
+     - 后端 `npm test` 当前不可用，Worker Dockerfile 启动路径也需整理。
+
+2. **修复 OCR 识别接口所有权校验**
+   - 问题：
+     - `src/backend/src/services/ocr.service.ts` 的 `recognizeImage(imageId)` 只按 `imageId` 查询 `LabReport`。
+     - `src/backend/src/controllers/ocr.controller.ts` 已拿到当前登录 `userId`，但没有传给服务层。
+     - 结果是：如果用户猜到或拿到别人的 `imageId`，理论上可以触发识别不属于自己的图片。
+   - 修复：
+     - `src/backend/src/controllers/ocr.controller.ts`
+       - 调用改为 `ocrService.recognizeImage(userId, imageId)`。
+     - `src/backend/src/services/ocr.service.ts`
+       - 签名改为 `recognizeImage(userId: string, imageId: string)`。
+       - 查询改为 `findFirst({ where: { id: imageId, userId } })`。
+   - 结果：
+     - 不属于当前用户的 `imageId` 会按“不存在”处理，与 `getOCRResult()` / `confirmOCRResult()` 的所有权校验保持一致。
+
+### 验证情况
+
+- 后端构建通过：
+  ```bash
+  cd src/backend && npm run build
+  ```
+
+### 当前注意点 / 下次优先
+
+1. **下一个任务建议先做 `P0-04 Refresh Token 签名验证与轮换加固`**
+   - 当前 `auth.service.ts` 的刷新逻辑手动 base64 解 payload 后查 DB，应改为先 `jwt.verify()` 校验签名，再校验 jti、过期、吊销状态和用户状态。
+
+2. **生产化 P0 仍未完成**
+   - 验证码仍在内存 Map。
+   - 限流仍在内存 Map。
+   - 文档要求 HttpOnly Cookie，但前端实际使用 localStorage 存 token；这是后续安全加固方向。
+
+3. **不要回滚已有未提交改动**
+   - 本轮仅涉及：
+     - `docs/next-agent-todos.md`
+     - `docs/dev-log.md`
+     - `src/backend/src/controllers/ocr.controller.ts`
+     - `src/backend/src/services/ocr.service.ts`
+   - 工作区原本已有 Dashboard、Charts、Profile、dashboardStore、alert/dashboard/report service 等移植风险与报告相关改动。后续 agent 应基于现有状态继续开发，不要误认为这些都是本轮 OCR 修复产生的改动。
+
+---
+
+## 2026-05-18 — 指标趋势分层 + 肾移植术后基线风险提示 + 复诊报告展示优化
+
+### 今日完成
+
+1. **Dashboard 指标趋势交互重构**
+   - 背景：
+     - 旧版“更多/收起”会在手机端一次露出过多指标，用户反馈交互不理想。
+     - 肾移植术后用户不能只看通用正常范围，更应该看个人基线、趋势偏移和红旗规则。
+   - 前端改动：
+     - `src/frontend/src/pages/Dashboard.tsx`
+       - 新增 `MetricScope = core | recommended | all`。
+       - 新增 `METRIC_SCOPE_OPTIONS`，将趋势指标切换改成“核心 / 推荐 / 全部”三段式。
+       - 默认只选核心指标，不再默认选中一大组推荐指标。
+       - `getRecommendedMetrics()` 扩展原发病差异：
+         - 糖尿病肾病：肌酐、尿素氮、血钾、血糖、体重、血红蛋白。
+         - 高血压肾病：肌酐、尿素氮、血钾、收缩压、舒张压、体重。
+         - 慢性肾小球肾炎：肌酐、尿素氮、血钾、尿量、体重、血红蛋白。
+       - 肾移植用户核心指标改为：肌酐、他克莫司、收缩压。
+       - 新增趋势提醒文案：
+         - 非移植用户：提示近 30 天缺少哪些核心指标，便于复诊前补齐。
+         - 移植用户：提示趋势优先参考个人基线、连续变化、医生设定目标范围。
+     - `src/frontend/src/pages/Charts.tsx`
+       - 与 Dashboard 同步“核心 / 推荐 / 全部”分层选择。
+       - 移除他克莫司固定 `5-15 ng/mL` 参考范围，改为提示“必须以移植医生设定目标范围为准，请勿自行调药”。
+
+2. **肾移植术后基线风险提示第一版**
+   - 理论依据：
+     - 肾移植术后不应设计成“单次化验值在范围内 = 安全”。
+     - 第一版按“个人稳定基线 + 趋势变化 + 红旗规则”落地，暂不做排异、感染、药物毒性等诊断推断。
+   - 后端改动：
+     - `src/backend/src/services/dashboard.service.ts`
+       - Dashboard API 的 `user` 对象新增：
+         - `hasTransplant`
+         - `transplantDate`
+         - `baselineCreatinine`
+     - `src/frontend/src/stores/dashboardStore.ts`
+       - 同步扩展 Dashboard 用户类型。
+   - 前端风险提示：
+     - `Dashboard.tsx` 新增 `getTransplantRiskReminder()`：
+       - 未填写 `baselineCreatinine`：灰色，提示先建立个人基线。
+       - 近 30 天无肌酐记录：灰色，提示补充最近一次化验结果。
+       - 最近肌酐较个人基线上升 `> 10%`：黄色，建议复查并观察趋势。
+       - 最近肌酐较个人基线上升 `> 25%`：红色，建议尽快联系移植医生。
+       - 最近 3 次肌酐连续上升：黄色，建议复诊时重点核对报告和用药情况。
+       - 肌酐相对基线稳定：绿色，但仍提示血药浓度目标范围、病毒载量、尿蛋白需以医生配置和化验结果为准。
+   - 后端预警规则：
+     - `src/backend/src/services/alert.service.ts`
+       - 原 `creatinine_rise` 单一 warning 规则拆成两档：
+         - `creatinine_rise_warning`：肌酐较个人基线上升 `>10% 且 <=25%`，warning。
+         - `creatinine_rise_critical`：肌酐较个人基线上升 `>25%`，critical。
+       - 文案改为“建议复查/联系移植医生”，并明确“请勿自行调整免疫抑制剂”。
+   - 重要限制：
+     - 当前数据库还没有 `eGFR`、尿蛋白/肌酐比、尿白蛋白/肌酐比、BK/CMV/EBV 病毒载量、医生配置的他克莫司目标范围。
+     - 因此本次只基于已有字段做安全的第一版，不假装能判断缺失指标。
+
+3. **数据导出 / 分享给医生展示逻辑优化**
+   - `src/frontend/src/pages/Profile.tsx`
+     - 将“数据导出 / 分享给医生”从普通入口列表中独立出来，新增“近 30 天健康报告”卡片。
+     - 普通用户展示报告内容：基础档案、关键指标、用药摘要、未读预警。
+     - 肾移植用户展示报告内容：个人基线、趋势偏移、血药浓度、复诊提醒。
+     - 说明文案强调：
+       - 报告仅在用户主动操作时生成。
+       - 分享调用当前设备系统分享面板，不会自动发送给任何人。
+       - 导出报告不能替代医生诊断。
+       - 移植报告中的他克莫司目标范围、病毒载量、尿蛋白仍需以医生医嘱和化验结果为准。
+   - `src/backend/src/services/report.service.ts`
+     - PDF 趋势图不再给他克莫司写死 `5-15 ng/mL` 参考范围。
+     - 医生阅读摘要中：
+       - 肾移植用户优先提示个人基线肌酐。
+       - 若缺少基线肌酐，提示补充稳定期连续检查结果。
+       - 明确免疫抑制药目标范围需由移植医生设定，本报告只整理记录和趋势，不提供调药建议。
+     - PDF 免责声明新增：移植术后血药浓度、病毒载量、尿蛋白等目标范围请以移植医生医嘱为准。
+
+### 涉及文件
+
+- `src/frontend/src/pages/Dashboard.tsx`
+- `src/frontend/src/pages/Charts.tsx`
+- `src/frontend/src/pages/Profile.tsx`
+- `src/frontend/src/stores/dashboardStore.ts`
+- `src/backend/src/services/dashboard.service.ts`
+- `src/backend/src/services/alert.service.ts`
+- `src/backend/src/services/report.service.ts`
+
+### 验证情况
+
+- 前端构建通过：
+  ```bash
+  cd src/frontend && npm run build
+  ```
+- 后端构建通过：
+  ```bash
+  cd src/backend && npm run build
+  ```
+- 注意：
+  - 之前尝试做截图级浏览器 QA 时，Browser 插件连接超时，Playwright Chromium 启动也超时；本次可靠验证是前后端 TypeScript/build 级验证。
+  - 后续若要做渲染验证，可优先确认本机 Playwright/Chromium 是否能正常启动，再测 `/`、`/charts`、`/profile`。
+
+### 当前注意点 / 下次优先
+
+1. **肾移植风险提示仍是第一版**
+   - 已支持：肌酐相对个人基线、连续 3 次趋势、他克莫司“目标范围由医生设定”的提示。
+   - 未支持：eGFR、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV、医生配置的他克莫司目标范围、移植术后阶段化监测频率。
+
+2. **下一步建议**
+   - Prisma migration 新增字段：
+     - `HealthRecord.egfr`
+     - `HealthRecord.urineProteinCreatinineRatio`
+     - `HealthRecord.urineAlbuminCreatinineRatio`
+     - `HealthRecord.urineOccultBlood`
+     - `HealthRecord.bkVirusCopies`
+     - `HealthRecord.cmvVirusCopies`
+   - 新增用户/医生配置：
+     - 他克莫司目标范围低值/高值。
+     - 个人稳定基线计算：稳定期连续 3 次检查结果中位数。
+   - 将移植风险规则抽到独立模块，例如：
+     - `src/frontend/src/services/transplantRisk/`
+     - 或后端 `src/backend/src/services/transplant-risk.service.ts`
+   - 接入报告导出：把移植风险摘要、缺失指标提示、医生配置目标范围写入 PDF。
+
+3. **医学红线**
+   - 禁止自动建议调药。
+   - 禁止输出“排异/感染/药物毒性”的诊断结论。
+   - 只能提示“建议复查 / 联系移植医生 / 按医嘱处理”。
+
+---
+
 ## 2026-04-25 — 用药提醒跨天修复 + 我的/用药/记录页面 UI 重构 + PDF 中文修复
 
 ### 今日完成
@@ -356,10 +546,9 @@
    - `docs/billing-plan.md` — Freemium + 支付宝/微信支付完整方案
    - 决策：内测通过后实施
 
-6. **Dashboard 指标个性化展示（进行中）**
-   - 后端 `dashboard.service.ts` 已返回 `userType` / `primaryDisease`
-   - 前端 `Dashboard.tsx` 已添加 `ALL_METRICS`、`getRecommendedMetrics()`、`showMoreMetrics`
-   - **问题**：交互体验未达预期，需重新设计（后端未重启，修改未生效）
+6. **Dashboard 指标个性化展示（历史记录，已在 2026-05-18 完成第一版）**
+   - 2026-04-18 时只完成了部分代码，旧交互为 `showMoreMetrics` “更多/收起”。
+   - 2026-05-18 已替换为“核心 / 推荐 / 全部”分层，并新增肾移植个人基线提示。
 
 ---
 
@@ -437,21 +626,22 @@ docker-compose up -d
 
 ## 🚀 下次开发入口（Agent必读）
 
-**当前日期**: 2026-04-21  
-**Git提交**: `c3a3df3` fix: SPA路由刷新404问题  
-**部署状态**: 修复已推送GitHub，待服务器部署验证
+**当前日期**: 2026-05-18  
+**最新状态**: Dashboard 指标分层、肾移植肌酐基线风险提示、复诊报告展示逻辑已完成第一版。  
+**验证状态**: `cd src/frontend && npm run build`、`cd src/backend && npm run build` 均通过。
 
 ### 当前项目状态
 
-MVP v1.0.0 功能已完成并部署到生产服务器（阿里云ECS，HTTP + IP直连）。最近完成SPA路由404修复。
+MVP v1.0.0 功能已完成并部署到生产服务器（阿里云ECS，HTTP + IP直连）。当前功能增强重点已从 Dashboard 基础指标个性化，转向肾移植术后风险提示字段扩展、健康洞察增强和生产环境 Redis。
 
 ### 待办清单（按优先级排序）
 
 | 优先级 | 任务 | 状态 | 说明 |
 |--------|------|------|------|
 | **P0** | 生产环境Redis | ❌ 未开始 | 验证码目前存内存Map，重启丢失。需切换到Redis |
-| **P0** | SPA路由404部署验证 | 🚧 待验证 | 代码已提交，需服务器拉取+重建验证 |
-| **P1** | Dashboard指标个性化 | 🚧 进行中 | 根据userType+primaryDisease动态展示。代码部分实现，需重新设计交互 |
+| **P1** | 肾移植字段扩展 | ❌ 未开始 | 新增 eGFR、尿蛋白/肌酐比、BK/CMV、他克莫司医生目标范围 |
+| **P1** | 移植风险规则模块化 | ❌ 未开始 | 当前第一版规则在 Dashboard 中，建议抽到独立 service |
+| **P1** | Dashboard指标个性化 | ✅ 已完成第一版 | 2026-05-18 改为核心/推荐/全部分层 |
 | **P1** | iOS日期输入框 | ✅ 已修复 | 2026-04-21已添加WebKit样式重置 |
 | **P2** | 健康洞察增强 | ❌ 未开始 | 接入每日打卡数据（血压、体重）到洞察引擎 |
 | **P2** | 检查报告到期提醒 | ❌ 未开始 | 基于用户类型和上次检查日期智能提醒复查 |
@@ -470,12 +660,35 @@ MVP v1.0.0 功能已完成并部署到生产服务器（阿里云ECS，HTTP + IP
   2. 替换内存Map操作
   3. 添加Redis连接错误回退
 
-#### 选项B：Dashboard指标个性化交互重设计（P1，产品优化）
-- 文件：`src/frontend/src/pages/Dashboard.tsx`
-- 当前问题：用户反馈"更多/收起"交互体验未达预期
-- 已有代码：后端返回userType/primaryDisease，前端有ALL_METRICS和getRecommendedMetrics()
-- 待决策：Tab分组、优先级折叠、卡片式折叠等新交互方案
-- 需要：重新设计交互后再实现
+#### 选项B：肾移植字段扩展（P1，产品/数据基础）
+- 当前：只支持肌酐个人基线、连续趋势、他克莫司目标范围免责声明。
+- 目标：支持更完整的移植术后随访风险提示。
+- 建议新增字段：
+  1. `HealthRecord.egfr`
+  2. `HealthRecord.urineProteinCreatinineRatio`
+  3. `HealthRecord.urineAlbuminCreatinineRatio`
+  4. `HealthRecord.urineOccultBlood`
+  5. `HealthRecord.bkVirusCopies`
+  6. `HealthRecord.cmvVirusCopies`
+  7. 他克莫司医生目标范围低值/高值（建议放用户配置或专门 target 表）
+- 涉及：
+  - `src/backend/prisma/schema.prisma`
+  - `src/backend/src/services/health-record.service.ts`
+  - `src/frontend/src/pages/RecordForm.tsx`
+  - `src/frontend/src/pages/Records.tsx`
+  - `src/frontend/src/pages/Dashboard.tsx`
+  - `src/backend/src/services/report.service.ts`
+
+#### 选项B2：移植风险规则模块化（P1，架构优化）
+- 当前：`getTransplantRiskReminder()` 在 `src/frontend/src/pages/Dashboard.tsx` 中。
+- 目标：抽到独立模块，便于 Dashboard、健康洞察、PDF 报告复用。
+- 可选位置：
+  - 前端：`src/frontend/src/services/transplantRisk/`
+  - 后端：`src/backend/src/services/transplant-risk.service.ts`
+- 医疗边界：
+  - 禁止诊断排异/感染/药物毒性。
+  - 禁止自动建议调药。
+  - 只能输出复查、联系移植医生、按医嘱处理等提示。
 
 #### 选项C：健康洞察增强（P2，功能扩展）
 - 文件：`src/frontend/src/services/insights/`
@@ -492,11 +705,11 @@ MVP v1.0.0 功能已完成并部署到生产服务器（阿里云ECS，HTTP + IP
 
 **后端**
 - 验证码存储：`src/backend/src/services/auth.service.ts` 内存Map `verificationCodes`
-- Dashboard API：`src/backend/src/services/dashboard.service.ts` 已返回userType/primaryDisease
+- Dashboard API：`src/backend/src/services/dashboard.service.ts` 已返回 `userType` / `primaryDisease` / `hasTransplant` / `transplantDate` / `baselineCreatinine`
 - Redis服务：docker-compose.yml已定义，端口6379
 
 **前端**
-- Dashboard：`src/frontend/src/pages/Dashboard.tsx` 指标趋势图、今日打卡
+- Dashboard：`src/frontend/src/pages/Dashboard.tsx` 指标趋势图、今日打卡、肾移植肌酐基线提示
 - 洞察引擎：`src/frontend/src/services/insights/` 纯本地规则引擎
 - 路由：React Router，nginx已配置try_files
 

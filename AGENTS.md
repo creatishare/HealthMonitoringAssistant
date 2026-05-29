@@ -4,7 +4,7 @@
 
 肾衰竭健康监测Web应用 - MVP版本已完成，当前处于功能增强阶段。
 
-## 当前项目状态 (2026-04-25)
+## 当前项目状态 (2026-05-18)
 
 ### 已完成的核心功能
 1. **用户认证** — 手机号注册/登录、JWT Token、刷新令牌、忘记密码
@@ -24,6 +24,7 @@
 - **2026-04-18**: 常用药物BottomSelector（19种药物+规格联动）、隐私政策页面、注册时隐私政策勾选、Playwright E2E测试框架、深色模式底栏修复、本地健康洞察引擎、付费方案规划文档
 - **2026-04-22**: Dashboard 洞察按钮文字换行修复（`whitespace-nowrap`）、消息通知红点位置修复（`right-0.5 top-0.5`）、首页副标题移除产品规划文案改为仅显示日期、Settings 深色模式/消息通知开关修复（`w-13` → `w-12`，`translate-x-6` → `translate-x-5`）
 - **2026-04-25**: 修复用药提醒跨天状态不更新（后端返回 `scheduledAt`，前端直接回传；记录服药改幂等 update/create；Dashboard 跨午夜刷新）、修复消息中心不补发过期用药提醒（`getAlerts`/`getUnreadAlertCount` 查询前同步 missed 服药日志和预警）、修复线上旧后端没有 `scheduledAt` 时点击“服用”提示成功但状态不变（前端兜底改用 UTC 同一提醒时刻）、新增报告导出接口 `/reports/follow-up`、修复 PDF 中文乱码（pdfkit 注册中文字体 + Docker CJK 字体）、重构“我的/用药/健康记录”页面为截图风格，新增提醒设置、隐私与安全、帮助中心独立页面。
+- **2026-05-18**: Dashboard 指标趋势交互重构为“核心 / 推荐 / 全部”，移除旧“更多/收起”；肾移植用户新增基于 `baselineCreatinine` 的肌酐风险提示（>10% 黄色复查，>25% 红色联系移植医生，连续 3 次上升提示复诊核对）；后端预警规则同步拆成 10%/25% 两档；Dashboard API 返回 `hasTransplant` / `transplantDate` / `baselineCreatinine`；Charts 和 PDF 报告移除他克莫司固定 5-15 参考范围，改为医生目标范围提示；Profile 独立“近30天健康报告”模块，移植用户突出个人基线、趋势偏移、血药浓度、复诊提醒。
 
 ### 当前已知问题（下次开发优先处理）
 
@@ -32,24 +33,32 @@
 - **PDF 字体部署**：如果 PDF 只有约 2KB 且 `strings report.pdf | rg "BaseFont|ToUnicode"` 显示 `/Helvetica` / `/WinAnsiEncoding`，说明容器未加载中文字体。必须 `docker compose build --no-cache backend` 重建镜像，不能只 restart；`docker-compose.yml` 已设置默认 `PDF_FONT_PATH=/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc`。`report.service.ts` 会递归扫描 `/usr/share/fonts` 并优先使用 Noto/Source Han/WenQuanYi，生产环境不要依赖 Arial Unicode、STHeiti、微软雅黑、苹方等专有字体。
 - **用药漏服预警**：不要只依赖 `reminderWorker`。`src/backend/src/services/alert.service.ts` 的 `syncMissedMedicationAlerts()` 会在消息列表/未读数查询前按 Asia/Shanghai 日期补建今天已超时 30 分钟的 missed 日志和 medication alert。
 - **用药“服用”时间兼容**：新后端应返回 `scheduledAt`，前端直接回传。若线上旧后端没有 `scheduledAt`，`Dashboard.tsx` / `Medications.tsx` 会兜底用 Asia/Shanghai 日期 + UTC 同一提醒时刻（如 `08:00` → `T08:00:00.000Z`），避免写入成功但今日列表查不到。
+- **肾移植风险提示仍是第一版**：当前只支持肌酐个人基线 + 近 30 天趋势 + 他克莫司目标范围免责声明。数据库还没有 `eGFR`、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV 病毒载量、医生配置的他克莫司目标范围。后续不要假装判断这些缺失指标。
+- **医学安全边界**：移植相关功能只能提示“复查 / 联系移植医生 / 按医嘱处理”，禁止输出排异、感染、药物毒性等诊断结论，禁止自动建议调药。
 
 ### 当前进行中的工作（未完成）
 
-#### Dashboard 指标趋势个性化展示（已部分实现，待继续）
-**需求**：根据 `userType` + `primaryDisease` 动态展示推荐关注指标，默认只显示核心指标，通过"更多"按钮展开全部。
+#### 肾移植术后风险提示增强（第一版已实现，待扩展字段）
+**需求**：根据移植术后阶段、个人稳定基线、趋势变化、医生目标范围和红旗规则，做复查/联系医生级别的风险提示，不做诊断。
 
 **已完成的修改**：
-- `src/backend/src/services/dashboard.service.ts` — API 已返回 `userType` 和 `primaryDisease`
-- `src/frontend/src/stores/dashboardStore.ts` — 类型已扩展，导出 `UserType` / `PrimaryDisease`
+- `src/backend/src/services/dashboard.service.ts` — API 已返回 `userType`、`primaryDisease`、`hasTransplant`、`transplantDate`、`baselineCreatinine`
+- `src/backend/src/services/alert.service.ts` — 肌酐基线预警拆为 >10% warning、>25% critical
+- `src/backend/src/services/report.service.ts` — PDF 医生摘要加入移植基线提示，移除他克莫司写死参考范围
+- `src/frontend/src/stores/dashboardStore.ts` — 类型已扩展，导出 `UserType` / `PrimaryDisease`，并包含移植字段
 - `src/frontend/src/pages/Dashboard.tsx` — 已添加：
   - `ALL_METRICS` 常量（13 个指标）
-  - `getRecommendedMetrics()` 函数（按类型推荐）
-  - `showMoreMetrics` 状态 + "更多/收起" 按钮
+  - `getRecommendedMetrics()` / `getCoreMetrics()` 函数（按类型推荐）
+  - `MetricScope` + “核心 / 推荐 / 全部”分层切换
+  - `getTransplantRiskReminder()` 肌酐个人基线提示
   - 趋势 API 已改为查询全部指标
+- `src/frontend/src/pages/Charts.tsx` — 同步“核心 / 推荐 / 全部”，他克莫司仅展示趋势并提示医生目标范围
+- `src/frontend/src/pages/Profile.tsx` — 独立“近30天健康报告”模块，移植用户突出个人基线/趋势偏移/血药浓度/复诊提醒
 
 **已知问题**：
-- 用户反馈"收起/展开"交互体验未达预期，需要重新设计。
-- **下一步**：重新设计指标展示交互（可考虑 Tab 分组、优先级折叠等方案）。
+- 缺少数据库字段：`eGFR`、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV、医生配置他克莫司目标范围。
+- 移植风险逻辑目前在 `Dashboard.tsx` 中，后续建议抽成独立规则模块。
+- **下一步**：新增 Prisma 字段和迁移，再把移植风险摘要接入 Dashboard、健康洞察和 PDF 报告。
 
 ### 开放待办 (按优先级)
 
@@ -59,7 +68,7 @@
 | 2 | P0 | **生产环境Redis** | 验证码仍存内存Map，重启丢失。需切换到Redis。 | ❌ 未开始 |
 | 3 | P0 | ~~血压打卡卡片文字溢出~~ | ✅ 已修复（2026-04-19）：改为动态状态色 + `whitespace-nowrap` + 统一卡片规格。 | ✅ 已完成 |
 | 4 | P0 | ~~SMS 404修复~~ | ✅ 已修复（2026-04-19）：nginx 代理路径去掉 `/api/` 前缀，后端路由无此前缀。 | ✅ 已完成 |
-| 5 | P1 | **Dashboard指标个性化** | 根据userType+primaryDisease动态展示推荐指标。代码已部分实现，需重新设计交互（可考虑 Tab 分组或优先级折叠）。后端重启后先验证 `userType`/`primaryDisease` 字段是否正确返回。 | 🚧 进行中 |
+| 5 | P1 | ~~Dashboard指标个性化~~ | ✅ 已完成（2026-05-18）：核心/推荐/全部分层，移植用户核心指标和基线提示已接入。 | ✅ 已完成 |
 | 6 | P1 | **UI响应式适配** | ~~仅手机480px~~ ✅ 已完成（2026-04-19）：手机100%自适应+桌面左侧边栏 | ✅ 已完成 |
 | 7 | P1 | **生产环境部署** | ~~待部署~~ ✅ 已完成（2026-04-19）：Docker Compose + nginx已部署到ECS | ✅ 已完成 |
 | 8 | P1 | **iOS 日期输入框溢出** | ~~待修复~~ ✅ 已修复（2026-04-21）：`index.css` 添加 `-webkit-appearance: none` + `line-height: 1.5` 重置。 | ✅ 已完成 |
@@ -67,6 +76,7 @@
 | 10 | P2 | **检查报告到期提醒** | 基于用户类型和上次检查日期，智能提醒复查时间 | ❌ 未开始 |
 | 11 | P2 | **商业化付费功能** | 内测通过后实施。完整方案见 `docs/billing-plan.md`。 | ❌ 未开始 |
 | 12 | P2 | **心率正式字段** | 当前心率仅在 `Records.tsx` 中写入 notes，需 Prisma migration 增加 `heartRate` 后才能做趋势/洞察。 | ❌ 未开始 |
+| 13 | P1 | **肾移植字段扩展** | 新增 eGFR、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV、他克莫司医生目标范围，并抽离移植风险规则模块。 | ❌ 未开始 |
 
 ---
 
@@ -467,6 +477,7 @@ type: 修改描述
 | 文档 | 路径 | 内容 |
 |------|------|------|
 | **开发者手册** | `docs/developer-handbook.md` | **必读**：架构约定、启动指南、踩坑记录、待办清单 |
+| **下个Agent待办** | `docs/next-agent-todos.md` | **串行执行**：近期优化任务包、范围、验收标准、避坑提示 |
 | 产品需求 | `docs/prd.md` | 功能需求、用户故事 |
 | API规范 | `docs/api-spec.md` | REST API详细定义 |
 | 数据库设计 | `docs/database-schema.md` | Prisma schema说明 |

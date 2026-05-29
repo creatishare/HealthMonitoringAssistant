@@ -99,7 +99,7 @@ const CHART_METRICS: ChartMetricConfig[] = [
   { key: 'bloodPressureSystolic', label: '收缩压', unit: 'mmHg', color: '#EA580C', referenceRange: [90, 140] },
   { key: 'bloodPressureDiastolic', label: '舒张压', unit: 'mmHg', color: '#F59E0B', referenceRange: [60, 90] },
   { key: 'urineVolume', label: '尿量', unit: 'mL', color: '#0D9488' },
-  { key: 'tacrolimus', label: '他克莫司', unit: 'ng/mL', color: '#7C3AED', referenceRange: [5, 15] },
+  { key: 'tacrolimus', label: '他克莫司', unit: 'ng/mL', color: '#7C3AED' },
 ];
 
 const TEXT_COLOR = '#262626';
@@ -446,6 +446,15 @@ function buildDoctorSummaryLines(reportData: FollowUpReportData) {
     `本报告覆盖 ${reportData.dateRange.startDate} 至 ${reportData.dateRange.endDate}，共 ${records.length} 条健康记录。`,
   ];
 
+  if (reportData.profile.hasTransplant) {
+    lines.push(
+      reportData.profile.baselineCreatinine
+        ? `移植术后摘要优先参考个人基线：当前档案基线肌酐 ${reportData.profile.baselineCreatinine} μmol/L。`
+        : '移植术后摘要缺少个人基线肌酐，建议在档案中补充稳定期连续检查结果。'
+    );
+    lines.push('他克莫司等免疫抑制药目标范围需由移植医生设定；本报告仅整理记录和趋势，不提供调药建议。');
+  }
+
   const notableMetrics = CHART_METRICS.map((metric) => {
     const points = getMetricPoints(records, metric);
     if (points.length === 0) {
@@ -696,7 +705,7 @@ export async function generateFollowUpReportPdf(
     writeSection(doc, '七、区间原始记录明细', formatRecordLines(reportData.records));
 
     doc.moveDown();
-    doc.font(PDF_FONT_NAME).fontSize(10).fillColor('gray').text('说明：本报告仅用于复诊资料整理与回顾，不构成医疗诊断建议。图表中的参考范围仅作数据标记，具体解读请以医生意见为准。', {
+    doc.font(PDF_FONT_NAME).fontSize(10).fillColor('gray').text('说明：本报告仅用于复诊资料整理与回顾，不构成医疗诊断建议。图表中的参考范围仅作数据标记；移植术后血药浓度、病毒载量、尿蛋白等目标范围请以移植医生医嘱为准。', {
       align: 'left',
     });
 

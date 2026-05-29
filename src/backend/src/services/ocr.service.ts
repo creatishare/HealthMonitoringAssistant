@@ -78,14 +78,14 @@ export async function saveImage(userId: string, imageUrl: string): Promise<strin
 }
 
 // 模拟OCR识别（实际项目中调用百度AI或其他OCR服务）
-export async function recognizeImage(imageId: string): Promise<OCRResult> {
+export async function recognizeImage(userId: string, imageId: string): Promise<OCRResult> {
   // 检查OCR配置
   if (!isOCRConfigValid()) {
     throw new AppError('百度OCR配置不完整，请检查环境变量', 500, '00001');
   }
 
-  const report = await prisma.labReport.findUnique({
-    where: { id: imageId },
+  const report = await prisma.labReport.findFirst({
+    where: { id: imageId, userId },
   });
 
   if (!report) {

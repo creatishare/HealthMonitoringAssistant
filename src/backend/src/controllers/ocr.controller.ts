@@ -49,7 +49,7 @@ export async function recognizeImage(req: Request, res: Response, next: NextFunc
       throw new ApiError('图片ID不能为空', 400, '00002');
     }
 
-    const result = await ocrService.recognizeImage(imageId);
+    const result = await ocrService.recognizeImage(userId, imageId);
 
     res.status(200).json({
       code: 200,

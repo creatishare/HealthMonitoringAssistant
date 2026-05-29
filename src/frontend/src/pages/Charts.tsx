@@ -4,7 +4,7 @@ import { ChevronLeft, TrendingUp } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { healthRecordApi } from '../services/api'
 import { useAuthStore } from '../stores/authStore'
-import { ALL_METRICS, getRecommendedMetrics } from './Dashboard'
+import { ALL_METRICS, METRIC_SCOPE_OPTIONS, getVisibleMetricsByScope, type MetricScope } from './Dashboard'
 import toast from 'react-hot-toast'
 
 const timeRanges = [
@@ -18,7 +18,6 @@ const metricRanges: Record<string, { min?: number; max?: number }> = {
   urea: { min: 2.6, max: 7.5 },
   potassium: { min: 3.5, max: 5.3 },
   uricAcid: { min: 150, max: 420 },
-  tacrolimus: { min: 5, max: 15 },
   hemoglobin: { min: 120, max: 160 },
   bloodSugar: { min: 3.9, max: 6.1 },
   bloodPressureSystolic: { min: 90, max: 140 },
@@ -34,7 +33,7 @@ export default function Charts() {
   const [selectedRange, setSelectedRange] = useState(timeRanges[0])
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
-  const [showMoreMetrics, setShowMoreMetrics] = useState(false)
+  const [metricScope, setMetricScope] = useState<MetricScope>('core')
 
   useEffect(() => {
     fetchTrends()
@@ -65,8 +64,15 @@ export default function Charts() {
   const range = metricRanges[selectedMetric.key]
   const hasRange = range?.min != null && range?.max != null
 
-  const recommended = getRecommendedMetrics(user?.userType, user?.primaryDisease)
-  const visibleMetrics = showMoreMetrics ? ALL_METRICS : ALL_METRICS.filter((m) => recommended.includes(m.key))
+  const visibleMetrics = getVisibleMetricsByScope(metricScope, user?.userType, user?.primaryDisease)
+  const trendReminder =
+    data.length === 0
+      ? '当前周期暂无记录，复诊前可先补充最近一次化验数据。'
+      : selectedMetric.key === 'tacrolimus'
+        ? '他克莫司谷浓度必须以移植医生设定的目标范围为准，本页只展示记录趋势，请勿自行调药。'
+      : hasRange
+        ? '参考范围仅用于标记数值位置，实际解读请结合医生建议。'
+        : '该指标暂无通用参考线，可结合连续记录观察波动。'
 
   return (
     <div className="page-shell">
@@ -84,11 +90,23 @@ export default function Charts() {
         <div className="page-header">
           <div>
             <h2 className="text-card-title text-gray-text-primary">选择关注指标</h2>
-            <p className="mt-1 text-helper text-gray-text-secondary">先显示与你当前用户类型最相关的指标，其余指标可按需展开。</p>
+            <p className="mt-1 text-helper text-gray-text-secondary">按当前档案展示核心、推荐和全部指标。</p>
           </div>
-          <button onClick={() => setShowMoreMetrics((v) => !v)} className={`chip ${showMoreMetrics ? 'chip-active' : ''}`}>
-            {showMoreMetrics ? '收起全部' : '展开更多'}
-          </button>
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-2 rounded-[18px] border border-gray-border bg-white/56 p-1 dark:bg-slate-900/30">
+          {METRIC_SCOPE_OPTIONS.map((option) => (
+            <button
+              key={option.key}
+              onClick={() => setMetricScope(option.key)}
+              className={`h-9 rounded-[14px] text-helper font-medium transition-all ${
+                metricScope === option.key
+                  ? 'bg-primary text-white shadow-[0_10px_22px_rgba(62,99,221,0.18)]'
+                  : 'text-gray-text-secondary hover:text-primary'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           {visibleMetrics.map((metric) => (
@@ -138,6 +156,11 @@ export default function Charts() {
             </h2>
             <p className="mt-1 text-helper text-gray-text-secondary">当前单位：{selectedMetric.unit}</p>
           </div>
+        </div>
+
+        <div className="mt-4 flex items-start gap-2 rounded-[18px] border border-primary/15 bg-primary/10 p-3 text-helper text-gray-text-secondary dark:bg-primary/10">
+          <TrendingUp size={16} className="mt-0.5 shrink-0 text-primary" />
+          <p>{trendReminder}</p>
         </div>
 
         {loading ? (
