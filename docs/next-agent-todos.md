@@ -13,11 +13,16 @@
    - `docs/dev-log.md` 最新条目
    - 本文件当前任务包
 3. 先执行 `git status --short`，确认工作区是否已有他人改动。不要回滚无关改动。
-4. 任务完成后至少运行相关构建或类型检查：
+4. 每项开发必须按 TDD/回归测试方式推进：
+   - 能先写失败测试时，先写测试再实现。
+   - 已有实现的补救任务，必须补自动化回归测试覆盖本次问题。
+   - 最终记录必须写明测试命令和结果，不能只写“已手动验证”。
+5. 任务完成后至少运行相关测试、构建或类型检查：
+   - 后端健康记录校验：`cd src/backend && npm test`
    - 前端任务：`cd src/frontend && npm run build`
    - 后端任务：`cd src/backend && npm run build`
    - 涉及 Prisma：还需运行 `cd src/backend && npx prisma generate`
-5. 医疗安全边界必须遵守：
+6. 医疗安全边界必须遵守：
    - 只做记录、趋势、复查提醒、联系医生提醒。
    - 不输出排异、感染、药物毒性等诊断结论。
    - 不建议用户自行调整药物剂量。
@@ -26,11 +31,11 @@
 
 ## 推荐执行顺序
 
-1. P1-08 健康记录输入校验与趋势指标白名单
-2. P1-01 健康洞察接入日常数据
-3. P1-02 统一健康记录录入体验
-4. P1-03 移植用户个人基线引导
-5. P1-04 健康记录字段扩展 migration
+1. ~~P1-08 健康记录输入校验与趋势指标白名单~~ — 已完成（2026-05-30）
+2. ~~P1-01 健康洞察接入日常数据~~ — 已完成（2026-05-30）
+3. ~~P1-02 统一健康记录录入体验~~ — 已完成（2026-05-30）
+4. ~~P1-03 移植用户个人基线引导~~ — 已完成（2026-05-30）
+5. ~~P1-04 健康记录字段扩展 migration~~ — 已完成（2026-05-30）
 6. P1-05 移植风险规则抽离与报告接入
 7. P1-06 预警动作化
 8. P0-02 HTTPS 与域名生产化
@@ -79,13 +84,15 @@
 
 **完成记录**：2026-05-29 已修复。后端新增 `src/backend/src/utils/app-date.ts`，前端新增 `src/frontend/src/utils/appDate.ts`；Dashboard 今日打卡、报告默认区间、趋势查询、健康洞察、OCR/健康记录默认日期、用药统计和部分日期展示均改为应用时区。`cd src/backend && npm run build`、`cd src/frontend && npm run build` 通过；smoke test 确认 UTC 16:00 前后会按 Asia/Shanghai 切换应用日期。
 
-### P1-08 健康记录输入校验与趋势指标白名单
+### P1-08 健康记录输入校验与趋势指标白名单 — 已完成
 
 **问题**：健康记录创建/更新基本直接透传 body，趋势接口允许任意 `metrics` 动态拼 Prisma 查询。
 
 **建议**：接入 `utils/validators.ts` 中的数值范围校验，建立允许查询的健康指标白名单，对未知字段返回 400。
 
 **验收标准**：非法日期、非法数值、未知趋势指标都返回明确 400，不暴露 Prisma 错误。
+
+**完成记录**：2026-05-30 已修复。`src/backend/src/services/health-record.service.ts` 新增健康记录字段/趋势指标白名单、创建/更新输入清洗、严格日期范围校验、整数字段校验和分页参数校验；`src/backend/src/utils/validators.ts` 收紧日期校验并补充指标中文提示与他克莫司录入安全上限；`src/backend/src/controllers/health-record.controller.ts` 对趋势查询参数类型做格式校验；新增 `src/backend/src/tests/health-record-validation.test.ts` 覆盖非法日期、非法数值、未知字段、未知列表指标和未知趋势指标。`cd src/backend && npm test`、`cd src/backend && npm run build` 通过。
 
 ### P1-09 清理他克莫司固定参考范围
 
@@ -113,7 +120,7 @@
 
 ---
 
-## P1-01 健康洞察接入日常数据
+## P1-01 健康洞察接入日常数据 — 已完成
 
 ### 用户价值
 
@@ -170,6 +177,10 @@
 - 没有数据时仍保持友好空状态。
 - `cd src/frontend && npm run build` 通过。
 
+### 完成记录
+
+2026-05-30 已修复。新增 `src/frontend/src/services/insights/engine.test.ts` 先覆盖日常指标趋势、血钾 critical、他克莫司 trend-only 和血压/尿量完整度摘要；随后扩展洞察引擎从 `records` 直接提取血压、尿量、血糖、他克莫司，`HealthInsights.tsx` 不再构造空 `checkIns`；他克莫司标记为 trend-only，不参与固定参考范围异常判断；摘要增加最近 14 天血压、体重、尿量记录完整度提示。Vitest 配置已排除 Playwright E2E，避免单测入口误收 `e2e/*.spec.ts`。`cd src/frontend && npm test -- --run`、`cd src/frontend && npm run build` 通过。
+
 ### 避坑
 
 - 不要新增外部 AI 调用。
@@ -178,7 +189,7 @@
 
 ---
 
-## P1-02 统一健康记录录入体验
+## P1-02 统一健康记录录入体验 — 已完成
 
 ### 用户价值
 
@@ -227,6 +238,10 @@
 - 心率仍能保存并在最近记录显示。
 - `cd src/frontend && npm run build` 通过。
 
+### 完成记录
+
+2026-05-30 已修复。先新增 `src/frontend/src/services/healthRecordFields.test.ts` 覆盖统一字段顺序、Dashboard 快捷入口字段过滤、他克莫司 placeholder、心率 notes 读写与备注保留、列表/详情摘要一致性；再新增 `src/frontend/src/services/healthRecordFields.ts` 和 `src/frontend/src/components/health/HealthRecordForm.tsx`。`/records` 内嵌表单、`/records/new` 和 `/records/:id/edit` 已复用同一表单组件；`RecordDetail.tsx` 改用同一字段配置展示，心率从 notes 中单独展示且备注保留非心率内容；他克莫司不再显示固定 `5-15` 范围，改为医生目标范围提示。`cd src/frontend && npm test -- --run`、`cd src/frontend && npm run build` 通过。
+
 ### 避坑
 
 - 不要在本任务里新增数据库字段。
@@ -235,7 +250,7 @@
 
 ---
 
-## P1-03 移植用户个人基线引导
+## P1-03 移植用户个人基线引导 — 已完成
 
 ### 用户价值
 
@@ -281,6 +296,10 @@
 - ProfileEdit 401 时能触发统一登录过期处理。
 - `cd src/frontend && npm run build` 通过。
 
+### 完成记录
+
+2026-05-30 已修复。先新增 `src/frontend/src/services/transplantProfile.test.ts` 覆盖 onboarding 基线 payload、基线可留空、Dashboard CTA 判断、Profile 档案 checklist、ProfileEdit 日期/字段归一化；再新增 `src/frontend/src/services/transplantProfile.ts`。`Onboarding.tsx` 为移植用户增加可选稳定期基线肌酐；`Dashboard.tsx` 在移植用户缺少基线时提供“填写个人基线”CTA 跳转 `/profile/edit#disease-info`；`Profile.tsx` 突出移植时间和基线肌酐填写状态；`ProfileEdit.tsx` 改用 `userApi.getProfile()` / `userApi.updateProfile()`，保存后同步 authStore 的 name/userType/primaryDisease/onboardingCompleted，401 可走 axios 统一拦截；`src/backend/src/controllers/user.controller.ts` 补齐 onboarding 的 `baselineCreatinine` 通路，不新增数据库字段。`cd src/frontend && npm test -- --run`、`cd src/frontend && npm run build`、`cd src/backend && npm run build`、`cd src/backend && npm test` 通过。
+
 ### 避坑
 
 - 基线肌酐不能强制必填，否则会阻塞不确定数据的用户。
@@ -289,6 +308,8 @@
 ---
 
 ## P1-04 健康记录字段扩展 migration
+
+> 状态：已完成（2026-05-30）
 
 ### 用户价值
 
@@ -361,6 +382,12 @@
 - `cd src/backend && npm run build` 通过。
 - `cd src/frontend && npm run build` 通过。
 
+### 完成记录
+
+2026-05-30 已完成。先补后端 `src/backend/src/tests/health-record-validation.test.ts`，覆盖正式 `heartRate`、尿潜血文本校验、新增数值字段创建和趋势白名单；前端补 `healthRecordFields.test.ts`、`transplantProfile.test.ts`、`insights/engine.test.ts`，覆盖正式心率字段、旧 notes 心率兜底、新增移植监测字段、他克莫司医生目标范围和 trend-only 洞察。新增 `HealthRecord.heartRate/egfr/urineProteinCreatinineRatio/urineAlbuminCreatinineRatio/urineOccultBlood/bkVirusCopies/cmvVirusCopies/ebvVirusCopies`，新增 `UserProfile.tacrolimusTargetMin/tacrolimusTargetMax`，并创建 `20260530122000_add_transplant_monitoring_fields` migration。健康记录 create/update/list/trends、Dashboard/Charts、健康洞察、Profile/ProfileEdit 和统一录入表单已接入。`cd src/backend && npx prisma validate`、`cd src/backend && npx prisma generate`、`cd src/backend && npm test`、`cd src/backend && npm run build`、`cd src/frontend && npm test -- --run`、`cd src/frontend && npm run build` 通过。
+
+注意：本机 `npx prisma migrate dev --name add-transplant-monitoring-fields` 与 `npx prisma migrate status` 连接到 `health_monitoring` 后返回空的 `Schema engine error:`；已用同一份 migration SQL 通过 `psql` 事务应用到本地库，并写入 `_prisma_migrations`，列存在性已验证。后续若 Prisma CLI 继续空报错，优先排查本地 Prisma schema engine/数据库状态，而不是重复创建迁移。
+
 ### 避坑
 
 - 不要在 migration 里删除旧 notes 心率。
@@ -377,7 +404,7 @@
 
 ### 前置条件
 
-建议先完成 P1-04。如果没有新增字段，本任务只做抽离，不做扩展规则。
+P1-04 已完成基础字段和数据通路。本任务可以直接基于 `heartRate`、`egfr`、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV、`tacrolimusTargetMin/Max` 做规则抽离，但仍然只输出复查/联系医生级别提醒。
 
 ### 建议范围
 

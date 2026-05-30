@@ -107,6 +107,8 @@ export async function getDashboardData(userId: string) {
       hasTransplant: user.profile?.hasTransplant,
       transplantDate: formatDateOnly(user.profile?.transplantDate),
       baselineCreatinine: user.profile?.baselineCreatinine,
+      tacrolimusTargetMin: user.profile?.tacrolimusTargetMin,
+      tacrolimusTargetMax: user.profile?.tacrolimusTargetMax,
     },
     today: {
       date: formatAppDisplayDate(),

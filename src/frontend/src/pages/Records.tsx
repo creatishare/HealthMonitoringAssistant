@@ -1,134 +1,53 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Activity,
   Camera,
   ChevronRight,
-  Droplets,
   Edit3,
   FileText,
   FlaskConical,
-  HeartPulse,
   History,
-  Save,
-  Scale,
   Upload,
 } from 'lucide-react'
+import HealthRecordForm from '../components/health/HealthRecordForm'
 import { healthRecordApi } from '../services/api'
-import { formatShortAppDate, getAppDateString } from '../utils/appDate'
+import {
+  getRecordSummary,
+  getRecordType,
+  type HealthRecordFormMode,
+  type HealthRecordLike,
+  type HealthRecordPayload,
+} from '../services/healthRecordFields'
+import { formatShortAppDate } from '../utils/appDate'
 import toast from 'react-hot-toast'
 
-type RecordMode = 'daily' | 'lab'
-
-interface HealthRecord {
+interface HealthRecord extends HealthRecordLike {
   id: string
-  recordDate: string
-  creatinine?: number
-  urea?: number
-  potassium?: number
-  sodium?: number
-  phosphorus?: number
-  uricAcid?: number
-  hemoglobin?: number
-  bloodSugar?: number
-  tacrolimus?: number
-  weight?: number
-  bloodPressureSystolic?: number
-  bloodPressureDiastolic?: number
-  urineVolume?: number
-  notes?: string
-}
-
-const dailyFields = [
-  { key: 'weight', label: '体重', unit: 'kg', icon: Scale, step: '0.1', placeholder: '62.5' },
-  { key: 'urineVolume', label: '尿量', unit: 'ml', icon: Droplets, step: '1', placeholder: '1200' },
-  { key: 'bloodPressureSystolic', label: '收缩压', unit: 'mmHg', icon: HeartPulse, step: '1', placeholder: '120' },
-  { key: 'bloodPressureDiastolic', label: '舒张压', unit: 'mmHg', icon: HeartPulse, step: '1', placeholder: '80' },
-  { key: 'heartRate', label: '心率', unit: '次/分', icon: HeartPulse, step: '1', placeholder: '72' },
-]
-
-const labFields = [
-  { key: 'creatinine', label: '肌酐', unit: 'μmol/L', icon: FlaskConical, step: '0.01', placeholder: '130' },
-  { key: 'urea', label: '尿素氮', unit: 'mmol/L', icon: FlaskConical, step: '0.01', placeholder: '8.2' },
-  { key: 'potassium', label: '血钾', unit: 'mmol/L', icon: FlaskConical, step: '0.01', placeholder: '4.8' },
-  { key: 'hemoglobin', label: '血红蛋白', unit: 'g/L', icon: FlaskConical, step: '0.01', placeholder: '120' },
-  { key: 'uricAcid', label: '尿酸', unit: 'μmol/L', icon: FlaskConical, step: '0.01', placeholder: '420' },
-  { key: 'tacrolimus', label: '他克莫司', unit: 'ng/mL', icon: FlaskConical, step: '0.01', placeholder: '8.0' },
-]
-
-function createInitialForm() {
-  return {
-    recordDate: getAppDateString(),
-    weight: '',
-    urineVolume: '',
-    bloodPressureSystolic: '',
-    bloodPressureDiastolic: '',
-    heartRate: '',
-    creatinine: '',
-    urea: '',
-    potassium: '',
-    hemoglobin: '',
-    uricAcid: '',
-    tacrolimus: '',
-  }
 }
 
 function formatShortDate(dateStr: string) {
   return formatShortAppDate(dateStr)
 }
 
-function getRecordType(record: HealthRecord) {
-  const hasLab = ['creatinine', 'urea', 'potassium', 'hemoglobin', 'uricAcid', 'tacrolimus'].some(
-    (key) => record[key as keyof HealthRecord] != null
-  )
-
-  return hasLab ? '化验' : '日常'
-}
-
-function getRecordSummary(record: HealthRecord) {
-  const type = getRecordType(record)
-  const heartRate = record.notes?.match(/心率：(\d+(?:\.\d+)?)次\/分/)?.[1]
-
-  if (type === '化验') {
-    return [
-      record.creatinine != null ? `肌酐: ${record.creatinine} μmol/L` : null,
-      record.urea != null ? `尿素氮: ${record.urea} mmol/L` : null,
-      record.potassium != null ? `血钾: ${record.potassium} mmol/L` : null,
-      record.tacrolimus != null ? `他克莫司: ${record.tacrolimus} ng/mL` : null,
-    ].filter(Boolean)
-  }
-
-  return [
-    record.weight != null ? `体重: ${record.weight} kg` : null,
-    record.bloodPressureSystolic != null && record.bloodPressureDiastolic != null
-      ? `血压: ${record.bloodPressureSystolic}/${record.bloodPressureDiastolic} mmHg`
-      : null,
-    heartRate ? `心率: ${heartRate} 次/分` : null,
-    record.urineVolume != null ? `尿量: ${record.urineVolume} ml` : null,
-  ].filter(Boolean)
-}
-
 export default function Records() {
   const navigate = useNavigate()
   const [records, setRecords] = useState<HealthRecord[]>([])
   const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [mode, setMode] = useState<RecordMode>('daily')
-  const [formData, setFormData] = useState(createInitialForm)
+  const [mode, setMode] = useState<HealthRecordFormMode>('daily')
   const [showAllRecords, setShowAllRecords] = useState(false)
 
   useEffect(() => {
     fetchRecords()
   }, [])
 
-  const visibleFields = useMemo(() => (mode === 'daily' ? dailyFields : labFields), [mode])
   const visibleRecords = showAllRecords ? records : records.slice(0, 3)
 
   const fetchRecords = async () => {
     setLoading(true)
     try {
       const response: any = await healthRecordApi.getList({ pageSize: 20 })
-      setRecords(response.data.list)
+      setRecords(response.data?.list ?? [])
     } catch (error) {
       toast.error('获取记录失败')
     } finally {
@@ -136,38 +55,14 @@ export default function Records() {
     }
   }
 
-  const handleChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
-  }
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault()
-    setSaving(true)
-
+  const handleCreateRecord = async (payload: HealthRecordPayload) => {
     try {
-      const data = {
-        recordDate: formData.recordDate,
-        weight: formData.weight ? parseFloat(formData.weight) : undefined,
-        urineVolume: formData.urineVolume ? parseInt(formData.urineVolume) : undefined,
-        bloodPressureSystolic: formData.bloodPressureSystolic ? parseInt(formData.bloodPressureSystolic) : undefined,
-        bloodPressureDiastolic: formData.bloodPressureDiastolic ? parseInt(formData.bloodPressureDiastolic) : undefined,
-        notes: formData.heartRate ? `心率：${formData.heartRate}次/分` : undefined,
-        creatinine: formData.creatinine ? parseFloat(formData.creatinine) : undefined,
-        urea: formData.urea ? parseFloat(formData.urea) : undefined,
-        potassium: formData.potassium ? parseFloat(formData.potassium) : undefined,
-        hemoglobin: formData.hemoglobin ? parseFloat(formData.hemoglobin) : undefined,
-        uricAcid: formData.uricAcid ? parseFloat(formData.uricAcid) : undefined,
-        tacrolimus: formData.tacrolimus ? parseFloat(formData.tacrolimus) : undefined,
-      }
-
-      await healthRecordApi.create(data)
+      await healthRecordApi.create(payload)
       toast.success('保存成功')
-      setFormData(createInitialForm())
-      fetchRecords()
+      await fetchRecords()
     } catch (error: any) {
       toast.error(error.response?.data?.message || '保存失败')
-    } finally {
-      setSaving(false)
+      throw error
     }
   }
 
@@ -225,45 +120,13 @@ export default function Records() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-5">
-          <div>
-            <label className="mb-2 block text-helper font-medium text-gray-text-secondary">记录日期</label>
-            <input
-              type="date"
-              value={formData.recordDate}
-              onChange={(event) => handleChange('recordDate', event.target.value)}
-              className="input-field"
-              required
-            />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {visibleFields.map(({ key, label, unit, icon: Icon, step, placeholder }) => (
-              <div key={key}>
-                <label className="mb-2 flex items-center gap-1.5 text-helper font-medium text-gray-text-secondary">
-                  <Icon size={15} />
-                  {label}
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    step={step}
-                    value={formData[key as keyof typeof formData]}
-                    onChange={(event) => handleChange(key, event.target.value)}
-                    placeholder={placeholder}
-                    className="input-field pr-16"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-helper text-gray-text-secondary">{unit}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <button type="submit" disabled={saving} className="btn-primary w-full">
-            <Save size={19} />
-            {saving ? '保存中...' : '保存记录'}
-          </button>
-        </form>
+        <div className="mt-6">
+          <HealthRecordForm
+            mode={mode}
+            resetAfterSubmit
+            onSubmit={handleCreateRecord}
+          />
+        </div>
       </section>
 
       <section className="card p-5 md:p-7">

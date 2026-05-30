@@ -57,6 +57,9 @@ export const authApi = {
       currentWeight?: number
       diagnosisDate?: string
       transplantDate?: string
+      baselineCreatinine?: number
+      tacrolimusTargetMin?: number
+      tacrolimusTargetMax?: number
     }
   ) => api.patch('/users/onboarding', { userType, primaryDisease, ...profile }),
 }

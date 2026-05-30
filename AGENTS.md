@@ -25,27 +25,29 @@
 - **2026-04-22**: Dashboard 洞察按钮文字换行修复（`whitespace-nowrap`）、消息通知红点位置修复（`right-0.5 top-0.5`）、首页副标题移除产品规划文案改为仅显示日期、Settings 深色模式/消息通知开关修复（`w-13` → `w-12`，`translate-x-6` → `translate-x-5`）
 - **2026-04-25**: 修复用药提醒跨天状态不更新（后端返回 `scheduledAt`，前端直接回传；记录服药改幂等 update/create；Dashboard 跨午夜刷新）、修复消息中心不补发过期用药提醒（`getAlerts`/`getUnreadAlertCount` 查询前同步 missed 服药日志和预警）、修复线上旧后端没有 `scheduledAt` 时点击“服用”提示成功但状态不变（前端兜底改用 UTC 同一提醒时刻）、新增报告导出接口 `/reports/follow-up`、修复 PDF 中文乱码（pdfkit 注册中文字体 + Docker CJK 字体）、重构“我的/用药/健康记录”页面为截图风格，新增提醒设置、隐私与安全、帮助中心独立页面。
 - **2026-05-18**: Dashboard 指标趋势交互重构为“核心 / 推荐 / 全部”，移除旧“更多/收起”；肾移植用户新增基于 `baselineCreatinine` 的肌酐风险提示（>10% 黄色复查，>25% 红色联系移植医生，连续 3 次上升提示复诊核对）；后端预警规则同步拆成 10%/25% 两档；Dashboard API 返回 `hasTransplant` / `transplantDate` / `baselineCreatinine`；Charts 和 PDF 报告移除他克莫司固定 5-15 参考范围，改为医生目标范围提示；Profile 独立“近30天健康报告”模块，移植用户突出个人基线、趋势偏移、血药浓度、复诊提醒。
+- **2026-05-30**: 完成健康记录输入校验与趋势指标白名单（含后端回归测试）；健康洞察接入 records 中的血压、尿量、体重、血糖、他克莫司趋势，补充日常数据完整度摘要；统一 `/records`、`/records/new`、编辑页健康记录表单，移除记录表单/详情中的他克莫司固定 `5-15`；移植用户 onboarding/Profile/Dashboard 增加个人基线引导，ProfileEdit 改用统一 `userApi`；新增健康记录正式 `heartRate`、eGFR、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV 病毒载量字段，以及用户档案他克莫司医生目标范围；Vitest 单测入口排除 Playwright E2E。
 
 ### 当前已知问题（下次开发优先处理）
 
-- **心率字段临时方案**：`/records` 新 UI 中心率暂存到 `HealthRecord.notes`，格式为 `心率：72次/分`，最近记录从 notes 提取展示。若后续需要心率趋势/统计，需新增 Prisma 字段并迁移。
+- **旧心率 notes 兼容**：`HealthRecord.heartRate` 已是正式字段；旧记录中 `notes` 的 `心率：72次/分` 仍会在前端兜底提取展示。不要迁移或删除旧 notes，除非有单独数据迁移任务。
 - **PDF 中文排查**：若重新导出的 PDF 仍乱码，先确认后端是否已重启并加载 `src/backend/src/services/report.service.ts` 最新代码；正常 PDF 应嵌入 `ArialUnicodeMS` / `NotoSansCJK`，不应只有 `/Helvetica`。
 - **PDF 字体部署**：如果 PDF 只有约 2KB 且 `strings report.pdf | rg "BaseFont|ToUnicode"` 显示 `/Helvetica` / `/WinAnsiEncoding`，说明容器未加载中文字体。必须 `docker compose build --no-cache backend` 重建镜像，不能只 restart；`docker-compose.yml` 已设置默认 `PDF_FONT_PATH=/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc`。`report.service.ts` 会递归扫描 `/usr/share/fonts` 并优先使用 Noto/Source Han/WenQuanYi，生产环境不要依赖 Arial Unicode、STHeiti、微软雅黑、苹方等专有字体。
 - **用药漏服预警**：不要只依赖 `reminderWorker`。`src/backend/src/services/alert.service.ts` 的 `syncMissedMedicationAlerts()` 会在消息列表/未读数查询前按 Asia/Shanghai 日期补建今天已超时 30 分钟的 missed 日志和 medication alert。
 - **用药“服用”时间兼容**：新后端应返回 `scheduledAt`，前端直接回传。若线上旧后端没有 `scheduledAt`，`Dashboard.tsx` / `Medications.tsx` 会兜底用 Asia/Shanghai 日期 + UTC 同一提醒时刻（如 `08:00` → `T08:00:00.000Z`），避免写入成功但今日列表查不到。
-- **肾移植风险提示仍是第一版**：当前只支持肌酐个人基线 + 近 30 天趋势 + 他克莫司目标范围免责声明。数据库还没有 `eGFR`、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV 病毒载量、医生配置的他克莫司目标范围。后续不要假装判断这些缺失指标。
+- **肾移植风险提示仍是第一版**：数据库已具备 `eGFR`、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV 病毒载量和他克莫司医生目标范围字段；但风险规则尚未接入这些字段。后续不要假装判断排异、感染、药物毒性等诊断结论。
+- **本机 Prisma migrate CLI 空错误**：2026-05-30 `npx prisma migrate dev --name add-transplant-monitoring-fields` 和 `npx prisma migrate status` 在本地 `health_monitoring` 库上返回空的 `Schema engine error:`；schema validate/generate 通过。已用同一 migration SQL 通过 `psql` 事务应用并写入 `_prisma_migrations`。若后续仍空报错，优先排查本地 Prisma schema engine/数据库状态。
 - **医学安全边界**：移植相关功能只能提示“复查 / 联系移植医生 / 按医嘱处理”，禁止输出排异、感染、药物毒性等诊断结论，禁止自动建议调药。
 
 ### 当前进行中的工作（未完成）
 
-#### 肾移植术后风险提示增强（第一版已实现，待扩展字段）
+#### 肾移植术后风险提示增强（第一版已实现，待规则抽离）
 **需求**：根据移植术后阶段、个人稳定基线、趋势变化、医生目标范围和红旗规则，做复查/联系医生级别的风险提示，不做诊断。
 
 **已完成的修改**：
 - `src/backend/src/services/dashboard.service.ts` — API 已返回 `userType`、`primaryDisease`、`hasTransplant`、`transplantDate`、`baselineCreatinine`
 - `src/backend/src/services/alert.service.ts` — 肌酐基线预警拆为 >10% warning、>25% critical
 - `src/backend/src/services/report.service.ts` — PDF 医生摘要加入移植基线提示，移除他克莫司写死参考范围
-- `src/frontend/src/stores/dashboardStore.ts` — 类型已扩展，导出 `UserType` / `PrimaryDisease`，并包含移植字段
+- `src/frontend/src/stores/dashboardStore.ts` — 类型已扩展，导出 `UserType` / `PrimaryDisease`，并包含移植字段与他克莫司目标范围
 - `src/frontend/src/pages/Dashboard.tsx` — 已添加：
   - `ALL_METRICS` 常量（13 个指标）
   - `getRecommendedMetrics()` / `getCoreMetrics()` 函数（按类型推荐）
@@ -56,9 +58,9 @@
 - `src/frontend/src/pages/Profile.tsx` — 独立“近30天健康报告”模块，移植用户突出个人基线/趋势偏移/血药浓度/复诊提醒
 
 **已知问题**：
-- 缺少数据库字段：`eGFR`、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV、医生配置他克莫司目标范围。
+- 数据库字段已补齐：`heartRate`、`eGFR`、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV、医生配置他克莫司目标范围。
 - 移植风险逻辑目前在 `Dashboard.tsx` 中，后续建议抽成独立规则模块。
-- **下一步**：新增 Prisma 字段和迁移，再把移植风险摘要接入 Dashboard、健康洞察和 PDF 报告。
+- **下一步**：把移植风险规则抽离成独立模块，并把新字段接入 Dashboard、健康洞察和 PDF 报告的摘要逻辑。
 
 ### 开放待办 (按优先级)
 
@@ -72,11 +74,11 @@
 | 6 | P1 | **UI响应式适配** | ~~仅手机480px~~ ✅ 已完成（2026-04-19）：手机100%自适应+桌面左侧边栏 | ✅ 已完成 |
 | 7 | P1 | **生产环境部署** | ~~待部署~~ ✅ 已完成（2026-04-19）：Docker Compose + nginx已部署到ECS | ✅ 已完成 |
 | 8 | P1 | **iOS 日期输入框溢出** | ~~待修复~~ ✅ 已修复（2026-04-21）：`index.css` 添加 `-webkit-appearance: none` + `line-height: 1.5` 重置。 | ✅ 已完成 |
-| 9 | P2 | **健康洞察增强** | 接入每日打卡数据（血压、体重）到洞察引擎；图表联动 | ❌ 未开始 |
+| 9 | P2 | ~~健康洞察增强~~ | ✅ 已完成（2026-05-30）：接入 records 中的血压、体重、尿量、血糖、他克莫司趋势，并补充日常记录完整度摘要。 | ✅ 已完成 |
 | 10 | P2 | **检查报告到期提醒** | 基于用户类型和上次检查日期，智能提醒复查时间 | ❌ 未开始 |
 | 11 | P2 | **商业化付费功能** | 内测通过后实施。完整方案见 `docs/billing-plan.md`。 | ❌ 未开始 |
-| 12 | P2 | **心率正式字段** | 当前心率仅在 `Records.tsx` 中写入 notes，需 Prisma migration 增加 `heartRate` 后才能做趋势/洞察。 | ❌ 未开始 |
-| 13 | P1 | **肾移植字段扩展** | 新增 eGFR、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV、他克莫司医生目标范围，并抽离移植风险规则模块。 | ❌ 未开始 |
+| 12 | P2 | ~~心率正式字段~~ | ✅ 已完成（2026-05-30）：Prisma 增加 `heartRate`，新记录优先写正式字段，旧 notes 心率继续兜底展示。 | ✅ 已完成 |
+| 13 | P1 | **肾移植风险规则抽离** | 字段基础已完成（eGFR、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV、他克莫司医生目标范围）；下一步抽离规则模块并接入报告。 | ❌ 未开始 |
 
 ---
 
@@ -370,6 +372,12 @@ npx playwright test --headed # 可视化
 
 ## 开发工作流
 
+### 测试纪律（TDD）
+- 每一项开发都必须有自动化测试或明确的回归测试脚本，不能只做手动验证。
+- 能先写失败测试时，先写测试再实现；修复既有问题时，必须补能复现问题的回归测试。
+- 完成记录和最终回复必须写明运行过的测试命令与结果。
+- 后端健康记录校验测试：`cd src/backend && npm test`。
+
 ### 启动开发环境
 ```bash
 # 后端 (端口3001)
@@ -409,6 +417,7 @@ type: 修改描述
 - [ ] 错误消息不泄露敏感数据
 - [ ] 医疗相关功能已添加免责声明
 - [ ] 深色模式样式已检查（无 `bg-white` 硬编码）
+- [ ] 本项开发对应的自动化测试已通过
 - [ ] TypeScript类型检查通过 (`npx tsc --noEmit`)
 - [ ] 构建通过 (`npm run build`)
 
@@ -425,9 +434,10 @@ type: 修改描述
 6. **Tailwind 不存在 `w-13`**：Tailwind v3 内置只有 `w-12`(48px) 和 `w-14`(56px)，写了 `w-13` 不会生成 CSS，元素宽度为 0。Toggle 开关用 `w-12` + `translate-x-5` 组合。
 7. **PDF 中文乱码**：`pdfkit` 默认 Helvetica 不支持中文。必须在 `report.service.ts` 注册中文字体；生产 Docker 必须安装 CJK 字体。若用户重新导出仍乱码，优先检查 PDF 是否还只有 `/Helvetica`。Debian 的 `fonts-noto-cjk` 常是 `.ttc` 字体集合，PDFKit 注册时需要指定 face（如 `NotoSansCJKsc-Regular`），否则可能报 `this.font.createSubset is not a function`。
 8. **用药提醒跨天状态**：不要让前端用 `new Date().toISOString().split('T')[0]` 拼当天服药记录。后端 `getTodayMedications()` 已返回 `scheduledAt`，前端应直接回传。
-9. **健康记录心率**：当前数据库没有 `heartRate`，新 Records UI 先将心率写到 notes。不要误以为已有独立字段。
+9. **健康记录心率**：当前数据库已有正式 `HealthRecord.heartRate` 字段。新记录优先写正式字段；旧数据里的 `notes` 心率只做兜底展示，不要删除。
 10. **Docker Compose .env 解析**：`.env` 密钥不能拆成多行。若 `docker compose` 报 `unexpected character "/" in variable name`，通常是上一行变量值换行导致密钥片段变成“变量名”；修成 `KEY=value` 单行或加引号。
 11. **PDF 字体日志排查顺序**：先触发一次导出，再看 `docker compose logs backend | grep -i "PDF\\|字体\\|font\\|Noto"`；没触发导出时没有字体日志是正常的。用 `docker compose exec backend sh -lc 'find /usr/share/fonts -iname "*NotoSansCJK*"'` 判断字体是否在容器内。
+12. **Prisma migrate 空报错**：2026-05-30 本机 `migrate dev/status` 对 `health_monitoring` 返回空的 `Schema engine error:`，但 `prisma validate/generate` 正常。不要重复创建同名迁移；先排查本地 schema engine 或数据库迁移状态。
 
 ### 设计决策记录
 - **不做AI大模型调用**：健康洞察使用纯本地规则引擎，规避医疗政策风险

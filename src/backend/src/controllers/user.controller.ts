@@ -51,6 +51,8 @@ export async function updateProfile(req: Request, res: Response, next: NextFunct
       dialysisType,
       dryWeight,
       baselineCreatinine,
+      tacrolimusTargetMin,
+      tacrolimusTargetMax,
       diagnosisDate,
       primaryDisease,
       hasTransplant,
@@ -67,6 +69,8 @@ export async function updateProfile(req: Request, res: Response, next: NextFunct
       dialysisType,
       dryWeight,
       baselineCreatinine,
+      tacrolimusTargetMin,
+      tacrolimusTargetMax,
       diagnosisDate,
       primaryDisease,
       hasTransplant,
@@ -92,7 +96,18 @@ export async function completeOnboarding(req: Request, res: Response, next: Next
       throw new ApiError('未登录', 401, '01007');
     }
 
-    const { userType, primaryDisease, name, gender, birthDate, height, currentWeight, diagnosisDate, transplantDate } = req.body;
+    const {
+      userType,
+      primaryDisease,
+      name,
+      gender,
+      birthDate,
+      height,
+      currentWeight,
+      diagnosisDate,
+      transplantDate,
+      baselineCreatinine,
+    } = req.body;
 
     if (!isUserType(userType)) {
       throw new ApiError('用户身份类型无效', 400, '01001');
@@ -110,6 +125,7 @@ export async function completeOnboarding(req: Request, res: Response, next: Next
       currentWeight,
       diagnosisDate,
       transplantDate,
+      baselineCreatinine,
     });
 
     res.status(200).json({

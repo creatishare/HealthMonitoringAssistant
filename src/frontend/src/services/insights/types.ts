@@ -4,9 +4,19 @@ export type MetricKey =
   | 'potassium'
   | 'uricAcid'
   | 'hemoglobin'
+  | 'bloodSugar'
   | 'weight'
+  | 'heartRate'
   | 'systolic'
   | 'diastolic'
+  | 'urineVolume'
+  | 'egfr'
+  | 'urineProteinCreatinineRatio'
+  | 'urineAlbuminCreatinineRatio'
+  | 'tacrolimus'
+  | 'bkVirusCopies'
+  | 'cmvVirusCopies'
+  | 'ebvVirusCopies'
 
 export interface MetricValue {
   value: number
@@ -46,6 +56,13 @@ export interface MedicationAdherence {
   adherenceRate: number
 }
 
+export interface DailyDataCompleteness {
+  periodDays: number
+  weightDays: number
+  bloodPressureDays: number
+  urineVolumeDays: number
+}
+
 export interface HealthInsight {
   type: 'trend' | 'anomaly' | 'adherence' | 'summary'
   severity: 'info' | 'warning' | 'critical'
@@ -73,13 +90,26 @@ export interface AnalysisInput {
     potassium?: number
     uricAcid?: number
     hemoglobin?: number
+    bloodSugar?: number
     weight?: number
+    bloodPressureSystolic?: number
+    bloodPressureDiastolic?: number
+    urineVolume?: number
+    heartRate?: number
+    egfr?: number
+    urineProteinCreatinineRatio?: number
+    urineAlbuminCreatinineRatio?: number
+    tacrolimus?: number
+    bkVirusCopies?: number
+    cmvVirusCopies?: number
+    ebvVirusCopies?: number
   }>
-  checkIns: Array<{
+  checkIns?: Array<{
     date: string
     weight?: number
     systolic?: number
     diastolic?: number
+    urineVolume?: number
   }>
   medicationLogs: Array<{
     medicationId: string

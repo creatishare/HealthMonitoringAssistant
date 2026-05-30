@@ -4,6 +4,7 @@ import { Plus, Bell, AlertTriangle, ChevronRight, Clock, TrendingUp, Sparkles } 
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
 import { useDashboardStore, type UserType, type PrimaryDisease } from '../stores/dashboardStore'
 import { healthRecordApi, medicationApi } from '../services/api'
+import { getTransplantBaselinePrompt } from '../services/transplantProfile'
 import {
   getAppDateWindow,
   getFallbackScheduledAtForAppDate,
@@ -14,6 +15,7 @@ import toast from 'react-hot-toast'
 interface TrendData {
   date: string
   creatinine?: number
+  egfr?: number
   urea?: number
   potassium?: number
   uricAcid?: number
@@ -23,9 +25,15 @@ interface TrendData {
   weight?: number
   bloodPressureSystolic?: number
   bloodPressureDiastolic?: number
+  heartRate?: number
   sodium?: number
   phosphorus?: number
   urineVolume?: number
+  urineProteinCreatinineRatio?: number
+  urineAlbuminCreatinineRatio?: number
+  bkVirusCopies?: number
+  cmvVirusCopies?: number
+  ebvVirusCopies?: number
 }
 
 interface TodayMedication {
@@ -41,6 +49,7 @@ interface TodayMedication {
 
 export const ALL_METRICS = [
   { key: 'creatinine', name: '肌酐', unit: 'μmol/L', color: '#3E63DD' },
+  { key: 'egfr', name: 'eGFR', unit: 'ml/min/1.73m²', color: '#1F8A70' },
   { key: 'urea', name: '尿素氮', unit: 'mmol/L', color: '#2F9E6D' },
   { key: 'potassium', name: '血钾', unit: 'mmol/L', color: '#D98E04' },
   { key: 'uricAcid', name: '尿酸', unit: 'μmol/L', color: '#6F5BD3' },
@@ -50,9 +59,15 @@ export const ALL_METRICS = [
   { key: 'weight', name: '体重', unit: 'kg', color: '#2D9C9B' },
   { key: 'bloodPressureSystolic', name: '收缩压', unit: 'mmHg', color: '#4C6FFF' },
   { key: 'bloodPressureDiastolic', name: '舒张压', unit: 'mmHg', color: '#73A942' },
+  { key: 'heartRate', name: '心率', unit: '次/分', color: '#E05263' },
   { key: 'sodium', name: '血钠', unit: 'mmol/L', color: '#2FA7A1' },
   { key: 'phosphorus', name: '血磷', unit: 'mmol/L', color: '#D7A22A' },
   { key: 'urineVolume', name: '尿量', unit: 'ml', color: '#3157C8' },
+  { key: 'urineProteinCreatinineRatio', name: '尿蛋白/肌酐比', unit: 'mg/mg', color: '#8B6FC9' },
+  { key: 'urineAlbuminCreatinineRatio', name: '尿白蛋白/肌酐比', unit: 'mg/g', color: '#C56A95' },
+  { key: 'bkVirusCopies', name: 'BK病毒载量', unit: 'copies/mL', color: '#6772E5' },
+  { key: 'cmvVirusCopies', name: 'CMV病毒载量', unit: 'copies/mL', color: '#B35C44' },
+  { key: 'ebvVirusCopies', name: 'EBV病毒载量', unit: 'copies/mL', color: '#5B7C99' },
 ]
 
 export type MetricScope = 'core' | 'recommended' | 'all'
@@ -78,7 +93,18 @@ export function getRecommendedMetrics(userType?: UserType | null, primaryDisease
       return ['creatinine', 'urea', 'potassium', 'hemoglobin', 'weight']
     }
     case 'kidney_transplant':
-      return ['creatinine', 'tacrolimus', 'bloodPressureSystolic', 'bloodPressureDiastolic', 'urineVolume', 'potassium', 'hemoglobin']
+      return [
+        'creatinine',
+        'egfr',
+        'tacrolimus',
+        'urineProteinCreatinineRatio',
+        'urineAlbuminCreatinineRatio',
+        'bkVirusCopies',
+        'cmvVirusCopies',
+        'ebvVirusCopies',
+        'bloodPressureSystolic',
+        'urineVolume',
+      ]
     case 'other':
       return ['creatinine', 'urea', 'uricAcid', 'weight', 'bloodPressureSystolic']
     default:
@@ -88,7 +114,7 @@ export function getRecommendedMetrics(userType?: UserType | null, primaryDisease
 
 export function getCoreMetrics(userType?: UserType | null, primaryDisease?: PrimaryDisease | null): string[] {
   if (userType === 'kidney_transplant') {
-    return ['creatinine', 'tacrolimus', 'bloodPressureSystolic']
+    return ['creatinine', 'egfr', 'tacrolimus']
   }
 
   if (primaryDisease === 'diabetic_nephropathy') {
@@ -367,6 +393,7 @@ export default function Dashboard() {
   const transplantRiskReminder = data?.user?.userType === 'kidney_transplant'
     ? getTransplantRiskReminder(trendData, data.user.baselineCreatinine)
     : null
+  const transplantBaselinePrompt = data?.user ? getTransplantBaselinePrompt(data.user) : null
 
   const getMetricTone = (status?: 'normal' | 'warning' | 'critical') => {
     switch (status) {
@@ -567,6 +594,16 @@ export default function Dashboard() {
               <div className="min-w-0">
                 <p className="text-helper font-semibold">{transplantRiskReminder.title}</p>
                 <p className="mt-1 text-helper text-gray-text-secondary">{transplantRiskReminder.message}</p>
+                {transplantBaselinePrompt && (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/profile/edit#disease-info')}
+                    className="mt-3 inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-small font-semibold text-white"
+                  >
+                    {transplantBaselinePrompt.actionLabel}
+                    <ChevronRight size={14} />
+                  </button>
+                )}
               </div>
             </div>
           )}

@@ -1,30 +1,23 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { ChevronLeft, Save } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../stores/authStore'
-
-interface UserProfile {
-  name?: string
-  gender?: 'male' | 'female'
-  birthDate?: string
-  height?: number
-  currentWeight?: number
-  dialysisType?: 'none' | 'hemodialysis' | 'peritoneal'
-  dryWeight?: number
-  baselineCreatinine?: number
-  diagnosisDate?: string
-  primaryDisease?: string
-  hasTransplant?: boolean
-  transplantDate?: string
-}
+import { userApi } from '../services/api'
+import {
+  buildProfileEditPayload,
+  getTransplantBaselinePrompt,
+  normalizeProfileForEdit,
+  type ProfileEditValues,
+} from '../services/transplantProfile'
 
 export default function ProfileEdit() {
   const navigate = useNavigate()
-  useAuthStore()
+  const location = useLocation()
+  const { syncUserProfile } = useAuthStore()
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [formData, setFormData] = useState<UserProfile>({
+  const [formData, setFormData] = useState<ProfileEditValues>({
     name: '',
     gender: undefined,
     birthDate: '',
@@ -33,6 +26,8 @@ export default function ProfileEdit() {
     dialysisType: 'none',
     dryWeight: undefined,
     baselineCreatinine: undefined,
+    tacrolimusTargetMin: undefined,
+    tacrolimusTargetMax: undefined,
     diagnosisDate: '',
     primaryDisease: '',
     hasTransplant: false,
@@ -43,34 +38,26 @@ export default function ProfileEdit() {
     fetchProfile()
   }, [])
 
+  useEffect(() => {
+    if (!loading && location.hash === '#disease-info') {
+      document.getElementById('disease-info')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [loading, location.hash])
+
   const fetchProfile = async () => {
     setLoading(true)
     try {
-      const response = await fetch('/api/users/profile', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        if (data.data) {
-          setFormData(prev => ({
-            ...prev,
-            ...data.data,
-            birthDate: data.data.birthDate ? data.data.birthDate.split('T')[0] : '',
-            diagnosisDate: data.data.diagnosisDate ? data.data.diagnosisDate.split('T')[0] : '',
-            transplantDate: data.data.transplantDate ? data.data.transplantDate.split('T')[0] : '',
-          }))
-        }
-      }
+      const response: any = await userApi.getProfile()
+      const profile = response.data ?? response
+      setFormData(normalizeProfileForEdit(profile))
     } catch (error) {
-      console.error('获取档案失败', error)
+      toast.error('获取档案失败')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleChange = (field: keyof UserProfile, value: any) => {
+  const handleChange = (field: keyof ProfileEditValues, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
@@ -78,20 +65,18 @@ export default function ProfileEdit() {
     e.preventDefault()
     setSaving(true)
     try {
-      const response = await fetch('/api/users/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-        body: JSON.stringify(formData),
+      const response: any = await userApi.updateProfile(buildProfileEditPayload(formData))
+      const profile = response.data ?? response
+      const nextUserType = (profile.userType ?? formData.userType) || null
+      const nextPrimaryDisease = (profile.primaryDisease ?? formData.primaryDisease) || null
+      syncUserProfile({
+        name: profile.name ?? formData.name,
+        userType: nextUserType,
+        primaryDisease: nextPrimaryDisease,
+        onboardingCompleted: profile.onboardingCompleted,
       })
-      if (response.ok) {
-        toast.success('保存成功')
-        navigate('/profile')
-      } else {
-        toast.error('保存失败')
-      }
+      toast.success('保存成功')
+      navigate('/profile')
     } catch (error) {
       toast.error('保存失败')
     } finally {
@@ -106,6 +91,8 @@ export default function ProfileEdit() {
       </div>
     )
   }
+
+  const transplantBaselinePrompt = getTransplantBaselinePrompt(formData)
 
   return (
     <div className="space-y-4">
@@ -205,22 +192,18 @@ export default function ProfileEdit() {
                 className="input-field w-full"
               />
             </div>
-            <div>
-              <label className="block text-small text-gray-secondary mb-1">基线肌酐 (μmol/L)</label>
-              <input
-                type="number"
-                value={formData.baselineCreatinine || ''}
-                onChange={(e) => handleChange('baselineCreatinine', e.target.value ? parseFloat(e.target.value) : undefined)}
-                placeholder="100"
-                className="input-field w-full"
-              />
-            </div>
           </div>
         </div>
 
         {/* 疾病信息 */}
-        <div className="card">
+        <div id="disease-info" className="card scroll-mt-24">
           <h2 className="text-card-title font-medium text-gray-text-primary mb-4">疾病信息</h2>
+          {transplantBaselinePrompt && (
+            <div className="mb-4 rounded-[16px] border border-primary/15 bg-primary/10 p-3 text-helper text-gray-text-secondary dark:bg-primary/10">
+              <p className="font-semibold text-gray-text-primary">{transplantBaselinePrompt.title}</p>
+              <p className="mt-1">{transplantBaselinePrompt.message}</p>
+            </div>
+          )}
           <div className="space-y-4">
             <div>
               <label className="block text-small text-gray-secondary mb-1">透析类型</label>
@@ -285,15 +268,55 @@ export default function ProfileEdit() {
               </div>
             </div>
             {formData.hasTransplant && (
-              <div>
-                <label className="block text-small text-gray-secondary mb-1">移植时间</label>
-                <input
-                  type="date"
-                  value={formData.transplantDate || ''}
-                  onChange={(e) => handleChange('transplantDate', e.target.value)}
-                  className="input-field w-full"
-                />
-              </div>
+              <>
+                <div>
+                  <label className="block text-small text-gray-secondary mb-1">移植时间</label>
+                  <input
+                    type="date"
+                    value={formData.transplantDate || ''}
+                    onChange={(e) => handleChange('transplantDate', e.target.value)}
+                    className="input-field w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-small text-gray-secondary mb-1">稳定期基线肌酐 (μmol/L)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={formData.baselineCreatinine || ''}
+                    onChange={(e) => handleChange('baselineCreatinine', e.target.value ? parseFloat(e.target.value) : undefined)}
+                    placeholder="如：92"
+                    className="input-field w-full"
+                  />
+                  <p className="mt-1 text-small text-gray-text-helper">
+                    如果不确定可以留空；补充后趋势报告会更有参考价值。
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-small text-gray-secondary mb-1">他克莫司目标范围 (ng/mL)</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={formData.tacrolimusTargetMin || ''}
+                      onChange={(e) => handleChange('tacrolimusTargetMin', e.target.value ? parseFloat(e.target.value) : undefined)}
+                      placeholder="下限"
+                      className="input-field w-full"
+                    />
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={formData.tacrolimusTargetMax || ''}
+                      onChange={(e) => handleChange('tacrolimusTargetMax', e.target.value ? parseFloat(e.target.value) : undefined)}
+                      placeholder="上限"
+                      className="input-field w-full"
+                    />
+                  </div>
+                  <p className="mt-1 text-small text-gray-text-helper">
+                    仅填写医生告知的个人目标范围；不确定时请留空。
+                  </p>
+                </div>
+              </>
             )}
           </div>
         </div>

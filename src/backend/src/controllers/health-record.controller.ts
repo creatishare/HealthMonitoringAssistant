@@ -62,45 +62,13 @@ export async function createHealthRecord(req: Request, res: Response, next: Next
       throw new ApiError('未登录', 401, '01007');
     }
 
-    const {
-      recordDate,
-      creatinine,
-      urea,
-      potassium,
-      sodium,
-      phosphorus,
-      uricAcid,
-      hemoglobin,
-      bloodSugar,
-      weight,
-      bloodPressureSystolic,
-      bloodPressureDiastolic,
-      urineVolume,
-      tacrolimus,
-      notes,
-    } = req.body;
+    const { recordDate } = req.body;
 
     if (!recordDate) {
       throw new ApiError('记录日期不能为空', 400, '03002');
     }
 
-    const record = await healthRecordService.createHealthRecord(userId, {
-      recordDate,
-      creatinine,
-      urea,
-      potassium,
-      sodium,
-      phosphorus,
-      uricAcid,
-      hemoglobin,
-      bloodSugar,
-      weight,
-      bloodPressureSystolic,
-      bloodPressureDiastolic,
-      urineVolume,
-      tacrolimus,
-      notes,
-    });
+    const record = await healthRecordService.createHealthRecord(userId, req.body);
 
     res.status(201).json({
       code: 201,
@@ -171,13 +139,17 @@ export async function getTrends(req: Request, res: Response, next: NextFunction)
       throw new ApiError('缺少必要参数', 400, '00002');
     }
 
-    const metricList = (metrics as string).split(',');
+    if (typeof metrics !== 'string' || typeof startDate !== 'string' || typeof endDate !== 'string') {
+      throw new ApiError('参数格式错误', 400, '00002');
+    }
+
+    const metricList = metrics.split(',');
 
     const result = await healthRecordService.getTrends(
       userId,
       metricList,
-      startDate as string,
-      endDate as string
+      startDate,
+      endDate
     );
 
     res.status(200).json({

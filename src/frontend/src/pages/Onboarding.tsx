@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAuthStore, type UserType, type PrimaryDisease } from '../stores/authStore'
+import { buildOnboardingProfilePayload } from '../services/transplantProfile'
 
 const userTypeOptions: Array<{ value: UserType; title: string; description: string }> = [
   {
@@ -44,6 +45,7 @@ export default function Onboarding() {
     currentWeight: string
     diagnosisDate: string
     transplantDate: string
+    baselineCreatinine: string
   }>({
     name: '',
     gender: '',
@@ -52,6 +54,7 @@ export default function Onboarding() {
     currentWeight: '',
     diagnosisDate: '',
     transplantDate: '',
+    baselineCreatinine: '',
   })
   const [loading, setLoading] = useState(false)
 
@@ -87,15 +90,7 @@ export default function Onboarding() {
 
     setLoading(true)
     try {
-      await completeOnboarding(selectedType, selectedDisease, {
-        name: profile.name || undefined,
-        gender: profile.gender || undefined,
-        birthDate: profile.birthDate || undefined,
-        height: profile.height ? parseFloat(profile.height) : undefined,
-        currentWeight: profile.currentWeight ? parseFloat(profile.currentWeight) : undefined,
-        diagnosisDate: profile.diagnosisDate || undefined,
-        transplantDate: profile.transplantDate || undefined,
-      })
+      await completeOnboarding(selectedType, selectedDisease, buildOnboardingProfilePayload(selectedType, profile))
       toast.success('初始化完成')
       navigate('/')
     } catch (error: unknown) {
@@ -301,15 +296,31 @@ export default function Onboarding() {
               </div>
 
               {selectedType === 'kidney_transplant' && (
-                <div>
-                  <label className="block text-small text-gray-secondary mb-1">移植时间</label>
-                  <input
-                    type="date"
-                    value={profile.transplantDate}
-                    onChange={(e) => updateProfile('transplantDate', e.target.value)}
-                    className="input-field w-full"
-                  />
-                </div>
+                <>
+                  <div>
+                    <label className="block text-small text-gray-secondary mb-1">移植时间</label>
+                    <input
+                      type="date"
+                      value={profile.transplantDate}
+                      onChange={(e) => updateProfile('transplantDate', e.target.value)}
+                      className="input-field w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-small text-gray-secondary mb-1">稳定期基线肌酐 (μmol/L)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={profile.baselineCreatinine}
+                      onChange={(e) => updateProfile('baselineCreatinine', e.target.value)}
+                      placeholder="如：92"
+                      className="input-field w-full"
+                    />
+                    <p className="mt-1 text-small text-gray-text-helper">
+                      如果不确定，可稍后在个人档案补充；报告会更有参考价值。
+                    </p>
+                  </div>
+                </>
               )}
             </div>
 

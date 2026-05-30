@@ -53,6 +53,8 @@ model UserProfile {
   dialysisType        DialysisType    @default(none)
   dryWeight           Float? // 干体重(kg)，透析患者使用
   baselineCreatinine  Float? // 基线肌酐值(μmol/L)
+  tacrolimusTargetMin Float? // 医生配置的他克莫司目标下限(ng/mL)
+  tacrolimusTargetMax Float? // 医生配置的他克莫司目标上限(ng/mL)
   diagnosisDate       DateTime?
   primaryDisease      PrimaryDisease?
   hasTransplant       Boolean         @default(false) // 是否经过移植手术
@@ -115,6 +117,16 @@ model HealthRecord {
   bloodPressureSystolic  Int? // 收缩压 (mmHg)，正常: <140
   bloodPressureDiastolic Int? // 舒张压 (mmHg)，正常: <90
   urineVolume            Int? // 尿量 (ml/24h)
+  heartRate              Int? // 心率 (次/分)
+
+  // 移植术后扩展监测指标（仅记录和趋势，不自动诊断）
+  egfr                         Float? // eGFR (ml/min/1.73m²)
+  urineProteinCreatinineRatio  Float? // 尿蛋白/肌酐比
+  urineAlbuminCreatinineRatio  Float? // 尿白蛋白/肌酐比
+  urineOccultBlood             String? // 尿潜血结果，如 阴性/±/+/++/+++
+  bkVirusCopies                Float? // BK病毒载量 (copies/mL)
+  cmvVirusCopies               Float? // CMV病毒载量 (copies/mL)
+  ebvVirusCopies               Float? // EBV病毒载量 (copies/mL)
 
   // 免疫抑制剂浓度
   tacrolimus Float? // 他克莫司浓度 (ng/mL)

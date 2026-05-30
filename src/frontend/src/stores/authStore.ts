@@ -27,7 +27,7 @@ interface AuthResponse {
   onboardingCompleted?: boolean
 }
 
-interface ProfileBasicInfo {
+export interface ProfileBasicInfo {
   name?: string
   gender?: 'male' | 'female'
   birthDate?: string
@@ -35,6 +35,16 @@ interface ProfileBasicInfo {
   currentWeight?: number
   diagnosisDate?: string
   transplantDate?: string
+  baselineCreatinine?: number
+  tacrolimusTargetMin?: number
+  tacrolimusTargetMax?: number
+}
+
+interface ProfileSyncInput {
+  name?: string | null
+  userType?: UserType | null
+  primaryDisease?: PrimaryDisease | null
+  onboardingCompleted?: boolean | null
 }
 
 interface AuthState {
@@ -47,6 +57,7 @@ interface AuthState {
   logout: () => void
   setTokens: (accessToken: string, refreshToken: string) => void
   completeOnboarding: (userType: UserType, primaryDisease: PrimaryDisease, profile?: ProfileBasicInfo) => Promise<void>
+  syncUserProfile: (profile: ProfileSyncInput) => void
 }
 
 function buildUser(response: AuthResponse): User {
@@ -130,6 +141,21 @@ export const useAuthStore = create<AuthState>()(
             userType,
             primaryDisease,
             onboardingCompleted: true,
+          },
+        })
+      },
+
+      syncUserProfile: (profile: ProfileSyncInput) => {
+        const currentUser = get().user
+        if (!currentUser) return
+
+        set({
+          user: {
+            ...currentUser,
+            name: profile.name ?? currentUser.name,
+            userType: profile.userType ?? currentUser.userType,
+            primaryDisease: profile.primaryDisease ?? currentUser.primaryDisease,
+            onboardingCompleted: profile.onboardingCompleted ?? currentUser.onboardingCompleted,
           },
         })
       },

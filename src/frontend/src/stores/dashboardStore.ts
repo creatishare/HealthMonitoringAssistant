@@ -13,6 +13,8 @@ interface DashboardData {
     hasTransplant?: boolean | null
     transplantDate?: string | null
     baselineCreatinine?: number | null
+    tacrolimusTargetMin?: number | null
+    tacrolimusTargetMax?: number | null
   }
   today: {
     date: string

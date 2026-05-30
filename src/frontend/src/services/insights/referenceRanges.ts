@@ -7,10 +7,11 @@ import type { MetricKey } from './types'
  */
 
 export interface ReferenceRange {
-  min: number
-  max: number
+  min?: number
+  max?: number
   unit: string
   name: string
+  trendOnly?: boolean
 }
 
 const COMMON_RANGES: Record<MetricKey, ReferenceRange> = {
@@ -19,9 +20,19 @@ const COMMON_RANGES: Record<MetricKey, ReferenceRange> = {
   potassium: { min: 3.5, max: 5.5, unit: 'mmol/L', name: '血钾' },
   uricAcid: { min: 208, max: 428, unit: 'μmol/L', name: '尿酸' },
   hemoglobin: { min: 120, max: 160, unit: 'g/L', name: '血红蛋白' },
+  bloodSugar: { min: 3.9, max: 6.1, unit: 'mmol/L', name: '血糖' },
   weight: { min: 40, max: 100, unit: 'kg', name: '体重' },
+  heartRate: { unit: '次/分', name: '心率', trendOnly: true },
   systolic: { min: 90, max: 140, unit: 'mmHg', name: '收缩压' },
   diastolic: { min: 60, max: 90, unit: 'mmHg', name: '舒张压' },
+  urineVolume: { min: 400, max: 3000, unit: 'ml', name: '尿量' },
+  egfr: { unit: 'ml/min/1.73m²', name: 'eGFR', trendOnly: true },
+  urineProteinCreatinineRatio: { unit: 'mg/mg', name: '尿蛋白/肌酐比', trendOnly: true },
+  urineAlbuminCreatinineRatio: { unit: 'mg/g', name: '尿白蛋白/肌酐比', trendOnly: true },
+  tacrolimus: { unit: 'ng/mL', name: '他克莫司', trendOnly: true },
+  bkVirusCopies: { unit: 'copies/mL', name: 'BK病毒载量', trendOnly: true },
+  cmvVirusCopies: { unit: 'copies/mL', name: 'CMV病毒载量', trendOnly: true },
+  ebvVirusCopies: { unit: 'copies/mL', name: 'EBV病毒载量', trendOnly: true },
 }
 
 export function getReferenceRange(metric: MetricKey): ReferenceRange {
@@ -43,6 +54,10 @@ export function getAllReferenceRanges(): Record<MetricKey, ReferenceRange> {
  */
 export function evaluateLevel(metric: MetricKey, value: number): 'normal' | 'warning' | 'critical' {
   const range = COMMON_RANGES[metric]
+  if (range.trendOnly || range.min == null || range.max == null) {
+    return 'normal'
+  }
+
   const { min, max } = range
 
   // 特殊规则：血钾危险阈值更严格

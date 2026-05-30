@@ -39,13 +39,11 @@ export default function HealthInsightsPage() {
 
       const records = recordsRes.data?.list ?? []
       const logs = logsRes.data?.list ?? []
-      const checkIns: Array<{ date: string; weight?: number; systolic?: number; diastolic?: number }> = []
 
       const nextReport = generateInsightReport(
         {
           userType,
           records,
-          checkIns,
           medicationLogs: logs.map((l: any) => ({
             medicationId: l.medicationId ?? l.id ?? 'unknown',
             name: l.medication?.name ?? l.name ?? '未知药物',

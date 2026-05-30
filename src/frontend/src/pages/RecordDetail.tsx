@@ -2,43 +2,19 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft, Calendar, Edit, Trash2 } from 'lucide-react'
 import { healthRecordApi } from '../services/api'
+import {
+  ALL_HEALTH_RECORD_FIELDS,
+  extractHeartRateFromNotes,
+  stripHeartRateFromNotes,
+  type HealthRecordFieldKey,
+  type HealthRecordLike,
+} from '../services/healthRecordFields'
 import { formatAppChineseDate } from '../utils/appDate'
 import toast from 'react-hot-toast'
 
-interface HealthRecord {
+interface HealthRecord extends HealthRecordLike {
   id: string
-  recordDate: string
-  creatinine?: number
-  urea?: number
-  potassium?: number
-  sodium?: number
-  phosphorus?: number
-  uricAcid?: number
-  tacrolimus?: number
-  hemoglobin?: number
-  bloodSugar?: number
-  weight?: number
-  bloodPressureSystolic?: number
-  bloodPressureDiastolic?: number
-  urineVolume?: number
-  notes?: string
 }
-
-const metrics = [
-  { key: 'creatinine', name: '肌酐', unit: 'μmol/L', min: 44, max: 133 },
-  { key: 'urea', name: '尿素氮', unit: 'mmol/L', min: 2.6, max: 7.5 },
-  { key: 'potassium', name: '血钾', unit: 'mmol/L', min: 3.5, max: 5.3 },
-  { key: 'sodium', name: '血钠', unit: 'mmol/L', min: 136, max: 145 },
-  { key: 'phosphorus', name: '血磷', unit: 'mmol/L', min: 0.87, max: 1.45 },
-  { key: 'uricAcid', name: '尿酸', unit: 'μmol/L', min: 150, max: 420 },
-  { key: 'tacrolimus', name: '他克莫司', unit: 'ng/mL', min: 5, max: 15 },
-  { key: 'hemoglobin', name: '血红蛋白', unit: 'g/L', min: 120, max: 160 },
-  { key: 'bloodSugar', name: '血糖', unit: 'mmol/L', min: 3.9, max: 6.1 },
-  { key: 'weight', name: '体重', unit: 'kg' },
-  { key: 'bloodPressureSystolic', name: '收缩压', unit: 'mmHg' },
-  { key: 'bloodPressureDiastolic', name: '舒张压', unit: 'mmHg' },
-  { key: 'urineVolume', name: '尿量', unit: 'ml' },
-]
 
 export default function RecordDetail() {
   const navigate = useNavigate()
@@ -103,7 +79,17 @@ export default function RecordDetail() {
     )
   }
 
-  const hasMetrics = metrics.filter(m => record[m.key as keyof HealthRecord] !== null && record[m.key as keyof HealthRecord] !== undefined)
+  const visibleMetrics = ALL_HEALTH_RECORD_FIELDS.map((field) => {
+    const value = field.key === 'heartRate'
+      ? record.heartRate ?? extractHeartRateFromNotes(record.notes)
+      : record[field.key as HealthRecordFieldKey]
+
+    return value !== null && value !== undefined && value !== ''
+      ? { ...field, value }
+      : null
+  }).filter(Boolean) as Array<typeof ALL_HEALTH_RECORD_FIELDS[number] & { value: string | number }>
+
+  const cleanNotes = stripHeartRateFromNotes(record.notes)
 
   return (
     <div className="space-y-4">
@@ -147,64 +133,35 @@ export default function RecordDetail() {
       </div>
 
       {/* 指标数据 */}
-      {hasMetrics.length > 0 && (
+      {visibleMetrics.length > 0 && (
         <div className="card">
           <h2 className="text-card-title font-medium text-gray-text-primary mb-4">检测指标</h2>
           <div className="grid grid-cols-2 gap-4">
-            {hasMetrics.map((metric) => {
-              const value = record[metric.key as keyof HealthRecord]
-              const isAbnormal = metric.max && metric.min && (
-                (value as number) > metric.max || (value as number) < metric.min
-              )
-              return (
-                <div key={metric.key} className="p-3 bg-gray-bg rounded-lg">
-                  <p className="text-small text-gray-secondary">{metric.name}</p>
-                  <div className="flex items-baseline gap-1">
-                    <p className={`text-metric ${isAbnormal ? 'text-danger' : 'text-gray-text-primary'}`}>
-                      {value}
-                    </p>
-                    <span className="text-small text-gray-secondary">{metric.unit}</span>
-                  </div>
-                  {metric.min && metric.max && (
-                    <p className="text-xs text-gray-helper mt-1">
-                      参考: {metric.min}-{metric.max}
-                    </p>
-                  )}
+            {visibleMetrics.map((metric) => (
+              <div key={metric.key} className="p-3 bg-gray-bg rounded-lg">
+                <p className="text-small text-gray-secondary">{metric.label}</p>
+                <div className="flex items-baseline gap-1">
+                  <p className="text-metric text-gray-text-primary">
+                    {metric.value}
+                  </p>
+                  <span className="text-small text-gray-secondary">{metric.unit}</span>
                 </div>
-              )
-            })}
+                {metric.key === 'tacrolimus' && (
+                  <p className="mt-1 text-xs text-gray-helper">
+                    以移植医生设定目标范围为准
+                  </p>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
 
       {/* 备注 */}
-      {record.notes && (
+      {cleanNotes && (
         <div className="card">
           <h2 className="text-card-title font-medium text-gray-text-primary mb-2">备注</h2>
-          <p className="text-body text-gray-secondary">{record.notes}</p>
-        </div>
-      )}
-
-      {/* 血压特殊显示 */}
-      {(record.bloodPressureSystolic || record.bloodPressureDiastolic) && (
-        <div className="card">
-          <h2 className="text-card-title font-medium text-gray-text-primary mb-4">血压</h2>
-          <div className="flex items-center gap-4">
-            <div className="text-center">
-              <p className="text-metric text-gray-text-primary">
-                {record.bloodPressureSystolic || '--'}
-              </p>
-              <p className="text-small text-gray-secondary">收缩压</p>
-            </div>
-            <span className="text-2xl text-gray-helper">/</span>
-            <div className="text-center">
-              <p className="text-metric text-gray-text-primary">
-                {record.bloodPressureDiastolic || '--'}
-              </p>
-              <p className="text-small text-gray-secondary">舒张压</p>
-            </div>
-            <span className="text-small text-gray-secondary">mmHg</span>
-          </div>
+          <p className="text-body text-gray-secondary whitespace-pre-line">{cleanNotes}</p>
         </div>
       )}
     </div>

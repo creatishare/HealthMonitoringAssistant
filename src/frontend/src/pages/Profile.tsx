@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { reportApi, userApi } from '../services/api'
+import { getTransplantProfileChecklist } from '../services/transplantProfile'
 import { getAppDateWindow, getDaysSinceAppDate } from '../utils/appDate'
 import toast from 'react-hot-toast'
 
@@ -29,6 +30,8 @@ interface UserProfile {
   dialysisType?: 'none' | 'hemodialysis' | 'peritoneal'
   dryWeight?: number
   baselineCreatinine?: number
+  tacrolimusTargetMin?: number
+  tacrolimusTargetMax?: number
   diagnosisDate?: string
   primaryDisease?: string
   hasTransplant?: boolean
@@ -130,6 +133,7 @@ export default function Profile() {
   const userTypeLabel = profile?.hasTransplant || profile?.userType === 'kidney_transplant' ? '肾移植术后' : profile?.userType === 'kidney_failure' ? '肾衰竭管理' : '健康监测'
   const reportRange = getReportDateRange()
   const isTransplantUser = profile?.hasTransplant || profile?.userType === 'kidney_transplant'
+  const transplantChecklist = useMemo(() => getTransplantProfileChecklist(profile), [profile])
   const reportItems = isTransplantUser
     ? ['个人基线', '趋势偏移', '血药浓度', '复诊提醒']
     : ['基础档案', '关键指标', '用药摘要', '未读预警']
@@ -272,6 +276,33 @@ export default function Profile() {
             </div>
           ))}
         </div>
+
+        {transplantChecklist.length > 0 && (
+          <div className="mt-4 rounded-[18px] border border-primary/15 bg-primary/10 p-4 dark:bg-primary/10">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-helper font-semibold text-gray-text-primary">移植随访资料</p>
+                <p className="mt-1 text-small text-gray-text-secondary">
+                  补充稳定期基线和移植时间后，趋势报告会更有参考价值。
+                </p>
+              </div>
+              <button onClick={() => navigate('/profile/edit#disease-info')} className="chip shrink-0">
+                <Pencil size={15} />
+                补充
+              </button>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {transplantChecklist.map((item) => (
+                <div key={item.label} className="rounded-[14px] bg-white/62 px-3 py-2 dark:bg-white/5">
+                  <p className="text-small text-gray-text-secondary">{item.label}</p>
+                  <p className={`mt-1 text-helper font-semibold ${item.completed ? 'text-success' : 'text-warning'}`}>
+                    {item.value}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="card p-5 md:p-7">

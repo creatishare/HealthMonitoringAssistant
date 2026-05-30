@@ -18,6 +18,8 @@ export function detectAnomalies(data: Partial<Record<MetricKey, MetricValue[]>>)
 
     if (level !== 'normal') {
       const range = getReferenceRange(metric)
+      if (range.min == null || range.max == null) continue
+
       anomalies.push({
         metric,
         metricName: range.name,

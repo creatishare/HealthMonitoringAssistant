@@ -14,6 +14,8 @@ interface UserProfileUpdateInput {
   dialysisType?: DialysisType;
   dryWeight?: number;
   baselineCreatinine?: number;
+  tacrolimusTargetMin?: number;
+  tacrolimusTargetMax?: number;
   diagnosisDate?: string;
   primaryDisease?: PrimaryDisease;
   hasTransplant?: boolean;
@@ -46,6 +48,8 @@ export async function getUserProfile(userId: string) {
     dialysisType: user.profile?.dialysisType,
     dryWeight: user.profile?.dryWeight,
     baselineCreatinine: user.profile?.baselineCreatinine,
+    tacrolimusTargetMin: user.profile?.tacrolimusTargetMin,
+    tacrolimusTargetMax: user.profile?.tacrolimusTargetMax,
     diagnosisDate: formatDateOnly(user.profile?.diagnosisDate),
     primaryDisease: user.profile?.primaryDisease,
     hasTransplant: user.profile?.hasTransplant,
@@ -63,6 +67,14 @@ export async function updateUserProfile(userId: string, data: UserProfileUpdateI
 
   if (!user) {
     throw new AppError('用户不存在', 404, '01004');
+  }
+
+  if (
+    data.tacrolimusTargetMin !== undefined &&
+    data.tacrolimusTargetMax !== undefined &&
+    data.tacrolimusTargetMin > data.tacrolimusTargetMax
+  ) {
+    throw new AppError('他克莫司目标下限不能高于上限', 400, '00002');
   }
 
   const profileData: Record<string, unknown> = {

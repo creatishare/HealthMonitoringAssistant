@@ -5,6 +5,340 @@
 
 ---
 
+## 2026-05-30 — 完成 P1-04 健康记录字段扩展 migration
+
+### 今日完成
+
+1. **先补字段扩展回归测试**
+   - 更新 `src/backend/src/tests/health-record-validation.test.ts`：
+     - 覆盖 `heartRate` 必须为整数。
+     - 覆盖 `urineOccultBlood` 必须为字符串。
+     - 使用 Prisma 方法 mock 验证创建记录可接收 `heartRate`、`egfr`、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV 病毒载量。
+     - 验证趋势白名单允许查询 `heartRate`、`egfr`、尿蛋白/肌酐比和病毒载量等数值字段。
+   - 更新前端 Vitest：
+     - `src/frontend/src/services/healthRecordFields.test.ts` 覆盖正式 `heartRate` 字段、新增移植监测字段、旧 notes 心率兜底展示。
+     - `src/frontend/src/services/transplantProfile.test.ts` 覆盖他克莫司医生目标范围进入 ProfileEdit payload。
+     - `src/frontend/src/services/insights/engine.test.ts` 覆盖心率、eGFR、尿蛋白/肌酐比、BK 病毒载量仅生成趋势，不生成异常诊断。
+
+2. **新增 Prisma 字段和 migration**
+   - `src/backend/prisma/schema.prisma`
+     - `HealthRecord` 新增：
+       - `heartRate Int?`
+       - `egfr Float?`
+       - `urineProteinCreatinineRatio Float?`
+       - `urineAlbuminCreatinineRatio Float?`
+       - `urineOccultBlood String?`
+       - `bkVirusCopies Float?`
+       - `cmvVirusCopies Float?`
+       - `ebvVirusCopies Float?`
+     - `UserProfile` 新增：
+       - `tacrolimusTargetMin Float?`
+       - `tacrolimusTargetMax Float?`
+   - 新增 migration：
+     - `src/backend/prisma/migrations/20260530122000_add_transplant_monitoring_fields/migration.sql`
+   - `npx prisma generate` 已成功。
+
+3. **后端 API 数据通路补齐**
+   - `src/backend/src/services/health-record.service.ts`
+     - 健康记录白名单加入新增数值字段。
+     - `heartRate` 加入整数字段校验。
+     - `urineOccultBlood` 作为文本字段校验，不进入趋势查询。
+     - `getTrends()` 可查询新增数值字段。
+     - `getRecentMetrics()` 补充 eGFR、尿蛋白/肌酐比、心率等最近指标候选。
+   - `src/backend/src/controllers/health-record.controller.ts`
+     - 创建记录改为把完整 body 交给 service 白名单清洗，避免新增字段被 controller 丢弃。
+   - `src/backend/src/services/user.service.ts` / `src/backend/src/controllers/user.controller.ts`
+     - 用户档案读取/更新支持 `tacrolimusTargetMin` / `tacrolimusTargetMax`。
+     - 若上下限同时填写且下限高于上限，返回业务错误。
+   - `src/backend/src/services/dashboard.service.ts`
+     - Dashboard 用户信息返回他克莫司目标范围字段。
+
+4. **前端录入、详情、趋势和洞察接入**
+   - `src/frontend/src/services/healthRecordFields.ts`
+     - 日常指标中心率改为正式 `heartRate` 字段；旧 notes 中的 `心率：72次/分` 仍可兜底读取。
+     - 化验字段新增 eGFR、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV 病毒载量。
+     - 保存时不再把新心率写回 notes，但会清理旧心率备注行。
+   - `src/frontend/src/components/health/HealthRecordForm.tsx`
+     - 支持文本字段（尿潜血）和新增数值字段。
+   - `src/frontend/src/pages/RecordDetail.tsx`
+     - 心率优先读正式字段，空时再读 notes。
+   - `src/frontend/src/pages/Dashboard.tsx` / `src/frontend/src/pages/Charts.tsx`
+     - 趋势指标池加入心率、eGFR、尿蛋白/肌酐比、尿白蛋白/肌酐比、BK/CMV/EBV。
+     - 移植用户核心指标改为肌酐、eGFR、他克莫司；推荐指标加入尿蛋白和病毒载量。
+   - `src/frontend/src/services/insights/*`
+     - 新增字段进入本地洞察趋势序列。
+     - eGFR、尿蛋白/肌酐比、病毒载量、心率均标记为 trend-only，不按通用参考范围生成异常结论。
+   - `src/frontend/src/pages/ProfileEdit.tsx` / `src/frontend/src/pages/Profile.tsx`
+     - 移植档案可填写并展示医生配置的他克莫司目标范围。
+
+### 验证
+
+- Prisma schema 校验通过：
+  ```bash
+  cd src/backend && npx prisma validate
+  ```
+- Prisma Client 生成通过：
+  ```bash
+  cd src/backend && npx prisma generate
+  ```
+- 后端回归测试通过：
+  ```bash
+  cd src/backend && npm test
+  ```
+- 后端构建通过：
+  ```bash
+  cd src/backend && npm run build
+  ```
+- 前端单测通过：
+  ```bash
+  cd src/frontend && npm test -- --run
+  ```
+- 前端构建通过：
+  ```bash
+  cd src/frontend && npm run build
+  ```
+  Vite 仍提示主 chunk 大于 500 kB，为既有体积提醒。
+- 本地数据库迁移：
+  - `npx prisma migrate dev --name add-transplant-monitoring-fields` 和 `npx prisma migrate status` 当前在本机 `health_monitoring` 库上返回 `Schema engine error:` 空错误。
+  - 已使用同一份 migration SQL 通过 `psql` 事务应用到本地库，并写入 `_prisma_migrations`。
+  - 已确认 `health_records` 存在 8 个新增字段，`user_profiles` 存在 `tacrolimusTargetMin` / `tacrolimusTargetMax`。
+
+### 下一项建议
+
+进入 `P1-05 移植风险规则抽离与报告接入`。新增字段已经可记录和趋势展示，但风险提示仍只应做“复查 / 联系医生 / 按医嘱处理”，不要输出诊断结论。
+
+---
+
+## 2026-05-30 — 完成 P1-03 移植用户个人基线引导
+
+### 今日完成
+
+1. **先补移植档案引导回归测试**
+   - 新增 `src/frontend/src/services/transplantProfile.test.ts`。
+   - 覆盖：
+     - 移植用户 onboarding payload 会携带可选 `baselineCreatinine`。
+     - 基线肌酐可留空，不阻塞初始化。
+     - Dashboard 仅在移植用户缺少基线时展示“填写个人基线”CTA。
+     - Profile 健康档案能区分移植时间和基线肌酐是否已填写。
+     - ProfileEdit 能把后端日期和数值字段归一化为表单值。
+
+2. **移植用户 onboarding 增加基线肌酐**
+   - 文件：
+     - `src/frontend/src/pages/Onboarding.tsx`
+     - `src/frontend/src/services/transplantProfile.ts`
+     - `src/frontend/src/services/api.ts`
+     - `src/frontend/src/stores/authStore.ts`
+   - 移植用户在基本信息步骤可选填写“稳定期基线肌酐 (μmol/L)”。
+   - 文案明确“不确定可稍后补充；报告会更有参考价值”，不强制必填。
+   - `authApi.completeOnboarding()` 和 authStore 类型补充 `baselineCreatinine`。
+
+3. **Dashboard 与 Profile 增加补充入口**
+   - `src/frontend/src/pages/Dashboard.tsx`
+     - 移植用户缺少基线时，在现有基线提示卡中展示“填写个人基线”按钮。
+     - 点击跳转 `/profile/edit#disease-info`。
+   - `src/frontend/src/pages/Profile.tsx`
+     - 健康档案区域新增“移植随访资料”状态块。
+     - 显示移植时间、基线肌酐是否已填写，并提供补充入口。
+
+4. **ProfileEdit 改用统一 API 层**
+   - `src/frontend/src/pages/ProfileEdit.tsx`
+     - `fetch('/api/users/profile')` 已替换为 `userApi.getProfile()` / `userApi.updateProfile()`。
+     - 401 可走 axios 统一拦截并触发登录过期处理。
+     - 保存后同步 authStore 的 `name`、`userType`、`primaryDisease`、`onboardingCompleted`，避免首页仍显示旧档案字段。
+     - 疾病信息区域加 `id="disease-info"`，支持 Dashboard/Profile CTA 定位。
+
+5. **后端 onboarding 字段通路补齐**
+   - `src/backend/src/controllers/user.controller.ts`
+     - `completeOnboarding` 补传 `baselineCreatinine` 到已存在的 `userService.completeOnboarding()`。
+   - 不新增数据库字段、不新增 migration。
+
+### 验证
+
+- 前端单测通过：
+  ```bash
+  cd src/frontend && npm test -- --run
+  ```
+- 前端构建通过：
+  ```bash
+  cd src/frontend && npm run build
+  ```
+- 后端构建通过：
+  ```bash
+  cd src/backend && npm run build
+  ```
+- 后端回归测试通过：
+  ```bash
+  cd src/backend && npm test
+  ```
+  构建仍有 Vite chunk size 提醒，为既有体积提示，本次未处理。
+
+### 下一项建议
+
+按 `docs/next-agent-todos.md` 推荐顺序，下一项进入 `P1-04 健康记录字段扩展 migration`。
+
+---
+
+## 2026-05-30 — 完成 P1-02 统一健康记录录入体验
+
+### 今日完成
+
+1. **先补统一表单回归测试**
+   - 新增 `src/frontend/src/services/healthRecordFields.test.ts`。
+   - 覆盖：
+     - 日常 / 化验 / 全量模式字段顺序。
+     - Dashboard 快捷入口仅显示体重、尿量或血压对应字段。
+     - 他克莫司 placeholder 不再出现固定 `5-15`。
+     - 心率从 `notes` 中提取，保存时写回 `心率：72次/分`。
+     - 编辑时清空心率不会丢失其他备注。
+     - 最近记录和详情页使用同一摘要逻辑。
+
+2. **抽统一字段配置与表单组件**
+   - 新增：
+     - `src/frontend/src/services/healthRecordFields.ts`
+     - `src/frontend/src/components/health/HealthRecordForm.tsx`
+   - 字段配置统一为：
+     - 日常指标：体重、尿量、收缩压、舒张压、心率。
+     - 化验指标：肌酐、尿素氮、血钾、血钠、血磷、血红蛋白、血糖、尿酸、他克莫司。
+   - `HealthRecordForm` 支持 `mode=daily | lab | full` 和 `quickType=weight | bloodPressure | urineVolume`。
+   - 心率仍按临时方案写入 `HealthRecord.notes`，未新增数据库字段。
+
+3. **接入页面**
+   - `src/frontend/src/pages/Records.tsx`
+     - 内嵌手动录入改为复用 `HealthRecordForm`。
+     - 保存成功后刷新最近记录。
+   - `src/frontend/src/pages/RecordForm.tsx`
+     - 新建、Dashboard 快捷入口、编辑页复用同一表单组件。
+     - 快捷入口只显示对应字段，保存后仍回到 Dashboard。
+   - `src/frontend/src/pages/RecordDetail.tsx`
+     - 使用同一字段配置展示指标。
+     - 心率从 notes 中单独展示，备注区域只显示非心率内容。
+     - 他克莫司不再显示固定 `5-15` 参考范围，改为“以移植医生设定目标范围为准”。
+
+### 验证
+
+- 前端单测通过：
+  ```bash
+  cd src/frontend && npm test -- --run
+  ```
+- 前端构建通过：
+  ```bash
+  cd src/frontend && npm run build
+  ```
+  构建仍有 Vite chunk size 提醒，为既有体积提示，本次未处理。
+
+### 下一项建议
+
+按 `docs/next-agent-todos.md` 推荐顺序，下一项进入 `P1-03 移植用户个人基线引导`。
+
+---
+
+## 2026-05-30 — 完成 P1-01 健康洞察接入日常数据
+
+### 今日完成
+
+1. **先补健康洞察回归测试**
+   - 新增 `src/frontend/src/services/insights/engine.test.ts`。
+   - 测试先覆盖并复现原缺口：
+     - `HealthRecord.records` 中的血压、尿量、血糖应生成趋势洞察。
+     - 血钾 `critical` 异常检测不能被破坏。
+     - 他克莫司只能生成趋势提示，不能被固定通用范围判异常。
+     - 摘要中应出现最近 14 天血压记录天数和尿量记录不足提示。
+   - 初次运行失败 3 项，确认测试能钉住本次需求。
+
+2. **洞察引擎接入日常数据**
+   - 文件：
+     - `src/frontend/src/services/insights/types.ts`
+     - `src/frontend/src/services/insights/engine.ts`
+     - `src/frontend/src/services/insights/referenceRanges.ts`
+     - `src/frontend/src/services/insights/ruleEngine.ts`
+     - `src/frontend/src/services/insights/summaryGenerator.ts`
+   - `MetricKey` 扩展 `bloodSugar`、`urineVolume`、`tacrolimus`。
+   - `AnalysisInput.records` 补齐血压、尿量、血糖、他克莫司字段。
+   - `extractMetricSeries()` 直接从健康记录中提取：
+     - `bloodPressureSystolic` → `systolic`
+     - `bloodPressureDiastolic` → `diastolic`
+     - `urineVolume`
+     - `bloodSugar`
+     - `tacrolimus`
+   - 保留可选 `checkIns` 兼容旧入口，但 `HealthInsights.tsx` 不再构造空数组。
+
+3. **医学安全边界**
+   - 他克莫司在参考范围配置中标记为 `trendOnly`，仅展示趋势和“以移植医生设定目标范围为准”的提示。
+   - 不输出排异、感染、药物毒性等诊断结论，也不建议调药。
+   - 血压、尿量、血糖加入通用参考标记，仅用于数据标记和复诊查看提醒。
+
+4. **测试入口修正**
+   - `src/frontend/vite.config.ts` 增加 Vitest include/exclude。
+   - `npm test -- --run` 不再误收 Playwright 的 `e2e/*.spec.ts`；E2E 仍通过 `npm run test:e2e` 单独运行。
+
+### 验证
+
+- 前端单测通过：
+  ```bash
+  cd src/frontend && npm test -- --run
+  ```
+- 前端构建通过：
+  ```bash
+  cd src/frontend && npm run build
+  ```
+  构建仍有 Vite chunk size 提醒，为既有打包体积提示，本次未处理。
+
+### 下一项建议
+
+按 `docs/next-agent-todos.md` 推荐顺序，下一项进入 `P1-02 统一健康记录录入体验`。
+
+---
+
+## 2026-05-30 — 完成 P1-08 健康记录输入校验与趋势指标白名单
+
+### 今日完成
+
+1. **健康记录创建/更新输入校验**
+   - 文件：
+     - `src/backend/src/services/health-record.service.ts`
+     - `src/backend/src/utils/validators.ts`
+   - 新增健康记录字段白名单，仅允许 `recordDate`、备注和已支持的健康指标写入。
+   - 更新记录不再把 `req.body` 原样透传给 Prisma，未知字段会返回明确 `400`。
+   - 指标值统一走 `validateMetricRange()`，并补充他克莫司录入安全上限校验。该范围只用于拦截明显非法录入，不作为医学目标范围。
+   - 血压、尿量等整数字段会拒绝小数。
+
+2. **日期校验收紧**
+   - `isValidDate()` 改为严格校验 `YYYY-MM-DD`，例如 `2026-02-31` 会被拒绝。
+   - 健康记录列表和趋势接口都会校验日期范围，开始日期晚于结束日期会返回 `400`。
+
+3. **趋势指标白名单**
+   - 趋势接口仅允许查询当前 `HealthRecord` 中支持的 13 个指标：
+     `creatinine`、`urea`、`potassium`、`sodium`、`phosphorus`、`uricAcid`、`hemoglobin`、`bloodSugar`、`weight`、`bloodPressureSystolic`、`bloodPressureDiastolic`、`urineVolume`、`tacrolimus`。
+   - 未知趋势指标会在 Prisma 查询前返回明确 `400`，不再暴露 Prisma schema 错误。
+   - `src/backend/src/controllers/health-record.controller.ts` 对非字符串趋势查询参数增加格式校验。
+
+4. **补充自动化测试与 TDD 规则**
+   - 新增 `src/backend/src/tests/health-record-validation.test.ts`，覆盖非法日期、非法指标值、整数字段、小字段白名单、列表指标白名单和趋势指标白名单。
+   - `src/backend/package.json` 的 `npm test` 改为运行本次健康记录校验回归测试，避免继续指向当前不可用的 `jest`。
+   - 后续每个任务都必须补自动化测试或先写失败测试，再做实现。
+
+### 验证
+
+- 后端构建通过：
+  ```bash
+  cd src/backend && npm run build
+  ```
+- 后端测试通过：
+  ```bash
+  cd src/backend && npm test
+  ```
+  覆盖项包括：
+  - 未知趋势指标 `badMetric` 返回 `400 / 不支持的趋势指标`。
+  - 非法日期 `2026-02-31` 返回 `400 / 开始日期格式错误`。
+  - 非法血钾值 `99` 返回 `400 / 血钾不能大于20`。
+  - 未知创建/更新字段返回 `400 / 不支持的字段`。
+
+### 下一项建议
+
+按 `docs/next-agent-todos.md` 推荐顺序，下一项进入 `P1-01 健康洞察接入日常数据`。
+
+---
+
 ## 2026-05-30 — 会话交接：日期/时区统一待本地复测与提交
 
 ### 当前 Git 状态
@@ -840,11 +1174,11 @@ MVP v1.0.0 功能已完成并部署到生产服务器（阿里云ECS，HTTP + IP
 | 优先级 | 任务 | 状态 | 说明 |
 |--------|------|------|------|
 | **P0** | 生产环境Redis | ❌ 未开始 | 验证码目前存内存Map，重启丢失。需切换到Redis |
-| **P1** | 肾移植字段扩展 | ❌ 未开始 | 新增 eGFR、尿蛋白/肌酐比、BK/CMV、他克莫司医生目标范围 |
+| **P1** | 肾移植字段扩展 | ✅ 已完成基础字段 | 2026-05-30 新增 eGFR、尿蛋白/肌酐比、BK/CMV/EBV、他克莫司医生目标范围 |
 | **P1** | 移植风险规则模块化 | ❌ 未开始 | 当前第一版规则在 Dashboard 中，建议抽到独立 service |
 | **P1** | Dashboard指标个性化 | ✅ 已完成第一版 | 2026-05-18 改为核心/推荐/全部分层 |
 | **P1** | iOS日期输入框 | ✅ 已修复 | 2026-04-21已添加WebKit样式重置 |
-| **P2** | 健康洞察增强 | ❌ 未开始 | 接入每日打卡数据（血压、体重）到洞察引擎 |
+| **P2** | 健康洞察增强 | ✅ 已完成第一版 | 2026-05-30 接入每日打卡和移植扩展字段 trend-only 趋势 |
 | **P2** | 检查报告到期提醒 | ❌ 未开始 | 基于用户类型和上次检查日期智能提醒复查 |
 | **P2** | 商业化付费功能 | ❌ 未开始 | 内测通过后实施，方案见docs/billing-plan.md |
 | **P3** | 域名+HTTPS+ICP备案 | ❌ 未开始 | 当前IP直连，正式对外需备案 |
