@@ -144,4 +144,35 @@ describe('generateInsightReport daily health data', () => {
     expect(summary?.content).toContain('最近 14 天有 1 天记录血压')
     expect(summary?.content).toContain('近 14 天尿量记录不足')
   })
+
+  it('adds transplant-specific risk summary without diagnostic wording', () => {
+    const report = generateInsightReport(
+      buildInput({
+        userType: 'kidney_transplant',
+        baselineCreatinine: 100,
+        tacrolimusTargetMin: 6,
+        tacrolimusTargetMax: 9,
+        records: [
+          {
+            recordDate: recentDate(1),
+            creatinine: 128,
+            egfr: 52,
+            tacrolimus: 7,
+            urineProteinCreatinineRatio: 0.2,
+            urineAlbuminCreatinineRatio: 28,
+            bkVirusCopies: 0,
+            cmvVirusCopies: 0,
+            ebvVirusCopies: 0,
+          },
+        ],
+      } as Partial<AnalysisInput>)
+    )
+
+    const transplantInsight = report.insights.find((insight) => insight.type === 'transplant')
+    expect(transplantInsight?.severity).toBe('critical')
+    expect(transplantInsight?.title).toBe('建议尽快联系移植医生')
+    expect(transplantInsight?.content).not.toContain('排异')
+    expect(transplantInsight?.content).not.toContain('感染')
+    expect(transplantInsight?.content).not.toContain('药物毒性')
+  })
 })

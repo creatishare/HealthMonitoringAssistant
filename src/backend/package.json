@@ -11,8 +11,10 @@
     "db:generate": "prisma generate",
     "worker": "tsx src/workers/reminderWorker.ts",
     "lint": "eslint src --ext .ts",
-    "test": "npm run test:health-records",
-    "test:health-records": "tsx src/tests/health-record-validation.test.ts"
+    "test": "npm run test:health-records && npm run test:transplant-risk && npm run test:alert-actions",
+    "test:health-records": "tsx src/tests/health-record-validation.test.ts",
+    "test:transplant-risk": "tsx src/tests/transplant-risk.test.ts",
+    "test:alert-actions": "tsx src/tests/alert-action-fields.test.ts"
   },
   "dependencies": {
     "@alicloud/credentials": "^2.4.4",

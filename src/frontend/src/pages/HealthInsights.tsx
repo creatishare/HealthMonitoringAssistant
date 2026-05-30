@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, AlertTriangle, AlertCircle, Info, Pill, TrendingUp, ShieldAlert } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
-import { healthRecordApi, medicationApi } from '../services/api'
+import { healthRecordApi, medicationApi, userApi } from '../services/api'
 import { generateInsightReport, type InsightReport, type HealthInsight } from '../services/insights/engine'
 import { getAppDateString, getAppDateWindow } from '../utils/appDate'
 import toast from 'react-hot-toast'
@@ -32,17 +32,24 @@ export default function HealthInsightsPage() {
     try {
       const { startDate, endDate } = getAppDateWindow(30)
 
-      const [recordsRes, logsRes] = await Promise.all([
+      const [recordsRes, logsRes, profileRes] = await Promise.all([
         healthRecordApi.getList({ startDate, endDate }),
         medicationApi.getLogs({ startDate, endDate }),
+        userApi.getProfile(),
       ])
 
       const records = recordsRes.data?.list ?? []
       const logs = logsRes.data?.list ?? []
+      const profile = profileRes.data ?? profileRes
 
       const nextReport = generateInsightReport(
         {
-          userType,
+          userType: profile?.userType ?? userType,
+          hasTransplant: profile?.hasTransplant,
+          transplantDate: profile?.transplantDate,
+          baselineCreatinine: profile?.baselineCreatinine,
+          tacrolimusTargetMin: profile?.tacrolimusTargetMin,
+          tacrolimusTargetMax: profile?.tacrolimusTargetMax,
           records,
           medicationLogs: logs.map((l: any) => ({
             medicationId: l.medicationId ?? l.id ?? 'unknown',
@@ -71,6 +78,7 @@ export default function HealthInsightsPage() {
     if (!report) return null
     return {
       summary: report.insights.filter((i) => i.type === 'summary'),
+      transplant: report.insights.filter((i) => i.type === 'transplant'),
       anomalies: report.insights.filter((i) => i.type === 'anomaly'),
       adherence: report.insights.filter((i) => i.type === 'adherence'),
       trends: report.insights.filter((i) => i.type === 'trend'),
@@ -134,6 +142,14 @@ export default function HealthInsightsPage() {
       {grouped.summary.map((insight) => (
         <InsightCard key={insight.title} insight={insight} />
       ))}
+
+      {grouped.transplant.length > 0 && (
+        <Section title="移植专项摘要" icon={ShieldAlert}>
+          {grouped.transplant.map((insight) => (
+            <InsightCard key={insight.title} insight={insight} />
+          ))}
+        </Section>
+      )}
 
       {grouped.anomalies.length > 0 && (
         <Section title="指标异常提醒" icon={AlertTriangle}>

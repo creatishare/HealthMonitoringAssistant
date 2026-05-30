@@ -6,6 +6,7 @@ import { getAlerts } from './alert.service';
 import { getHealthRecords, getRecentMetrics } from './health-record.service';
 import { getTodayMedications } from './medication.service';
 import { getUserProfile } from './user.service';
+import { analyzeTransplantRisk, type TransplantRiskMissingField } from './transplant-risk.service';
 import logger from '../utils/logger';
 import { getAppDateString, getDateOnlyValue } from '../utils/app-date';
 
@@ -37,6 +38,7 @@ interface ReportMedication {
 interface ReportRecord {
   recordDate: string;
   creatinine?: number | null;
+  egfr?: number | null;
   urea?: number | null;
   potassium?: number | null;
   sodium?: number | null;
@@ -48,7 +50,14 @@ interface ReportRecord {
   bloodPressureSystolic?: number | null;
   bloodPressureDiastolic?: number | null;
   urineVolume?: number | null;
+  heartRate?: number | null;
+  urineProteinCreatinineRatio?: number | null;
+  urineAlbuminCreatinineRatio?: number | null;
+  urineOccultBlood?: string | null;
   tacrolimus?: number | null;
+  bkVirusCopies?: number | null;
+  cmvVirusCopies?: number | null;
+  ebvVirusCopies?: number | null;
   notes?: string | null;
 }
 
@@ -80,6 +89,7 @@ export interface FollowUpReportData {
 
 const METRIC_LABELS: Array<{ key: keyof ReportRecord; label: string; unit?: string }> = [
   { key: 'creatinine', label: '肌酐', unit: 'μmol/L' },
+  { key: 'egfr', label: 'eGFR', unit: 'ml/min/1.73m²' },
   { key: 'urea', label: '尿素氮', unit: 'mmol/L' },
   { key: 'potassium', label: '血钾', unit: 'mmol/L' },
   { key: 'sodium', label: '血钠', unit: 'mmol/L' },
@@ -88,11 +98,19 @@ const METRIC_LABELS: Array<{ key: keyof ReportRecord; label: string; unit?: stri
   { key: 'hemoglobin', label: '血红蛋白', unit: 'g/L' },
   { key: 'bloodSugar', label: '血糖', unit: 'mmol/L' },
   { key: 'weight', label: '体重', unit: 'kg' },
+  { key: 'heartRate', label: '心率', unit: '次/分' },
+  { key: 'urineProteinCreatinineRatio', label: '尿蛋白/肌酐比', unit: 'mg/mg' },
+  { key: 'urineAlbuminCreatinineRatio', label: '尿白蛋白/肌酐比', unit: 'mg/g' },
+  { key: 'urineOccultBlood', label: '尿潜血' },
   { key: 'tacrolimus', label: '他克莫司', unit: 'ng/mL' },
+  { key: 'bkVirusCopies', label: 'BK病毒载量', unit: 'copies/mL' },
+  { key: 'cmvVirusCopies', label: 'CMV病毒载量', unit: 'copies/mL' },
+  { key: 'ebvVirusCopies', label: 'EBV病毒载量', unit: 'copies/mL' },
 ];
 
 const CHART_METRICS: ChartMetricConfig[] = [
   { key: 'creatinine', label: '肌酐', unit: 'μmol/L', color: '#2563EB', referenceRange: [44, 133] },
+  { key: 'egfr', label: 'eGFR', unit: 'ml/min/1.73m²', color: '#1F8A70' },
   { key: 'urea', label: '尿素氮', unit: 'mmol/L', color: '#0891B2', referenceRange: [2.6, 7.5] },
   { key: 'potassium', label: '血钾', unit: 'mmol/L', color: '#DC2626', referenceRange: [3.5, 5.3] },
   { key: 'hemoglobin', label: '血红蛋白', unit: 'g/L', color: '#9333EA', referenceRange: [110, 160] },
@@ -101,7 +119,25 @@ const CHART_METRICS: ChartMetricConfig[] = [
   { key: 'bloodPressureDiastolic', label: '舒张压', unit: 'mmHg', color: '#F59E0B', referenceRange: [60, 90] },
   { key: 'urineVolume', label: '尿量', unit: 'mL', color: '#0D9488' },
   { key: 'tacrolimus', label: '他克莫司', unit: 'ng/mL', color: '#7C3AED' },
+  { key: 'urineProteinCreatinineRatio', label: '尿蛋白/肌酐比', unit: 'mg/mg', color: '#8B6FC9' },
+  { key: 'urineAlbuminCreatinineRatio', label: '尿白蛋白/肌酐比', unit: 'mg/g', color: '#C56A95' },
+  { key: 'bkVirusCopies', label: 'BK病毒载量', unit: 'copies/mL', color: '#6772E5' },
+  { key: 'cmvVirusCopies', label: 'CMV病毒载量', unit: 'copies/mL', color: '#B35C44' },
+  { key: 'ebvVirusCopies', label: 'EBV病毒载量', unit: 'copies/mL', color: '#5B7C99' },
 ];
+
+const TRANSPLANT_MISSING_FIELD_LABELS: Record<TransplantRiskMissingField, string> = {
+  baselineCreatinine: '个人基线肌酐',
+  creatinine: '肌酐',
+  egfr: 'eGFR',
+  urineProteinCreatinineRatio: '尿蛋白/肌酐比',
+  urineAlbuminCreatinineRatio: '尿白蛋白/肌酐比',
+  tacrolimus: '他克莫司',
+  tacrolimusTargetRange: '他克莫司目标范围',
+  bkVirusCopies: 'BK病毒载量',
+  cmvVirusCopies: 'CMV病毒载量',
+  ebvVirusCopies: 'EBV病毒载量',
+};
 
 const TEXT_COLOR = '#262626';
 const MUTED_COLOR = '#666666';
@@ -314,6 +350,11 @@ function formatProfileLines(profile: FollowUpReportData['profile']) {
     `当前体重：${profile.currentWeight ?? '未填写'}${profile.currentWeight ? ' kg' : ''}`,
     `干体重：${profile.dryWeight ?? '未填写'}${profile.dryWeight ? ' kg' : ''}`,
     `基线肌酐：${profile.baselineCreatinine ?? '未填写'}${profile.baselineCreatinine ? ' μmol/L' : ''}`,
+    `他克莫司目标范围：${
+      profile.tacrolimusTargetMin != null && profile.tacrolimusTargetMax != null
+        ? `${profile.tacrolimusTargetMin}-${profile.tacrolimusTargetMax} ng/mL`
+        : '未填写'
+    }`,
     `确诊日期：${profile.diagnosisDate || '未填写'}`,
   ];
 
@@ -437,7 +478,15 @@ function getMetricStatus(value: number, metric: ChartMetricConfig) {
   return `在参考范围 ${min}-${max} 内`;
 }
 
-function buildDoctorSummaryLines(reportData: FollowUpReportData) {
+function formatTransplantMissingFields(fields: TransplantRiskMissingField[]) {
+  if (fields.length === 0) {
+    return '无';
+  }
+
+  return fields.map((field) => TRANSPLANT_MISSING_FIELD_LABELS[field]).join('、');
+}
+
+export function buildDoctorSummaryLines(reportData: FollowUpReportData) {
   const records = reportData.records;
   if (records.length === 0) {
     return ['所选时间范围内暂无健康记录，建议复诊前补充近期化验单、血压、体重、尿量等数据。'];
@@ -448,12 +497,29 @@ function buildDoctorSummaryLines(reportData: FollowUpReportData) {
   ];
 
   if (reportData.profile.hasTransplant) {
+    const transplantRisk = analyzeTransplantRisk({
+      userType: reportData.profile.userType,
+      hasTransplant: reportData.profile.hasTransplant,
+      transplantDate: reportData.profile.transplantDate,
+      baselineCreatinine: reportData.profile.baselineCreatinine,
+      tacrolimusTargetMin: reportData.profile.tacrolimusTargetMin,
+      tacrolimusTargetMax: reportData.profile.tacrolimusTargetMax,
+      records: reportData.records,
+    });
+
+    lines.push(`移植专项提示：${transplantRisk.title}。${transplantRisk.message}`);
+    lines.push(`建议动作：${transplantRisk.suggestedAction}`);
     lines.push(
-      reportData.profile.baselineCreatinine
-        ? `移植术后摘要优先参考个人基线：当前档案基线肌酐 ${reportData.profile.baselineCreatinine} μmol/L。`
-        : '移植术后摘要缺少个人基线肌酐，建议在档案中补充稳定期连续检查结果。'
+      transplantRisk.creatinineChangePercent != null
+        ? `趋势偏移：最近肌酐较个人基线变化约 ${transplantRisk.creatinineChangePercent}%。`
+        : '趋势偏移：当前资料不足以计算肌酐相对个人基线变化。'
     );
-    lines.push('他克莫司等免疫抑制药目标范围需由移植医生设定；本报告仅整理记录和趋势，不提供调药建议。');
+    lines.push(`缺失字段：${formatTransplantMissingFields(transplantRisk.missingFields)}。`);
+    lines.push(
+      reportData.profile.tacrolimusTargetMin != null && reportData.profile.tacrolimusTargetMax != null
+        ? `他克莫司医生目标范围：${reportData.profile.tacrolimusTargetMin}-${reportData.profile.tacrolimusTargetMax} ng/mL。`
+        : '他克莫司医生目标范围：未填写，请以移植医生医嘱为准。'
+    );
   }
 
   const notableMetrics = CHART_METRICS.map((metric) => {

@@ -64,7 +64,7 @@ export interface DailyDataCompleteness {
 }
 
 export interface HealthInsight {
-  type: 'trend' | 'anomaly' | 'adherence' | 'summary'
+  type: 'trend' | 'anomaly' | 'adherence' | 'summary' | 'transplant'
   severity: 'info' | 'warning' | 'critical'
   title: string
   content: string
@@ -83,6 +83,11 @@ export interface InsightReport {
 
 export interface AnalysisInput {
   userType: 'kidney_failure' | 'kidney_transplant' | 'other' | null
+  hasTransplant?: boolean | null
+  transplantDate?: string | null
+  baselineCreatinine?: number | null
+  tacrolimusTargetMin?: number | null
+  tacrolimusTargetMax?: number | null
   records: Array<{
     recordDate: string
     creatinine?: number

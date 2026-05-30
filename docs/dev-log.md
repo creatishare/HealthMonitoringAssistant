@@ -5,6 +5,152 @@
 
 ---
 
+## 2026-05-30 — 完成 P1-06 预警动作化
+
+### 今日完成
+
+1. **先补预警动作化回归测试**
+   - 新增 `src/backend/src/tests/alert-action-fields.test.ts`：
+     - 覆盖 `serializeAlertForClient()` 保留 `type`、`suggestion`、`recordId`、`metric`、`medicationId`、`medicationLogId` 等前端动作字段。
+     - 覆盖 `formatDashboardAlert()` 不再裁剪 Dashboard 预警动作字段。
+     - 确认响应序列化不暴露 `userId`。
+   - 新增 `src/frontend/src/services/alertActions.test.ts`：
+     - 覆盖 metric + recordId 生成“查看记录”动作。
+     - 覆盖 medication + medicationId 生成“查看用药”动作。
+     - 覆盖 critical 预警生成“生成报告”动作。
+     - 覆盖未读预警生成“标为已读”，已读预警不再显示该动作。
+
+2. **后端预警字段补齐**
+   - `src/backend/src/services/alert.service.ts`
+     - 新增 `serializeAlertForClient()`，列表接口返回前端动作所需字段。
+     - 保留 medication alert 删除/删除已读时的 `markMedicationAlertDismissed()` 逻辑，避免漏服提醒反复补发。
+   - `src/backend/src/services/dashboard.service.ts`
+     - 新增 `formatDashboardAlert()`。
+     - Dashboard API 的 `alerts` 现在返回 `id`、`level`、`type`、`message`、`suggestion`、`isRead`、`createdAt`、`recordId`、`metric`、`medicationId`、`medicationLogId`。
+
+3. **前端动作入口**
+   - 新增 `src/frontend/src/services/alertActions.ts`：
+     - 统一把预警转换为 `record` / `medication` / `report` / `read` 动作。
+   - 新增 `src/frontend/src/services/reportDownload.ts`：
+     - 复用近 30 天报告下载、Blob 下载和 API 错误解析。
+   - `src/frontend/src/pages/Dashboard.tsx`
+     - 预警卡显示 `suggestion`。
+     - 支持“查看记录”“查看用药”“生成报告”“标为已读”。
+     - 标为已读后刷新 Dashboard，红点随未读状态更新。
+   - `src/frontend/src/pages/Alerts.tsx`
+     - 消息中心同样支持查看相关记录/用药、生成报告、标为已读、删除。
+     - 生成报告只下载到本机，不自动分享。
+
+### 验证
+
+- 后端回归测试通过：
+  ```bash
+  cd src/backend && npm test
+  ```
+- 后端构建通过：
+  ```bash
+  cd src/backend && npm run build
+  ```
+- 前端单测通过：
+  ```bash
+  cd src/frontend && npm test -- --run --pool forks
+  ```
+- 前端构建通过：
+  ```bash
+  cd src/frontend && npm run build
+  ```
+  Vite 仍提示主 chunk 大于 500 kB，为既有体积提醒。
+
+### 渲染验证说明
+
+- 已尝试启动前端 dev server 做浏览器级烟测；`http://127.0.0.1:3000/` dev server 可启动。
+- 本地 mock API 监听 `127.0.0.1:3001` 被当前沙箱 `EPERM` 拦截，无法提供可控预警数据。
+- in-app Browser 随后拒绝访问 `127.0.0.1:3000`，因此本轮没有完成截图级 UI 验证。
+- 结束时尝试停止 dev server，但沙箱内 `kill` 被拒绝，提权审批两次超时；如 3000 端口仍被占用，可手动停止对应 Vite 进程。
+
+### 下一项建议
+
+按 `docs/next-agent-todos.md` 推荐顺序，下一项进入 `P0-02 HTTPS 与域名生产化`。这是部署/文档任务，不要和业务功能混做。
+
+---
+
+## 2026-05-30 — 完成 P1-05 移植风险规则抽离与报告接入
+
+### 今日完成
+
+1. **先补移植风险规则回归测试**
+   - 新增 `src/frontend/src/services/transplantRisk/rules.test.ts`：
+     - 覆盖肌酐较个人基线 `>10%` warning、`>25%` critical。
+     - 覆盖最近 3 次肌酐连续上升 warning。
+     - 覆盖他克莫司低于/高于医生目标范围时只提示复核，不建议调药。
+     - 覆盖缺失字段输出“建议补充数据”，不把缺失当正常。
+     - 覆盖文案不包含“疑似排异 / 排异 / 感染 / 药物毒性 / 建议调药 / 调整剂量”。
+   - 新增 `src/backend/src/tests/transplant-risk.test.ts`：
+     - 覆盖后端同一套阈值、缺失字段、免责声明和医学安全文案。
+     - 覆盖 PDF 医生摘要会写入移植专项提示、趋势偏移、他克莫司医生目标范围，并保持无诊断/调药措辞。
+   - 更新 `src/frontend/src/services/insights/engine.test.ts`：
+     - 覆盖健康洞察会生成 `type: 'transplant'` 的移植专项摘要。
+
+2. **前端规则模块抽离并接入页面**
+   - 新增 `src/frontend/src/services/transplantRisk/rules.ts`：
+     - 统一输入：用户类型、移植时间、个人基线肌酐、他克莫司医生目标范围、最近记录列表。
+     - 统一输出：`level`、`tone`、`title`、`message`、`suggestedAction`、`missingFields`、`disclaimer`。
+     - 缺失字段包括个人基线肌酐、肌酐、eGFR、尿蛋白/肌酐比、尿白蛋白/肌酐比、他克莫司、他克莫司目标范围、BK/CMV/EBV 病毒载量。
+   - `src/frontend/src/pages/Dashboard.tsx`
+     - 移除页面内原有 `getTransplantRiskReminder()` 逻辑，改为调用规则模块。
+     - Dashboard 趋势数据映射为规则模块统一的 `recordDate` 输入。
+   - `src/frontend/src/pages/HealthInsights.tsx`
+     - 拉取用户档案，把移植时间、个人基线和他克莫司目标范围传入洞察引擎。
+     - 新增“移植专项摘要”分组。
+   - `src/frontend/src/services/insights/engine.ts` / `types.ts`
+     - 洞察报告新增 `transplant` 类型，复用统一规则输出。
+
+3. **后端规则模块抽离并接入预警/PDF**
+   - 新增 `src/backend/src/services/transplant-risk.service.ts`，与前端保持同一阈值和医学边界。
+   - `src/backend/src/services/alert.service.ts`
+     - 移除旧的页面/服务内肌酐基线规则，改为复用 `analyzeTransplantRisk()`。
+     - 取最近 3 条健康记录传入统一规则，支持连续 3 次肌酐上升 warning。
+     - 他克莫司血药浓度预警文案改为核对采血时间和目标范围，不再出现调药建议。
+   - `src/backend/src/services/report.service.ts`
+     - PDF 医生摘要接入移植专项提示、建议动作、趋势偏移、缺失字段清单和医生目标范围。
+     - 报告指标列表补充 eGFR、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV 病毒载量。
+
+### 验证
+
+- 后端回归测试通过：
+  ```bash
+  cd src/backend && npm test
+  ```
+- 后端构建通过：
+  ```bash
+  cd src/backend && npm run build
+  ```
+- 前端单测通过：
+  ```bash
+  cd src/frontend && npm test -- --run --pool forks
+  ```
+- 前端构建通过：
+  ```bash
+  cd src/frontend && npm run build
+  ```
+  Vite 仍提示主 chunk 大于 500 kB，为既有体积提醒。
+- 医学安全文案扫描通过：
+  ```bash
+  rg -n "疑似排异|排异|感染|药物毒性|建议调药|调整剂量" src/frontend/src src/backend/src
+  ```
+  仅命中测试用例中的禁用词断言，运行代码未命中。
+
+### 注意事项
+
+- 一次普通 `cd src/frontend && npm test -- --run` 在 24 个测试全部通过后触发 Node/Vitest worker 的 V8 fatal 悬挂；改用 `--pool forks` 后干净通过。若后续复现，优先使用 forks pool 或升级 Vitest/Node 组合。
+- 移植风险规则仍只输出复查、联系移植医生、按医嘱处理等行动提示；不要加入排异、感染、药物毒性等诊断结论，也不要建议自行调药。
+
+### 下一项建议
+
+进入 `P1-06 预警动作化`：让 Dashboard 和 Alerts 页基于 `recordId`、`metric`、`medicationId` 等字段展示“查看记录 / 查看用药 / 生成报告 / 标为已读”等动作。
+
+---
+
 ## 2026-05-30 — 完成 P1-04 健康记录字段扩展 migration
 
 ### 今日完成

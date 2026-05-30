@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Plus, Bell, AlertTriangle, ChevronRight, Clock, TrendingUp, Sparkles } from 'lucide-react'
+import { Plus, Bell, AlertTriangle, ChevronRight, Clock, TrendingUp, Sparkles, CheckCircle, FileText, ClipboardList, Pill } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
 import { useDashboardStore, type UserType, type PrimaryDisease } from '../stores/dashboardStore'
-import { healthRecordApi, medicationApi } from '../services/api'
+import { alertApi, healthRecordApi, medicationApi } from '../services/api'
 import { getTransplantBaselinePrompt } from '../services/transplantProfile'
+import { analyzeTransplantRisk, type TransplantRiskTone } from '../services/transplantRisk/rules'
+import { getAlertActions, type AlertAction, type AlertActionSource } from '../services/alertActions'
+import { downloadFollowUpReport, getApiErrorMessage } from '../services/reportDownload'
 import {
   getAppDateWindow,
   getFallbackScheduledAtForAppDate,
@@ -143,90 +146,7 @@ function getMetricName(metricKey: string) {
   return ALL_METRICS.find((metric) => metric.key === metricKey)?.name || metricKey
 }
 
-function getLatestMetricValue(data: TrendData[], metricKey: keyof TrendData) {
-  for (let index = data.length - 1; index >= 0; index -= 1) {
-    const value = data[index][metricKey]
-    if (typeof value === 'number') {
-      return value
-    }
-  }
-
-  return null
-}
-
-function getLatestMetricValues(data: TrendData[], metricKey: keyof TrendData, limit = 3) {
-  const values: number[] = []
-
-  for (let index = data.length - 1; index >= 0 && values.length < limit; index -= 1) {
-    const value = data[index][metricKey]
-    if (typeof value === 'number') {
-      values.unshift(value)
-    }
-  }
-
-  return values
-}
-
-function getTrendDirection(values: number[]) {
-  if (values.length < 3) return 'unknown'
-  const [first, second, third] = values
-  if (first < second && second < third) return 'rising'
-  if (first > second && second > third) return 'falling'
-  return 'mixed'
-}
-
-function getTransplantRiskReminder(
-  trendData: TrendData[],
-  baselineCreatinine?: number | null
-): { tone: 'green' | 'yellow' | 'red' | 'gray'; title: string; message: string } {
-  const latestCreatinine = getLatestMetricValue(trendData, 'creatinine')
-
-  if (!baselineCreatinine) {
-    return {
-      tone: 'gray',
-      title: '需要建立个人基线',
-      message: '移植后肌酐更适合与个人稳定基线比较。请在个人档案中填写稳定期基线肌酐，报告会更有参考价值。',
-    }
-  }
-
-  if (latestCreatinine == null) {
-    return {
-      tone: 'gray',
-      title: '缺少肌酐数据',
-      message: '近30天暂无肌酐记录，复诊前建议补充最近一次化验结果和报告日期。',
-    }
-  }
-
-  const changeRate = (latestCreatinine - baselineCreatinine) / baselineCreatinine
-  const changePercent = Math.round(changeRate * 100)
-  const creatinineTrend = getTrendDirection(getLatestMetricValues(trendData, 'creatinine', 3))
-
-  if (changeRate > 0.25) {
-    return {
-      tone: 'red',
-      title: '建议尽快联系移植医生',
-      message: `最近肌酐较个人基线上升约${changePercent}%，需要结合脱水、药物、感染、梗阻或排异等原因由医生进一步判断。`,
-    }
-  }
-
-  if (changeRate > 0.1 || creatinineTrend === 'rising') {
-    return {
-      tone: 'yellow',
-      title: '建议复查并观察趋势',
-      message: changeRate > 0.1
-        ? `最近肌酐较个人基线上升约${changePercent}%，建议按医嘱复查并关注连续变化。`
-        : '最近3次肌酐呈连续上升趋势，建议复诊时重点核对报告和用药情况。',
-    }
-  }
-
-  return {
-    tone: 'green',
-    title: '核心指标暂未见明显偏离',
-    message: '肌酐相对个人基线较稳定。血药浓度目标范围、病毒载量和尿蛋白仍需以医生配置和化验结果为准。',
-  }
-}
-
-function getRiskToneClass(tone: 'green' | 'yellow' | 'red' | 'gray') {
+function getRiskToneClass(tone: TransplantRiskTone) {
   switch (tone) {
     case 'red':
       return 'border-danger/20 bg-red-50/85 text-danger dark:bg-red-950/25'
@@ -243,6 +163,13 @@ function getScheduledAt(med: TodayMedication) {
   return med.scheduledAt || getFallbackScheduledAtForAppDate(med.scheduledTime)
 }
 
+const ALERT_ACTION_ICONS = {
+  record: ClipboardList,
+  medication: Pill,
+  report: FileText,
+  read: CheckCircle,
+}
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -252,6 +179,7 @@ export default function Dashboard() {
   const [trendLoading, setTrendLoading] = useState(false)
   const [metricScope, setMetricScope] = useState<MetricScope>('core')
   const [hasInitializedMetrics, setHasInitializedMetrics] = useState(false)
+  const [alertActionLoading, setAlertActionLoading] = useState<string | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -356,6 +284,30 @@ export default function Dashboard() {
     }
   }
 
+  const handleAlertAction = async (alert: AlertActionSource, action: AlertAction) => {
+    if (action.kind === 'record' || action.kind === 'medication') {
+      navigate(action.to)
+      return
+    }
+
+    setAlertActionLoading(`${alert.id}:${action.kind}`)
+    try {
+      if (action.kind === 'report') {
+        await downloadFollowUpReport()
+        toast.success('报告已生成')
+      } else {
+        await alertApi.markAsRead(alert.id)
+        toast.success('已标记为已读')
+        await fetchDashboard()
+      }
+    } catch (error) {
+      const fallback = action.kind === 'report' ? '报告生成失败，请稍后重试' : '操作失败，请稍后重试'
+      toast.error(await getApiErrorMessage(error, fallback))
+    } finally {
+      setAlertActionLoading(null)
+    }
+  }
+
   if (loading || !data) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -377,21 +329,34 @@ export default function Dashboard() {
 
   const hasTrendData = trendData.length > 0 && selectedMetrics.some((m) => trendData.some((d) => d[m as keyof TrendData] !== undefined && d[m as keyof TrendData] !== null))
 
+  const isTransplantDashboardUser = data?.user?.userType === 'kidney_transplant' || data?.user?.hasTransplant === true
   const coreMetricKeys = getCoreMetrics(data?.user?.userType, data?.user?.primaryDisease)
   const visibleMetrics = getVisibleMetricsByScope(metricScope, data?.user?.userType, data?.user?.primaryDisease)
   const missingCoreMetricNames = coreMetricKeys
     .filter((metricKey) => !trendData.some((point) => point[metricKey as keyof TrendData] !== undefined && point[metricKey as keyof TrendData] !== null))
     .map(getMetricName)
   const trendReminder =
-    data?.user?.userType === 'kidney_transplant'
+    isTransplantDashboardUser
       ? '移植术后趋势优先参考个人基线、连续变化和医生设定目标范围。'
       : missingCoreMetricNames.length > 0
       ? `近30天缺少${missingCoreMetricNames.slice(0, 3).join('、')}记录，复诊前建议核对报告日期。`
       : selectedMetrics.length > 4
         ? '当前图表包含多项指标，复诊沟通时可在图表页逐项查看。'
         : '核心指标已有记录，建议持续观察同一周期内的变化。'
-  const transplantRiskReminder = data?.user?.userType === 'kidney_transplant'
-    ? getTransplantRiskReminder(trendData, data.user.baselineCreatinine)
+  const transplantRiskRecords = trendData.map(({ date, ...record }) => ({
+    recordDate: date,
+    ...record,
+  }))
+  const transplantRiskReminder = isTransplantDashboardUser
+    ? analyzeTransplantRisk({
+      userType: data.user.userType,
+      hasTransplant: data.user.hasTransplant,
+      transplantDate: data.user.transplantDate,
+      baselineCreatinine: data.user.baselineCreatinine,
+      tacrolimusTargetMin: data.user.tacrolimusTargetMin,
+      tacrolimusTargetMax: data.user.tacrolimusTargetMax,
+      records: transplantRiskRecords,
+    })
     : null
   const transplantBaselinePrompt = data?.user ? getTransplantBaselinePrompt(data.user) : null
 
@@ -534,23 +499,54 @@ export default function Dashboard() {
             <p className="section-kicker">预警提示</p>
             <h2 className="mt-2 text-card-title text-gray-text-primary">需要关注的提醒</h2>
           </div>
-          {alerts.map((alert: any) => (
-            <div
-              key={alert.id}
-              className={
-                alert.level === 'critical'
-                  ? 'card-alert-critical flex items-start gap-3'
-                  : alert.level === 'warning'
-                    ? 'card-alert-warning flex items-start gap-3'
-                    : 'card-alert-info flex items-start gap-3'
-              }
-            >
-              <div className="mt-0.5">
-                <AlertTriangle size={18} className={alert.level === 'critical' ? 'text-danger' : alert.level === 'warning' ? 'text-warning' : 'text-primary'} />
+          {alerts.map((alert: any) => {
+            const actions = getAlertActions(alert)
+
+            return (
+              <div
+                key={alert.id}
+                className={
+                  alert.level === 'critical'
+                    ? 'card-alert-critical'
+                    : alert.level === 'warning'
+                      ? 'card-alert-warning'
+                      : 'card-alert-info'
+                }
+              >
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5">
+                    <AlertTriangle size={18} className={alert.level === 'critical' ? 'text-danger' : alert.level === 'warning' ? 'text-warning' : 'text-primary'} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-body text-gray-text-primary">{alert.message}</p>
+                    {alert.suggestion && (
+                      <p className="mt-1 text-helper text-gray-text-secondary">{alert.suggestion}</p>
+                    )}
+                  </div>
+                </div>
+                {actions.length > 0 && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-border/50 pt-3">
+                    {actions.map((action) => {
+                      const Icon = ALERT_ACTION_ICONS[action.kind]
+                      const loadingKey = `${alert.id}:${action.kind}`
+                      return (
+                        <button
+                          key={action.kind}
+                          type="button"
+                          onClick={() => handleAlertAction(alert, action)}
+                          disabled={alertActionLoading === loadingKey}
+                          className="inline-flex h-9 items-center gap-1.5 rounded-full border border-gray-border bg-gray-card px-3 text-small font-medium text-gray-text-primary disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <Icon size={14} />
+                          {alertActionLoading === loadingKey ? '处理中' : action.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
-              <p className="flex-1 text-body text-gray-text-primary">{alert.message}</p>
-            </div>
-          ))}
+            )
+          })}
         </section>
       )}
 
@@ -594,6 +590,7 @@ export default function Dashboard() {
               <div className="min-w-0">
                 <p className="text-helper font-semibold">{transplantRiskReminder.title}</p>
                 <p className="mt-1 text-helper text-gray-text-secondary">{transplantRiskReminder.message}</p>
+                <p className="mt-1 text-small text-gray-text-helper">{transplantRiskReminder.suggestedAction}</p>
                 {transplantBaselinePrompt && (
                   <button
                     type="button"

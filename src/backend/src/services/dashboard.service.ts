@@ -2,7 +2,7 @@ import prisma from '../config/database';
 import { AppError } from '../utils/errors';
 import { getRecentMetrics } from './health-record.service';
 import { getTodayMedications } from './medication.service';
-import { getUnreadAlertCount, getAlerts } from './alert.service';
+import { getUnreadAlertCount, getAlerts, type AlertClientPayload } from './alert.service';
 import {
   formatAppDisplayDate,
   formatDateOnly,
@@ -36,6 +36,22 @@ function getWeightStatus(weight?: number | null, dryWeight?: number | null): 'no
   if (weight == null) return undefined;
   if (dryWeight != null && Math.abs(weight - dryWeight) > 3) return 'warning';
   return 'normal';
+}
+
+export function formatDashboardAlert(alert: AlertClientPayload) {
+  return {
+    id: alert.id,
+    level: alert.level,
+    type: alert.type,
+    message: alert.message,
+    suggestion: alert.suggestion,
+    isRead: alert.isRead,
+    createdAt: alert.createdAt,
+    recordId: alert.recordId,
+    metric: alert.metric,
+    medicationId: alert.medicationId,
+    medicationLogId: alert.medicationLogId,
+  };
 }
 
 // 获取仪表盘数据
@@ -135,11 +151,7 @@ export async function getDashboardData(userId: string) {
       },
     },
     medications: todayMedications.medications,
-    alerts: alertsData.list.map((alert) => ({
-      id: alert.id,
-      level: alert.level,
-      message: alert.message,
-    })),
+    alerts: alertsData.list.map(formatDashboardAlert),
     recentMetrics,
   };
 }

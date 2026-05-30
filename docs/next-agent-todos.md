@@ -36,8 +36,8 @@
 3. ~~P1-02 统一健康记录录入体验~~ — 已完成（2026-05-30）
 4. ~~P1-03 移植用户个人基线引导~~ — 已完成（2026-05-30）
 5. ~~P1-04 健康记录字段扩展 migration~~ — 已完成（2026-05-30）
-6. P1-05 移植风险规则抽离与报告接入
-7. P1-06 预警动作化
+6. ~~P1-05 移植风险规则抽离与报告接入~~ — 已完成（2026-05-30）
+7. ~~P1-06 预警动作化~~ — 已完成（2026-05-30）
 8. P0-02 HTTPS 与域名生产化
 
 ---
@@ -396,7 +396,7 @@
 
 ---
 
-## P1-05 移植风险规则抽离与报告接入
+## P1-05 移植风险规则抽离与报告接入 — 已完成
 
 ### 用户价值
 
@@ -453,6 +453,12 @@ P1-04 已完成基础字段和数据通路。本任务可以直接基于 `heartR
 - 所有文案都遵守医学边界。
 - 前后端 build 通过。
 
+### 完成记录
+
+2026-05-30 已完成。先补前端 `src/frontend/src/services/transplantRisk/rules.test.ts` 和后端 `src/backend/src/tests/transplant-risk.test.ts`，覆盖肌酐相对个人基线 `>10%` warning、`>25%` critical、最近 3 次连续上升、他克莫司医生目标范围、缺失字段清单、免责声明和禁用诊断/调药措辞；同时补 `src/frontend/src/services/insights/engine.test.ts`，覆盖健康洞察生成移植专项摘要。新增前端 `src/frontend/src/services/transplantRisk/rules.ts` 与后端 `src/backend/src/services/transplant-risk.service.ts`，Dashboard、HealthInsights、alert service 和 PDF 医生摘要已接入统一规则；alert service 会取最近 3 条记录复用连续上升判断；PDF 摘要新增移植专项提示、建议动作、趋势偏移、缺失字段和他克莫司医生目标范围。`cd src/backend && npm test`、`cd src/backend && npm run build`、`cd src/frontend && npm test -- --run --pool forks`、`cd src/frontend && npm run build` 通过。
+
+注意：一次普通 `cd src/frontend && npm test -- --run` 在 24 个测试全部通过后触发 Node/Vitest worker 的 V8 fatal 悬挂；使用 `--pool forks` 后可稳定干净退出。
+
 ### 避坑
 
 - 禁止输出“疑似排异/感染/药物毒性”。
@@ -461,7 +467,7 @@ P1-04 已完成基础字段和数据通路。本任务可以直接基于 `heartR
 
 ---
 
-## P1-06 预警动作化
+## P1-06 预警动作化 — 已完成
 
 ### 用户价值
 
@@ -512,6 +518,12 @@ P1-04 已完成基础字段和数据通路。本任务可以直接基于 `heartR
 - critical 预警能引导生成报告。
 - 删除/已读逻辑不破坏 missed medication alert 的去重逻辑。
 - 前后端 build 通过。
+
+### 完成记录
+
+2026-05-30 已完成。先补 `src/backend/src/tests/alert-action-fields.test.ts`，覆盖预警列表/Dashboard 预警保留 `type`、`suggestion`、`recordId`、`metric`、`medicationId`、`medicationLogId` 且不暴露 `userId`；补 `src/frontend/src/services/alertActions.test.ts`，覆盖“查看记录 / 查看用药 / 生成报告 / 标为已读”的动作推导。后端新增 `serializeAlertForClient()` 与 `formatDashboardAlert()`；Dashboard API 和 Alerts 列表返回动作字段。前端新增 `src/frontend/src/services/alertActions.ts` 与 `src/frontend/src/services/reportDownload.ts`，Dashboard 和 Alerts 页面已显示建议文案并支持查看相关记录、查看用药、生成近 30 天报告、标为已读。`cd src/backend && npm test`、`cd src/backend && npm run build`、`cd src/frontend && npm test -- --run --pool forks`、`cd src/frontend && npm run build` 通过。
+
+渲染验证注意：本轮尝试做浏览器烟测时，mock API 监听 3001 被沙箱 `EPERM` 拦截，in-app Browser 又拒绝访问 `127.0.0.1:3000`，因此没有截图级验证。若后续继续 UI 验证，先确认本地后端/测试数据和 Browser 访问权限。
 
 ### 避坑
 

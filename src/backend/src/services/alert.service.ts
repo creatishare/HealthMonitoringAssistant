@@ -1,11 +1,44 @@
 import prisma from '../config/database';
-import { AlertLevel, AlertType, HealthRecord, DrugConcentrationRecord, MedicationFrequency } from '@prisma/client';
+import { Alert, AlertLevel, AlertType, HealthRecord, DrugConcentrationRecord, MedicationFrequency } from '@prisma/client';
 import { AppError } from '../utils/errors';
 import logger from '../utils/logger';
 import { getAppDateString, getAppDateTime } from '../utils/app-date';
+import { analyzeTransplantRisk } from './transplant-risk.service';
 
 const MISSED_MEDICATION_GRACE_MINUTES = 30;
 const MEDICATION_ALERT_DISMISSED_MARKER = '[medication-alert-dismissed]';
+
+export interface AlertClientPayload {
+  id: string;
+  level: AlertLevel;
+  type: AlertType;
+  message: string;
+  suggestion?: string | null;
+  isRead: boolean;
+  readAt?: Date | null;
+  createdAt: Date;
+  recordId?: string | null;
+  metric?: string | null;
+  medicationId?: string | null;
+  medicationLogId?: string | null;
+}
+
+export function serializeAlertForClient(alert: Alert): AlertClientPayload {
+  return {
+    id: alert.id,
+    level: alert.level,
+    type: alert.type,
+    message: alert.message,
+    suggestion: alert.suggestion,
+    isRead: alert.isRead,
+    readAt: alert.readAt,
+    createdAt: alert.createdAt,
+    recordId: alert.recordId,
+    metric: alert.metric,
+    medicationId: alert.medicationId,
+    medicationLogId: alert.medicationLogId,
+  };
+}
 
 function shouldTakeMedicationToday(
   frequency: MedicationFrequency,
@@ -70,6 +103,70 @@ interface AlertRule {
   suggestionTemplate: string;
 }
 
+type AlertRiskRecordSource = Pick<
+  HealthRecord,
+  | 'id'
+  | 'recordDate'
+  | 'creatinine'
+  | 'egfr'
+  | 'tacrolimus'
+  | 'urineProteinCreatinineRatio'
+  | 'urineAlbuminCreatinineRatio'
+  | 'bkVirusCopies'
+  | 'cmvVirusCopies'
+  | 'ebvVirusCopies'
+>;
+
+function toTransplantRiskRecord(record: AlertRiskRecordSource) {
+  return {
+    recordDate: getAppDateString(record.recordDate),
+    creatinine: record.creatinine,
+    egfr: record.egfr,
+    tacrolimus: record.tacrolimus,
+    urineProteinCreatinineRatio: record.urineProteinCreatinineRatio,
+    urineAlbuminCreatinineRatio: record.urineAlbuminCreatinineRatio,
+    bkVirusCopies: record.bkVirusCopies,
+    cmvVirusCopies: record.cmvVirusCopies,
+    ebvVirusCopies: record.ebvVirusCopies,
+  };
+}
+
+async function getRecentTransplantRiskRecords(userId: string, record: HealthRecord) {
+  const recentRecords = await prisma.healthRecord.findMany({
+    where: {
+      userId,
+      recordDate: {
+        lte: record.recordDate,
+      },
+    },
+    orderBy: [
+      { recordDate: 'desc' },
+      { createdAt: 'desc' },
+    ],
+    take: 3,
+    select: {
+      id: true,
+      recordDate: true,
+      creatinine: true,
+      egfr: true,
+      tacrolimus: true,
+      urineProteinCreatinineRatio: true,
+      urineAlbuminCreatinineRatio: true,
+      bkVirusCopies: true,
+      cmvVirusCopies: true,
+      ebvVirusCopies: true,
+    },
+  });
+
+  const records: AlertRiskRecordSource[] = recentRecords.some((item) => item.id === record.id)
+    ? recentRecords
+    : [record, ...recentRecords].slice(0, 3);
+
+  return records
+    .sort((a, b) => a.recordDate.getTime() - b.recordDate.getTime())
+    .map(toTransplantRiskRecord);
+}
+
 // 指标预警规则
 const metricAlertRules: AlertRule[] = [
   {
@@ -98,30 +195,6 @@ const metricAlertRules: AlertRule[] = [
     type: 'metric',
     messageTemplate: '尿酸偏高（{value} μmol/L），建议复查并咨询医生',
     suggestionTemplate: '尿酸水平与饮食习惯相关，具体饮食调整建议请咨询医生或营养师',
-  },
-  {
-    id: 'creatinine_rise_critical',
-    name: '肌酐较基线明显升高',
-    condition: (record: HealthRecord, context: { baseline?: number }) => {
-      if (!record.creatinine || !context.baseline) return false;
-      return record.creatinine > context.baseline * 1.25;
-    },
-    level: 'critical',
-    type: 'metric',
-    messageTemplate: '肌酐较个人基线上升{percent}%，建议尽快联系移植医生',
-    suggestionTemplate: '肌酐升高原因需结合脱水、药物、感染、梗阻或排异等情况由医生判断，请勿自行调整免疫抑制剂',
-  },
-  {
-    id: 'creatinine_rise_warning',
-    name: '肌酐较基线上升',
-    condition: (record: HealthRecord, context: { baseline?: number }) => {
-      if (!record.creatinine || !context.baseline) return false;
-      return record.creatinine > context.baseline * 1.1 && record.creatinine <= context.baseline * 1.25;
-    },
-    level: 'warning',
-    type: 'metric',
-    messageTemplate: '肌酐较个人基线上升{percent}%，建议复查并观察趋势',
-    suggestionTemplate: '请核对报告日期、饮水和血压记录，并按医嘱复查；请勿自行调整免疫抑制剂',
   },
   {
     id: 'low_hemoglobin',
@@ -170,6 +243,27 @@ export async function checkHealthRecordAlerts(
     }
   }
 
+  if (baselineCreatinine && record.creatinine !== null) {
+    const records = await getRecentTransplantRiskRecords(userId, record);
+    const risk = analyzeTransplantRisk({
+      userType: 'kidney_transplant',
+      hasTransplant: true,
+      baselineCreatinine,
+      records,
+    });
+
+    if (
+      (risk.primaryReason === 'creatinine_change' || risk.primaryReason === 'creatinine_trend') &&
+      (risk.level === 'warning' || risk.level === 'critical')
+    ) {
+      alerts.push({
+        level: risk.level,
+        message: risk.message,
+        suggestion: risk.suggestedAction,
+      });
+    }
+  }
+
   return alerts;
 }
 
@@ -184,7 +278,7 @@ export async function checkDrugConcentrationAlerts(
     alerts.push({
       level: 'warning',
       message: `${record.drugName}血药浓度${status}目标范围`,
-      suggestion: '建议咨询医生调整剂量，请勿自行调整药物剂量',
+      suggestion: '建议联系医生核对采血时间和目标范围，并按医嘱处理',
     });
   }
 
@@ -273,7 +367,7 @@ export async function getAlerts(
   };
 
   return {
-    list: alerts,
+    list: alerts.map(serializeAlertForClient),
     unreadCount: unreadStats,
     pagination: {
       page,

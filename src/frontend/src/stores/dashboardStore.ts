@@ -37,7 +37,15 @@ interface DashboardData {
   alerts: Array<{
     id: string
     level: string
+    type?: string
     message: string
+    suggestion?: string | null
+    isRead?: boolean
+    createdAt?: string
+    recordId?: string | null
+    metric?: string | null
+    medicationId?: string | null
+    medicationLogId?: string | null
   }>
   recentMetrics: Array<{
     key: string

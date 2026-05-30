@@ -4,7 +4,7 @@
 
 肾衰竭健康监测Web应用 - MVP版本已完成，当前处于功能增强阶段。
 
-## 当前项目状态 (2026-05-18)
+## 当前项目状态 (2026-05-30)
 
 ### 已完成的核心功能
 1. **用户认证** — 手机号注册/登录、JWT Token、刷新令牌、忘记密码
@@ -25,7 +25,7 @@
 - **2026-04-22**: Dashboard 洞察按钮文字换行修复（`whitespace-nowrap`）、消息通知红点位置修复（`right-0.5 top-0.5`）、首页副标题移除产品规划文案改为仅显示日期、Settings 深色模式/消息通知开关修复（`w-13` → `w-12`，`translate-x-6` → `translate-x-5`）
 - **2026-04-25**: 修复用药提醒跨天状态不更新（后端返回 `scheduledAt`，前端直接回传；记录服药改幂等 update/create；Dashboard 跨午夜刷新）、修复消息中心不补发过期用药提醒（`getAlerts`/`getUnreadAlertCount` 查询前同步 missed 服药日志和预警）、修复线上旧后端没有 `scheduledAt` 时点击“服用”提示成功但状态不变（前端兜底改用 UTC 同一提醒时刻）、新增报告导出接口 `/reports/follow-up`、修复 PDF 中文乱码（pdfkit 注册中文字体 + Docker CJK 字体）、重构“我的/用药/健康记录”页面为截图风格，新增提醒设置、隐私与安全、帮助中心独立页面。
 - **2026-05-18**: Dashboard 指标趋势交互重构为“核心 / 推荐 / 全部”，移除旧“更多/收起”；肾移植用户新增基于 `baselineCreatinine` 的肌酐风险提示（>10% 黄色复查，>25% 红色联系移植医生，连续 3 次上升提示复诊核对）；后端预警规则同步拆成 10%/25% 两档；Dashboard API 返回 `hasTransplant` / `transplantDate` / `baselineCreatinine`；Charts 和 PDF 报告移除他克莫司固定 5-15 参考范围，改为医生目标范围提示；Profile 独立“近30天健康报告”模块，移植用户突出个人基线、趋势偏移、血药浓度、复诊提醒。
-- **2026-05-30**: 完成健康记录输入校验与趋势指标白名单（含后端回归测试）；健康洞察接入 records 中的血压、尿量、体重、血糖、他克莫司趋势，补充日常数据完整度摘要；统一 `/records`、`/records/new`、编辑页健康记录表单，移除记录表单/详情中的他克莫司固定 `5-15`；移植用户 onboarding/Profile/Dashboard 增加个人基线引导，ProfileEdit 改用统一 `userApi`；新增健康记录正式 `heartRate`、eGFR、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV 病毒载量字段，以及用户档案他克莫司医生目标范围；Vitest 单测入口排除 Playwright E2E。
+- **2026-05-30**: 完成健康记录输入校验与趋势指标白名单（含后端回归测试）；健康洞察接入 records 中的血压、尿量、体重、血糖、他克莫司趋势，补充日常数据完整度摘要；统一 `/records`、`/records/new`、编辑页健康记录表单，移除记录表单/详情中的他克莫司固定 `5-15`；移植用户 onboarding/Profile/Dashboard 增加个人基线引导，ProfileEdit 改用统一 `userApi`；新增健康记录正式 `heartRate`、eGFR、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV 病毒载量字段，以及用户档案他克莫司医生目标范围；移植风险规则抽离到前后端独立模块并接入 Dashboard、HealthInsights、预警和 PDF 医生摘要；预警动作化已完成，Dashboard/Alerts 支持查看记录、查看用药、生成报告、标为已读；Vitest 单测入口排除 Playwright E2E。
 
 ### 当前已知问题（下次开发优先处理）
 
@@ -34,33 +34,29 @@
 - **PDF 字体部署**：如果 PDF 只有约 2KB 且 `strings report.pdf | rg "BaseFont|ToUnicode"` 显示 `/Helvetica` / `/WinAnsiEncoding`，说明容器未加载中文字体。必须 `docker compose build --no-cache backend` 重建镜像，不能只 restart；`docker-compose.yml` 已设置默认 `PDF_FONT_PATH=/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc`。`report.service.ts` 会递归扫描 `/usr/share/fonts` 并优先使用 Noto/Source Han/WenQuanYi，生产环境不要依赖 Arial Unicode、STHeiti、微软雅黑、苹方等专有字体。
 - **用药漏服预警**：不要只依赖 `reminderWorker`。`src/backend/src/services/alert.service.ts` 的 `syncMissedMedicationAlerts()` 会在消息列表/未读数查询前按 Asia/Shanghai 日期补建今天已超时 30 分钟的 missed 日志和 medication alert。
 - **用药“服用”时间兼容**：新后端应返回 `scheduledAt`，前端直接回传。若线上旧后端没有 `scheduledAt`，`Dashboard.tsx` / `Medications.tsx` 会兜底用 Asia/Shanghai 日期 + UTC 同一提醒时刻（如 `08:00` → `T08:00:00.000Z`），避免写入成功但今日列表查不到。
-- **肾移植风险提示仍是第一版**：数据库已具备 `eGFR`、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV 病毒载量和他克莫司医生目标范围字段；但风险规则尚未接入这些字段。后续不要假装判断排异、感染、药物毒性等诊断结论。
+- **肾移植风险规则边界**：统一风险规则已抽离并接入 Dashboard、HealthInsights、预警和 PDF；`eGFR`、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV 当前只作为复诊资料完整度/摘要字段，不做排异、感染、药物毒性等诊断判断。
 - **本机 Prisma migrate CLI 空错误**：2026-05-30 `npx prisma migrate dev --name add-transplant-monitoring-fields` 和 `npx prisma migrate status` 在本地 `health_monitoring` 库上返回空的 `Schema engine error:`；schema validate/generate 通过。已用同一 migration SQL 通过 `psql` 事务应用并写入 `_prisma_migrations`。若后续仍空报错，优先排查本地 Prisma schema engine/数据库状态。
 - **医学安全边界**：移植相关功能只能提示“复查 / 联系移植医生 / 按医嘱处理”，禁止输出排异、感染、药物毒性等诊断结论，禁止自动建议调药。
 
 ### 当前进行中的工作（未完成）
 
-#### 肾移植术后风险提示增强（第一版已实现，待规则抽离）
-**需求**：根据移植术后阶段、个人稳定基线、趋势变化、医生目标范围和红旗规则，做复查/联系医生级别的风险提示，不做诊断。
+#### P0-02 HTTPS 与域名生产化（下一项）
+**需求**：生产环境配置正式域名和 HTTPS，保证健康数据产品的基础安全体验，并避免影响分享、PWA、浏览器权限和移动端能力。
 
-**已完成的修改**：
-- `src/backend/src/services/dashboard.service.ts` — API 已返回 `userType`、`primaryDisease`、`hasTransplant`、`transplantDate`、`baselineCreatinine`
-- `src/backend/src/services/alert.service.ts` — 肌酐基线预警拆为 >10% warning、>25% critical
-- `src/backend/src/services/report.service.ts` — PDF 医生摘要加入移植基线提示，移除他克莫司写死参考范围
-- `src/frontend/src/stores/dashboardStore.ts` — 类型已扩展，导出 `UserType` / `PrimaryDisease`，并包含移植字段与他克莫司目标范围
-- `src/frontend/src/pages/Dashboard.tsx` — 已添加：
-  - `ALL_METRICS` 常量（13 个指标）
-  - `getRecommendedMetrics()` / `getCoreMetrics()` 函数（按类型推荐）
-  - `MetricScope` + “核心 / 推荐 / 全部”分层切换
-  - `getTransplantRiskReminder()` 肌酐个人基线提示
-  - 趋势 API 已改为查询全部指标
-- `src/frontend/src/pages/Charts.tsx` — 同步“核心 / 推荐 / 全部”，他克莫司仅展示趋势并提示医生目标范围
-- `src/frontend/src/pages/Profile.tsx` — 独立“近30天健康报告”模块，移植用户突出个人基线/趋势偏移/血药浓度/复诊提醒
+**建议范围**：
+- `docs/deployment-guide.md`
+- `docs/server-operations.md`
+- `docs/quick-deploy.md`
+- `infrastructure/`
+- `docker-compose.yml`
+- nginx 配置文件
 
-**已知问题**：
-- 数据库字段已补齐：`heartRate`、`eGFR`、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV、医生配置他克莫司目标范围。
-- 移植风险逻辑目前在 `Dashboard.tsx` 中，后续建议抽成独立规则模块。
-- **下一步**：把移植风险规则抽离成独立模块，并把新字段接入 Dashboard、健康洞察和 PDF 报告的摘要逻辑。
+**验收标准**：
+- 域名 HTTPS 可访问前端。
+- SPA 刷新任意路由不 404。
+- `/api/auth/verification-code` 等 API 正常。
+- 浏览器无 mixed content。
+- 必须记录实际生产配置路径、验证命令和回滚步骤。
 
 ### 开放待办 (按优先级)
 
@@ -78,7 +74,8 @@
 | 10 | P2 | **检查报告到期提醒** | 基于用户类型和上次检查日期，智能提醒复查时间 | ❌ 未开始 |
 | 11 | P2 | **商业化付费功能** | 内测通过后实施。完整方案见 `docs/billing-plan.md`。 | ❌ 未开始 |
 | 12 | P2 | ~~心率正式字段~~ | ✅ 已完成（2026-05-30）：Prisma 增加 `heartRate`，新记录优先写正式字段，旧 notes 心率继续兜底展示。 | ✅ 已完成 |
-| 13 | P1 | **肾移植风险规则抽离** | 字段基础已完成（eGFR、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV、他克莫司医生目标范围）；下一步抽离规则模块并接入报告。 | ❌ 未开始 |
+| 13 | P1 | ~~肾移植风险规则抽离~~ | ✅ 已完成（2026-05-30）：前后端规则模块已抽离，并接入 Dashboard、HealthInsights、预警和 PDF 医生摘要。 | ✅ 已完成 |
+| 14 | P1 | ~~预警动作化~~ | ✅ 已完成（2026-05-30）：Dashboard/Alerts 支持查看记录、查看用药、生成报告、标为已读。 | ✅ 已完成 |
 
 ---
 

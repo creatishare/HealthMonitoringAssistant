@@ -19,6 +19,10 @@ import {
   generateOverallSummary,
   generateSummaryInsights,
 } from './summaryGenerator'
+import {
+  analyzeTransplantRisk,
+  transplantRiskToInsightSeverity,
+} from '../transplantRisk/rules'
 
 /**
  * 将原始记录转换为指标时间序列
@@ -136,10 +140,31 @@ export function generateInsightReport(input: AnalysisInput, periodDays = 14): In
   // 5. 生成整体摘要
   const summary = generateOverallSummary(trends, anomalyInsights, adherence, dailyCompleteness, periodDays)
   const summaryInsights = generateSummaryInsights(summary, hasCritical)
+  const transplantRisk = input.userType === 'kidney_transplant' || input.hasTransplant
+    ? analyzeTransplantRisk({
+      userType: input.userType,
+      hasTransplant: input.hasTransplant,
+      transplantDate: input.transplantDate,
+      baselineCreatinine: input.baselineCreatinine,
+      tacrolimusTargetMin: input.tacrolimusTargetMin,
+      tacrolimusTargetMax: input.tacrolimusTargetMax,
+      records: input.records,
+    })
+    : null
+  const transplantInsights: HealthInsight[] = transplantRisk
+    ? [{
+      type: 'transplant',
+      severity: transplantRiskToInsightSeverity(transplantRisk.level),
+      title: transplantRisk.title,
+      content: `${transplantRisk.message}${transplantRisk.suggestedAction ? ` ${transplantRisk.suggestedAction}` : ''}`,
+      disclaimer: transplantRisk.disclaimer,
+    }]
+    : []
 
   // 6. 组装报告：摘要 → 异常 → 用药 → 趋势
   const insights: HealthInsight[] = [
     ...summaryInsights,
+    ...transplantInsights,
     ...anomalyInsights,
     ...adherenceInsights,
     ...trendInsights,

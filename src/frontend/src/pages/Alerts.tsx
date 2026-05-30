@@ -1,17 +1,24 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, AlertTriangle, CheckCircle, Info, Trash2 } from 'lucide-react'
+import { ChevronLeft, AlertTriangle, CheckCircle, Info, Trash2, FileText, ClipboardList, Pill } from 'lucide-react'
 import { alertApi } from '../services/api'
+import { getAlertActions, type AlertAction, type AlertActionSource } from '../services/alertActions'
+import { downloadFollowUpReport, getApiErrorMessage } from '../services/reportDownload'
 import { formatAppMonthDayTime } from '../utils/appDate'
 import toast from 'react-hot-toast'
 
 interface Alert {
   id: string
   level: 'critical' | 'warning' | 'info'
+  type?: 'metric' | 'medication' | 'system' | string
   message: string
   suggestion?: string
   isRead: boolean
   createdAt: string
+  recordId?: string | null
+  metric?: string | null
+  medicationId?: string | null
+  medicationLogId?: string | null
 }
 
 const levelConfig = {
@@ -44,11 +51,19 @@ const levelConfig = {
   },
 }
 
+const actionIcons = {
+  record: ClipboardList,
+  medication: Pill,
+  report: FileText,
+  read: CheckCircle,
+}
+
 export default function Alerts() {
   const navigate = useNavigate()
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [unreadCount, setUnreadCount] = useState({ critical: 0, warning: 0, info: 0, total: 0 })
   const [loading, setLoading] = useState(false)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
   const hasReadAlerts = alerts.some((alert) => alert.isRead)
 
   useEffect(() => {
@@ -74,16 +89,6 @@ export default function Alerts() {
       setUnreadCount(response.data)
     } catch (error) {
       console.error('获取未读数量失败')
-    }
-  }
-
-  const handleMarkAsRead = async (id: string) => {
-    try {
-      await alertApi.markAsRead(id)
-      fetchAlerts()
-      fetchUnreadCount()
-    } catch (error) {
-      toast.error('操作失败')
     }
   }
 
@@ -118,6 +123,30 @@ export default function Alerts() {
       fetchUnreadCount()
     } catch (error) {
       toast.error('删除已读消息失败')
+    }
+  }
+
+  const handleAlertAction = async (alert: AlertActionSource, action: AlertAction) => {
+    if (action.kind === 'record' || action.kind === 'medication') {
+      navigate(action.to)
+      return
+    }
+
+    setActionLoading(`${alert.id}:${action.kind}`)
+    try {
+      if (action.kind === 'report') {
+        await downloadFollowUpReport()
+        toast.success('报告已生成')
+      } else {
+        await alertApi.markAsRead(alert.id)
+        toast.success('已标记为已读')
+        await Promise.all([fetchAlerts(), fetchUnreadCount()])
+      }
+    } catch (error) {
+      const fallback = action.kind === 'report' ? '报告生成失败，请稍后重试' : '操作失败'
+      toast.error(await getApiErrorMessage(error, fallback))
+    } finally {
+      setActionLoading(null)
     }
   }
 
@@ -187,6 +216,7 @@ export default function Alerts() {
           {alerts.map((alert) => {
             const config = levelConfig[alert.level]
             const Icon = config.icon
+            const actions = getAlertActions(alert)
 
             return (
               <div
@@ -210,19 +240,26 @@ export default function Alerts() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t border-gray-border/50">
-                  {!alert.isRead && (
-                    <button
-                      onClick={() => handleMarkAsRead(alert.id)}
-                      className="text-small text-primary flex items-center gap-1"
-                    >
-                      <CheckCircle size={14} />
-                      标记已读
-                    </button>
-                  )}
+                <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-gray-border/50 pt-3">
+                  {actions.map((action) => {
+                    const ActionIcon = actionIcons[action.kind]
+                    const loadingKey = `${alert.id}:${action.kind}`
+                    return (
+                      <button
+                        key={action.kind}
+                        type="button"
+                        onClick={() => handleAlertAction(alert, action)}
+                        disabled={actionLoading === loadingKey}
+                        className="inline-flex h-9 items-center gap-1.5 rounded-full border border-gray-border bg-gray-card px-3 text-small font-medium text-gray-text-primary disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <ActionIcon size={14} />
+                        {actionLoading === loadingKey ? '处理中' : action.label}
+                      </button>
+                    )
+                  })}
                   <button
                     onClick={() => handleDelete(alert.id)}
-                    className="flex items-center gap-1 text-small text-gray-text-secondary"
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-small text-gray-text-secondary"
                   >
                     <Trash2 size={14} />
                     删除
