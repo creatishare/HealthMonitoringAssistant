@@ -7,6 +7,7 @@ import { getHealthRecords, getRecentMetrics } from './health-record.service';
 import { getTodayMedications } from './medication.service';
 import { getUserProfile } from './user.service';
 import logger from '../utils/logger';
+import { getAppDateString, getDateOnlyValue } from '../utils/app-date';
 
 interface ReportMetric {
   key: string;
@@ -290,8 +291,8 @@ function setupPdfFonts(doc: PDFKit.PDFDocument) {
 }
 
 function validateDateRange(startDate: string, endDate: string) {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = getDateOnlyValue(startDate);
+  const end = getDateOnlyValue(endDate);
 
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
     throw new ApiError('日期格式无效', 400, '00002');
@@ -668,7 +669,7 @@ export async function buildFollowUpReportData(
       level: alert.level,
       message: alert.message,
       suggestion: alert.suggestion,
-      createdAt: alert.createdAt.toISOString().split('T')[0],
+      createdAt: getAppDateString(alert.createdAt),
     })),
     medications: todayMedications.medications,
     records: recordsResult.list,

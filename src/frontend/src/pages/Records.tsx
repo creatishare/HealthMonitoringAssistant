@@ -15,6 +15,7 @@ import {
   Upload,
 } from 'lucide-react'
 import { healthRecordApi } from '../services/api'
+import { formatShortAppDate, getAppDateString } from '../utils/appDate'
 import toast from 'react-hot-toast'
 
 type RecordMode = 'daily' | 'lab'
@@ -57,7 +58,7 @@ const labFields = [
 
 function createInitialForm() {
   return {
-    recordDate: new Date().toISOString().split('T')[0],
+    recordDate: getAppDateString(),
     weight: '',
     urineVolume: '',
     bloodPressureSystolic: '',
@@ -73,8 +74,7 @@ function createInitialForm() {
 }
 
 function formatShortDate(dateStr: string) {
-  const date = new Date(dateStr)
-  return `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`
+  return formatShortAppDate(dateStr)
 }
 
 function getRecordType(record: HealthRecord) {

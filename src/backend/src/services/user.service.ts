@@ -1,6 +1,7 @@
 import prisma from '../config/database';
 import { DialysisType, PrimaryDisease, Gender, UserType } from '@prisma/client';
 import { AppError } from '../utils/errors';
+import { formatDateOnly, getDateOnlyValue } from '../utils/app-date';
 
 interface UserProfileUpdateInput {
   name?: string;
@@ -37,7 +38,7 @@ export async function getUserProfile(userId: string) {
     phone: user.phone,
     name: user.profile?.name,
     gender: user.profile?.gender,
-    birthDate: user.profile?.birthDate?.toISOString().split('T')[0],
+    birthDate: formatDateOnly(user.profile?.birthDate),
     height: user.profile?.height,
     currentWeight: user.profile?.currentWeight,
     userType: user.profile?.userType,
@@ -45,10 +46,10 @@ export async function getUserProfile(userId: string) {
     dialysisType: user.profile?.dialysisType,
     dryWeight: user.profile?.dryWeight,
     baselineCreatinine: user.profile?.baselineCreatinine,
-    diagnosisDate: user.profile?.diagnosisDate?.toISOString().split('T')[0],
+    diagnosisDate: formatDateOnly(user.profile?.diagnosisDate),
     primaryDisease: user.profile?.primaryDisease,
     hasTransplant: user.profile?.hasTransplant,
-    transplantDate: user.profile?.transplantDate?.toISOString().split('T')[0],
+    transplantDate: formatDateOnly(user.profile?.transplantDate),
     createdAt: user.createdAt,
     updatedAt: user.profile?.updatedAt,
   };
@@ -66,9 +67,9 @@ export async function updateUserProfile(userId: string, data: UserProfileUpdateI
 
   const profileData: Record<string, unknown> = {
     ...data,
-    birthDate: data.birthDate ? new Date(data.birthDate) : undefined,
-    diagnosisDate: data.diagnosisDate ? new Date(data.diagnosisDate) : undefined,
-    transplantDate: data.transplantDate ? new Date(data.transplantDate) : undefined,
+    birthDate: data.birthDate ? getDateOnlyValue(data.birthDate) : undefined,
+    diagnosisDate: data.diagnosisDate ? getDateOnlyValue(data.diagnosisDate) : undefined,
+    transplantDate: data.transplantDate ? getDateOnlyValue(data.transplantDate) : undefined,
   };
 
   Object.keys(profileData).forEach((key) => {

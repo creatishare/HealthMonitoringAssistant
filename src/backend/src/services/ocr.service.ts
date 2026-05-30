@@ -2,6 +2,7 @@ import prisma from '../config/database';
 import { AppError } from '../utils/errors';
 import logger from '../utils/logger';
 import { recognizeText, imageFileToBase64, isOCRConfigValid } from '../utils/baiduOcr';
+import { formatDateOnly, getAppDateString, getDateOnlyValue } from '../utils/app-date';
 import path from 'path';
 import fs from 'fs';
 
@@ -147,7 +148,7 @@ export async function recognizeImage(userId: string, imageId: string): Promise<O
       rawText,
       extracted,
       lowConfidence,
-      recordDate: date || new Date().toISOString().split('T')[0],
+      recordDate: date || getAppDateString(),
       hospital: hospital || undefined,
     };
 
@@ -166,7 +167,7 @@ export async function recognizeImage(userId: string, imageId: string): Promise<O
           (acc, [key, data]) => ({ ...acc, [key]: data.confidence }),
           {}
         ),
-        reportDate: result.recordDate ? new Date(result.recordDate) : null,
+        reportDate: result.recordDate ? getDateOnlyValue(result.recordDate) : null,
         hospital: result.hospital,
       },
     });
@@ -209,7 +210,7 @@ export async function confirmOCRResult(
   const healthRecord = await prisma.healthRecord.create({
     data: {
       userId,
-      recordDate: new Date(data.recordDate),
+      recordDate: getDateOnlyValue(data.recordDate),
       creatinine: data.extractedData.creatinine,
       urea: data.extractedData.urea,
       potassium: data.extractedData.potassium,
@@ -237,7 +238,7 @@ export async function confirmOCRResult(
 
   return {
     recordId: healthRecord.id,
-    recordDate: healthRecord.recordDate.toISOString().split('T')[0],
+    recordDate: formatDateOnly(healthRecord.recordDate),
   };
 }
 
@@ -258,7 +259,7 @@ export async function getOCRResult(userId: string, imageId: string) {
     ocrResult: report.ocrResult,
     extractedData: report.extractedData,
     confidenceScores: report.confidenceScores,
-    reportDate: report.reportDate?.toISOString().split('T')[0],
+    reportDate: formatDateOnly(report.reportDate),
     hospital: report.hospital,
   };
 }

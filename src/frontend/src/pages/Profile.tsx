@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { reportApi, userApi } from '../services/api'
+import { getAppDateWindow, getDaysSinceAppDate } from '../utils/appDate'
 import toast from 'react-hot-toast'
 
 interface UserProfile {
@@ -57,21 +58,11 @@ function formatDate(date?: string) {
 }
 
 function getDaysSince(date?: string) {
-  if (!date) return null
-  const start = new Date(date)
-  if (Number.isNaN(start.getTime())) return null
-  return Math.max(0, Math.floor((Date.now() - start.getTime()) / (1000 * 60 * 60 * 24)))
+  return getDaysSinceAppDate(date)
 }
 
 function getReportDateRange() {
-  const end = new Date()
-  const start = new Date(end)
-  start.setDate(start.getDate() - 30)
-
-  return {
-    startDate: start.toISOString().split('T')[0],
-    endDate: end.toISOString().split('T')[0],
-  }
+  return getAppDateWindow(30)
 }
 
 function downloadBlob(blob: Blob, filename: string) {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, Camera } from 'lucide-react'
 import { healthRecordApi } from '../services/api'
+import { getAppDateString } from '../utils/appDate'
 import toast from 'react-hot-toast'
 
 type QuickType = 'weight' | 'bloodPressure' | 'urineVolume' | null
@@ -15,7 +16,7 @@ export default function RecordForm() {
   const isQuick = Boolean(quickType) && !isEdit
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
-    recordDate: new Date().toISOString().split('T')[0],
+    recordDate: getAppDateString(),
     creatinine: '',
     urea: '',
     potassium: '',
@@ -44,7 +45,7 @@ export default function RecordForm() {
       const response: any = await healthRecordApi.getById(recordId)
       const record = response.data || response
       setFormData({
-        recordDate: record.recordDate || new Date().toISOString().split('T')[0],
+        recordDate: record.recordDate || getAppDateString(),
         creatinine: record.creatinine != null ? String(record.creatinine) : '',
         urea: record.urea != null ? String(record.urea) : '',
         potassium: record.potassium != null ? String(record.potassium) : '',

@@ -2,6 +2,14 @@ import prisma from '../config/database';
 import { DrugType, SamplingTime } from '@prisma/client';
 import { AppError } from '../utils/errors';
 import logger from '../utils/logger';
+import {
+  addAppDays,
+  formatDateOnly,
+  getAppDateString,
+  getAppDateTime,
+  getAppTimeString,
+  getDateOnlyValue,
+} from '../utils/app-date';
 
 // 参考值范围定义
 const REFERENCE_RANGES: Record<DrugType, Record<SamplingTime, [number, number] | undefined>> = {
@@ -50,8 +58,8 @@ export async function getDrugConcentrations(
 
   if (startDate || endDate) {
     where.recordDate = {};
-    if (startDate) where.recordDate.gte = new Date(startDate);
-    if (endDate) where.recordDate.lte = new Date(endDate);
+    if (startDate) where.recordDate.gte = getDateOnlyValue(startDate);
+    if (endDate) where.recordDate.lte = getDateOnlyValue(endDate);
   }
 
   const [records, total] = await Promise.all([
@@ -67,7 +75,7 @@ export async function getDrugConcentrations(
   return {
     list: records.map((record) => ({
       ...record,
-      recordDate: record.recordDate.toISOString().split('T')[0],
+      recordDate: formatDateOnly(record.recordDate),
       referenceRange: [record.referenceRangeMin, record.referenceRangeMax],
     })),
     pagination: {
@@ -106,7 +114,7 @@ export async function createDrugConcentration(
   const record = await prisma.drugConcentrationRecord.create({
     data: {
       userId,
-      recordDate: new Date(data.recordDate),
+      recordDate: getDateOnlyValue(data.recordDate),
       drugType: data.drugType,
       drugName: data.drugName,
       concentration: data.concentration,
@@ -124,7 +132,7 @@ export async function createDrugConcentration(
 
   return {
     ...record,
-    recordDate: record.recordDate.toISOString().split('T')[0],
+    recordDate: formatDateOnly(record.recordDate),
     referenceRange: [record.referenceRangeMin, record.referenceRangeMax],
   };
 }
@@ -141,8 +149,8 @@ export async function getDrugConcentrationTrends(
       userId,
       drugType,
       recordDate: {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
+        gte: getDateOnlyValue(startDate),
+        lte: getDateOnlyValue(endDate),
       },
     },
     orderBy: { recordDate: 'asc' },
@@ -163,8 +171,8 @@ export async function getDrugConcentrationTrends(
     where: {
       userId,
       scheduledTime: {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
+        gte: getAppDateTime(startDate, 0, 0),
+        lt: getAppDateTime(addAppDays(endDate, 1), 0, 0),
       },
     },
     include: {
@@ -178,17 +186,17 @@ export async function getDrugConcentrationTrends(
     drugName,
     referenceRange,
     concentrations: records.map((record) => ({
-      date: record.recordDate.toISOString().split('T')[0],
+      date: formatDateOnly(record.recordDate),
       value: record.concentration,
       samplingTime: record.samplingTime,
       isInRange: record.isInRange,
     })),
     medicationLogs: medicationLogs.map((log) => ({
-      date: log.scheduledTime.toISOString().split('T')[0],
+      date: getAppDateString(log.scheduledTime),
       status: log.status,
-      scheduledTime: log.scheduledTime.toISOString().split('T')[1].substring(0, 5),
+      scheduledTime: getAppTimeString(log.scheduledTime),
       actualTime: log.actualTime
-        ? log.actualTime.toISOString().split('T')[1].substring(0, 5)
+        ? getAppTimeString(log.actualTime)
         : undefined,
     })),
   };

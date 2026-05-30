@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft, Calendar, Edit, Trash2 } from 'lucide-react'
 import { healthRecordApi } from '../services/api'
+import { formatAppChineseDate } from '../utils/appDate'
 import toast from 'react-hot-toast'
 
 interface HealthRecord {
@@ -77,8 +78,7 @@ export default function RecordDetail() {
   }
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr)
-    return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
+    return formatAppChineseDate(dateStr)
   }
 
   if (loading) {

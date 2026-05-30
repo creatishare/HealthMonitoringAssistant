@@ -1,16 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import * as reportService from '../services/report.service';
 import { ApiError } from '../middleware/error.middleware';
+import { getAppDateWindow } from '../utils/app-date';
 
 function getDefaultDateRange() {
-  const end = new Date();
-  const start = new Date(end);
-  start.setDate(start.getDate() - 30);
-
-  return {
-    startDate: start.toISOString().split('T')[0],
-    endDate: end.toISOString().split('T')[0],
-  };
+  return getAppDateWindow(30);
 }
 
 export async function downloadFollowUpReport(req: Request, res: Response, next: NextFunction) {

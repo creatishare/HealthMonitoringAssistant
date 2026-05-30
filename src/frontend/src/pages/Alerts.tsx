@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, AlertTriangle, CheckCircle, Info, Trash2 } from 'lucide-react'
 import { alertApi } from '../services/api'
+import { formatAppMonthDayTime } from '../utils/appDate'
 import toast from 'react-hot-toast'
 
 interface Alert {
@@ -121,10 +122,7 @@ export default function Alerts() {
   }
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr)
-    return `${date.getMonth() + 1}月${date.getDate()}日 ${date.getHours()}:${String(
-      date.getMinutes()
-    ).padStart(2, '0')}`
+    return formatAppMonthDayTime(dateStr)
   }
 
   return (

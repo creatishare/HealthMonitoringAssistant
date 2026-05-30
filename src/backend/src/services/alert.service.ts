@@ -2,32 +2,10 @@ import prisma from '../config/database';
 import { AlertLevel, AlertType, HealthRecord, DrugConcentrationRecord, MedicationFrequency } from '@prisma/client';
 import { AppError } from '../utils/errors';
 import logger from '../utils/logger';
+import { getAppDateString, getAppDateTime } from '../utils/app-date';
 
-const APP_TIME_ZONE = 'Asia/Shanghai';
-const APP_TIME_ZONE_OFFSET = '+08:00';
 const MISSED_MEDICATION_GRACE_MINUTES = 30;
 const MEDICATION_ALERT_DISMISSED_MARKER = '[medication-alert-dismissed]';
-
-function getAppDateString(date = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: APP_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-
-  const year = parts.find((part) => part.type === 'year')?.value;
-  const month = parts.find((part) => part.type === 'month')?.value;
-  const day = parts.find((part) => part.type === 'day')?.value;
-
-  return `${year}-${month}-${day}`;
-}
-
-function getAppDateTime(date: string, hours: number, minutes: number) {
-  const hourText = hours.toString().padStart(2, '0');
-  const minuteText = minutes.toString().padStart(2, '0');
-  return new Date(`${date}T${hourText}:${minuteText}:00.000${APP_TIME_ZONE_OFFSET}`);
-}
 
 function shouldTakeMedicationToday(
   frequency: MedicationFrequency,

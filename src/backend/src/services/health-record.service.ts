@@ -2,6 +2,7 @@ import prisma from '../config/database';
 import { RecordSource } from '@prisma/client';
 import { AppError } from '../utils/errors';
 import logger from '../utils/logger';
+import { formatDateOnly, getDateOnlyValue } from '../utils/app-date';
 
 // 获取健康记录列表
 export async function getHealthRecords(
@@ -20,8 +21,8 @@ export async function getHealthRecords(
 
   if (startDate || endDate) {
     where.recordDate = {};
-    if (startDate) where.recordDate.gte = new Date(startDate);
-    if (endDate) where.recordDate.lte = new Date(endDate);
+    if (startDate) where.recordDate.gte = getDateOnlyValue(startDate);
+    if (endDate) where.recordDate.lte = getDateOnlyValue(endDate);
   }
 
   // 如果指定了指标，只查询该指标不为空的记录
@@ -42,7 +43,7 @@ export async function getHealthRecords(
   return {
     list: records.map((record) => ({
       ...record,
-      recordDate: record.recordDate.toISOString().split('T')[0],
+      recordDate: formatDateOnly(record.recordDate),
     })),
     pagination: {
       page,
@@ -65,7 +66,7 @@ export async function getHealthRecordById(userId: string, recordId: string) {
 
   return {
     ...record,
-    recordDate: record.recordDate.toISOString().split('T')[0],
+    recordDate: formatDateOnly(record.recordDate),
   };
 }
 
@@ -94,7 +95,7 @@ export async function createHealthRecord(
   const record = await prisma.healthRecord.create({
     data: {
       userId,
-      recordDate: new Date(data.recordDate),
+      recordDate: getDateOnlyValue(data.recordDate),
       creatinine: data.creatinine,
       urea: data.urea,
       potassium: data.potassium,
@@ -117,7 +118,7 @@ export async function createHealthRecord(
 
   return {
     ...record,
-    recordDate: record.recordDate.toISOString().split('T')[0],
+    recordDate: formatDateOnly(record.recordDate),
   };
 }
 
@@ -154,7 +155,7 @@ export async function updateHealthRecord(
 
   const updateData: any = { ...data };
   if (data.recordDate) {
-    updateData.recordDate = new Date(data.recordDate);
+    updateData.recordDate = getDateOnlyValue(data.recordDate);
   }
 
   const record = await prisma.healthRecord.update({
@@ -166,7 +167,7 @@ export async function updateHealthRecord(
 
   return {
     ...record,
-    recordDate: record.recordDate.toISOString().split('T')[0],
+    recordDate: formatDateOnly(record.recordDate),
   };
 }
 
@@ -199,8 +200,8 @@ export async function getTrends(
     where: {
       userId,
       recordDate: {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
+        gte: getDateOnlyValue(startDate),
+        lte: getDateOnlyValue(endDate),
       },
       OR: metrics.map((metric) => ({ [metric]: { not: null } })),
     },
@@ -216,7 +217,7 @@ export async function getTrends(
     startDate,
     endDate,
     data: records.map((record) => ({
-      date: record.recordDate.toISOString().split('T')[0],
+      date: formatDateOnly(record.recordDate),
       ...metrics.reduce((acc, metric) => {
         const value = (record as any)[metric];
         if (value !== null && value !== undefined) {
@@ -262,7 +263,7 @@ export async function getRecentMetrics(userId: string, limit: number = 4) {
         name,
         value,
         unit,
-        date: (record.recordDate instanceof Date ? record.recordDate : new Date(record.recordDate as unknown as string)).toISOString().split('T')[0],
+        date: formatDateOnly((record as Record<string, any>).recordDate),
       });
     }
 

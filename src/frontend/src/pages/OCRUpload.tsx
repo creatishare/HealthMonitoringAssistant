@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, CheckCircle, Trash2, AlertTriangle, Upload, Loader2 } from 'lucide-react'
 import { ocrApi } from '../services/api'
+import { getAppDateString } from '../utils/appDate'
 import toast from 'react-hot-toast'
 
 interface OCRResult {
@@ -34,7 +35,7 @@ export default function OCRUpload() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [images, setImages] = useState<ImageItem[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
-  const [recordDate, setRecordDate] = useState(new Date().toISOString().split('T')[0])
+  const [recordDate, setRecordDate] = useState(getAppDateString())
   const [formData, setFormData] = useState<Record<string, string>>({
     creatinine: '',
     urea: '',

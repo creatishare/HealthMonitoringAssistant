@@ -4,6 +4,7 @@ import { ArrowLeft, AlertTriangle, AlertCircle, Info, Pill, TrendingUp, ShieldAl
 import { useAuthStore } from '../stores/authStore'
 import { healthRecordApi, medicationApi } from '../services/api'
 import { generateInsightReport, type InsightReport, type HealthInsight } from '../services/insights/engine'
+import { getAppDateString, getAppDateWindow } from '../utils/appDate'
 import toast from 'react-hot-toast'
 
 const ICONS: Record<HealthInsight['severity'], typeof Info> = {
@@ -29,10 +30,7 @@ export default function HealthInsightsPage() {
   const fetchData = async () => {
     setLoading(true)
     try {
-      const endDate = new Date().toISOString().split('T')[0]
-      const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split('T')[0]
+      const { startDate, endDate } = getAppDateWindow(30)
 
       const [recordsRes, logsRes] = await Promise.all([
         healthRecordApi.getList({ startDate, endDate }),
@@ -51,7 +49,7 @@ export default function HealthInsightsPage() {
           medicationLogs: logs.map((l: any) => ({
             medicationId: l.medicationId ?? l.id ?? 'unknown',
             name: l.medication?.name ?? l.name ?? '未知药物',
-            date: l.scheduledTime ? l.scheduledTime.split('T')[0] : endDate,
+            date: l.scheduledTime ? getAppDateString(new Date(l.scheduledTime)) : endDate,
             status: l.status,
             scheduledTime: l.scheduledTime ?? '08:00',
           })),

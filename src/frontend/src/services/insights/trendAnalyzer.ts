@@ -1,5 +1,6 @@
 import type { MetricKey, MetricValue, TrendResult } from './types'
 import { getReferenceRange } from './referenceRanges'
+import { addAppDays, getAppDateString } from '../../utils/appDate'
 
 function toFixed2(n: number | null): number | null {
   if (n === null || Number.isNaN(n)) return null
@@ -52,9 +53,7 @@ export function analyzeTrend(
     }
   }
 
-  const cutoff = new Date()
-  cutoff.setDate(cutoff.getDate() - daysWindow)
-  const cutoffStr = cutoff.toISOString().split('T')[0]
+  const cutoffStr = addAppDays(getAppDateString(), -daysWindow)
 
   const windowed = sorted.filter((v) => v.date >= cutoffStr)
   const useData = windowed.length >= 2 ? windowed : sorted.slice(-2)

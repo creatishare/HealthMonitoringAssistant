@@ -1,6 +1,6 @@
 # Next Agent 待办清单
 
-> 更新时间：2026-05-29
+> 更新时间：2026-05-30
 >
 > 目的：把近期优化规划拆成可以逐项完成的小任务。后续 agent 不要一次性开启所有任务；每次只选择一个任务，读对应文件，完成、验证、记录后再进入下一项。
 
@@ -26,15 +26,14 @@
 
 ## 推荐执行顺序
 
-1. P1-07 日期/时区工具统一
-2. P1-08 健康记录输入校验与趋势指标白名单
-3. P1-01 健康洞察接入日常数据
-4. P1-02 统一健康记录录入体验
-5. P1-03 移植用户个人基线引导
-6. P1-04 健康记录字段扩展 migration
-7. P1-05 移植风险规则抽离与报告接入
-8. P1-06 预警动作化
-9. P0-02 HTTPS 与域名生产化
+1. P1-08 健康记录输入校验与趋势指标白名单
+2. P1-01 健康洞察接入日常数据
+3. P1-02 统一健康记录录入体验
+4. P1-03 移植用户个人基线引导
+5. P1-04 健康记录字段扩展 migration
+6. P1-05 移植风险规则抽离与报告接入
+7. P1-06 预警动作化
+8. P0-02 HTTPS 与域名生产化
 
 ---
 
@@ -70,13 +69,15 @@
 
 **完成记录**：2026-05-29 已修复。`src/backend/src/middleware/security.middleware.ts` 的 `createRateLimiter()` 在生产环境改用 Redis Lua 脚本原子执行 `INCR + PTTL/PEXPIRE` 固定窗口限流，key 使用 SHA-256 后缀避免明文手机号/IP 入 key；开发环境保留内存 Map。生产 Redis 不可用时返回 503，不静默放行或回退。`cd src/backend && npm run build` 通过；smoke test 确认开发环境第三次请求返回 429、生产 Redis 不可用时返回 503。
 
-### P1-07 日期/时区工具统一
+### P1-07 日期/时区工具统一 — 已完成
 
 **问题**：用药模块使用 `Asia/Shanghai` 日期工具，但 Dashboard 今日打卡、趋势查询和部分前端页面仍使用 `new Date().toISOString().split('T')[0]`，午夜边界容易查错日期。
 
 **建议**：前后端都抽共享的应用日期工具，健康记录、Dashboard、趋势、用药统计统一按应用时区取日界线。
 
 **验收标准**：Asia/Shanghai 午夜前后，今日打卡、趋势、用药计划日期一致。
+
+**完成记录**：2026-05-29 已修复。后端新增 `src/backend/src/utils/app-date.ts`，前端新增 `src/frontend/src/utils/appDate.ts`；Dashboard 今日打卡、报告默认区间、趋势查询、健康洞察、OCR/健康记录默认日期、用药统计和部分日期展示均改为应用时区。`cd src/backend && npm run build`、`cd src/frontend && npm run build` 通过；smoke test 确认 UTC 16:00 前后会按 Asia/Shanghai 切换应用日期。
 
 ### P1-08 健康记录输入校验与趋势指标白名单
 

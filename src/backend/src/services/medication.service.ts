@@ -2,46 +2,7 @@ import prisma from '../config/database';
 import { MedicationFrequency } from '@prisma/client';
 import { AppError } from '../utils/errors';
 import logger from '../utils/logger';
-
-const APP_TIME_ZONE = 'Asia/Shanghai';
-const APP_TIME_ZONE_OFFSET = '+08:00';
-
-function getAppDateString(date = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: APP_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-
-  const year = parts.find((part) => part.type === 'year')?.value;
-  const month = parts.find((part) => part.type === 'month')?.value;
-  const day = parts.find((part) => part.type === 'day')?.value;
-
-  return `${year}-${month}-${day}`;
-}
-
-function getAppDateTime(date: string, hours: number, minutes: number) {
-  const hourText = hours.toString().padStart(2, '0');
-  const minuteText = minutes.toString().padStart(2, '0');
-  return new Date(`${date}T${hourText}:${minuteText}:00.000${APP_TIME_ZONE_OFFSET}`);
-}
-
-function addAppDays(date: string, days: number) {
-  const value = getAppDateTime(date, 0, 0);
-  value.setUTCDate(value.getUTCDate() + days);
-  return getAppDateString(value);
-}
-
-function getAppDateRange(date = getAppDateString()) {
-  const tomorrow = addAppDays(date, 1);
-
-  return {
-    date,
-    start: getAppDateTime(date, 0, 0),
-    end: getAppDateTime(tomorrow, 0, 0),
-  };
-}
+import { addAppDays, getAppDateRange, getAppDateString, getAppDateTime } from '../utils/app-date';
 
 // 获取用药列表
 export async function getMedications(userId: string, status?: string) {
@@ -461,10 +422,8 @@ export async function getMedicationStatistics(
   startDate: string,
   endDate: string
 ) {
-  const start = new Date(startDate);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(endDate);
-  end.setHours(23, 59, 59, 999);
+  const start = getAppDateTime(startDate, 0, 0);
+  const end = getAppDateTime(addAppDays(endDate, 1), 0, 0);
 
   // 总体统计
   const overallStats = await prisma.medicationLog.groupBy({
@@ -473,7 +432,7 @@ export async function getMedicationStatistics(
       userId,
       scheduledTime: {
         gte: start,
-        lte: end,
+        lt: end,
       },
     },
     _count: {
@@ -493,7 +452,7 @@ export async function getMedicationStatistics(
       userId,
       scheduledTime: {
         gte: start,
-        lte: end,
+        lt: end,
       },
     },
     _count: {

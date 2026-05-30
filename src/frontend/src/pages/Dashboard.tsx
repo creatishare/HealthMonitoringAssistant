@@ -4,6 +4,11 @@ import { Plus, Bell, AlertTriangle, ChevronRight, Clock, TrendingUp, Sparkles } 
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
 import { useDashboardStore, type UserType, type PrimaryDisease } from '../stores/dashboardStore'
 import { healthRecordApi, medicationApi } from '../services/api'
+import {
+  getAppDateWindow,
+  getFallbackScheduledAtForAppDate,
+  getMillisecondsUntilNextAppDay,
+} from '../utils/appDate'
 import toast from 'react-hot-toast'
 
 interface TrendData {
@@ -208,37 +213,8 @@ function getRiskToneClass(tone: 'green' | 'yellow' | 'red' | 'gray') {
   }
 }
 
-function getAppDateString(date = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date)
-
-  const year = parts.find((part) => part.type === 'year')?.value
-  const month = parts.find((part) => part.type === 'month')?.value
-  const day = parts.find((part) => part.type === 'day')?.value
-
-  return `${year}-${month}-${day}`
-}
-
-function getFallbackScheduledAt(scheduledTime: string) {
-  const [hours, minutes] = scheduledTime.split(':').map(Number)
-  const [year, month, day] = getAppDateString().split('-').map(Number)
-  // 兼容未返回 scheduledAt 的旧后端：旧逻辑用 UTC 日期中的同一时刻匹配日志。
-  return new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0)).toISOString()
-}
-
 function getScheduledAt(med: TodayMedication) {
-  return med.scheduledAt || getFallbackScheduledAt(med.scheduledTime)
-}
-
-function getMillisecondsUntilNextDay() {
-  const now = new Date()
-  const nextDay = new Date(now)
-  nextDay.setHours(24, 0, 5, 0)
-  return nextDay.getTime() - now.getTime()
+  return med.scheduledAt || getFallbackScheduledAtForAppDate(med.scheduledTime)
 }
 
 export default function Dashboard() {
@@ -282,7 +258,7 @@ export default function Dashboard() {
       timeoutId = setTimeout(() => {
         refreshDashboard()
         scheduleNextDayRefresh()
-      }, getMillisecondsUntilNextDay())
+      }, getMillisecondsUntilNextAppDay())
     }
 
     const handleVisibilityChange = () => {
@@ -312,10 +288,7 @@ export default function Dashboard() {
   const fetchTrendData = async (signal?: AbortSignal) => {
     setTrendLoading(true)
     try {
-      const endDate = new Date().toISOString().split('T')[0]
-      const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split('T')[0]
+      const { startDate, endDate } = getAppDateWindow(30)
 
       const allMetricKeys = ALL_METRICS.map((m) => m.key).join(',')
       const response: any = await healthRecordApi.getTrends(

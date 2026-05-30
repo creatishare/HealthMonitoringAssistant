@@ -5,7 +5,114 @@
 
 ---
 
-## 2026-05-29 — 代码审计待办补充 + OCR 所有权修复 + Refresh Token 加固 + Redis 验证码/限流
+## 2026-05-30 — 会话交接：日期/时区统一待本地复测与提交
+
+### 当前 Git 状态
+
+- 当前分支：`main`
+- 最新已提交 commit：
+  - `92b81ef fix: use redis for auth rate limits`
+  - `6dff686 fix: store verification codes in redis`
+  - `2817e5a fix: harden refresh token rotation`
+- 当前仍有**未提交改动**，全部属于 `P1-07 日期/时区工具统一`，不是用户的无关改动，后续 agent 不要回滚。
+
+### 未提交改动范围（P1-07）
+
+1. **新增统一日期工具**
+   - `src/backend/src/utils/app-date.ts`
+     - 应用时区：`Asia/Shanghai`
+     - 提供应用日期、应用时间点、应用日期窗口、`@db.Date` date-only 值、首页展示日期等工具。
+     - 特别区分：
+       - `getAppDateTime()`：用于真实时间点，带 `+08:00`。
+       - `getDateOnlyValue()` / `getDateOnlyRange()`：用于 Prisma `@db.Date` 字段，存 UTC 零点 date-only，避免把 `+08:00` 时间点误写入 date-only 字段。
+   - `src/frontend/src/utils/appDate.ts`
+     - 提供前端应用日期、日期窗口、跨应用午夜刷新、旧后端 `scheduledAt` 兜底、日期展示等工具。
+
+2. **后端改动**
+   - `src/backend/src/services/medication.service.ts`
+     - 复用统一应用日期工具。
+     - 用药统计按 Asia/Shanghai 日期范围查询。
+   - `src/backend/src/services/alert.service.ts`
+     - 复用统一应用日期工具。
+   - `src/backend/src/services/dashboard.service.ts`
+     - 今日打卡按应用日期查询。
+     - 问候语和首页日期按 Asia/Shanghai。
+   - `src/backend/src/services/health-record.service.ts`
+     - 健康记录 date-only 字段使用 `getDateOnlyValue()` / `formatDateOnly()`。
+     - 趋势查询 date-only 范围不再直接 `new Date(startDate)`。
+   - `src/backend/src/services/drug-concentration.service.ts`
+     - 血药浓度记录 date-only 字段使用统一工具。
+     - 关联用药日志按应用日期时间范围查询，日志日期/时间按应用时区展示。
+   - `src/backend/src/services/ocr.service.ts`
+     - OCR 默认报告日期改为应用日期。
+     - OCR 确认保存使用 date-only 工具。
+   - `src/backend/src/services/user.service.ts`
+     - 档案中的生日、诊断日期、移植日期使用 date-only 工具读写。
+   - `src/backend/src/controllers/report.controller.ts`
+     - 默认近 30 天报告区间改为应用日期窗口。
+   - `src/backend/src/services/report.service.ts`
+     - 报告日期校验和 alert 日期展示使用统一日期工具。
+
+3. **前端改动**
+   - `src/frontend/src/pages/Dashboard.tsx`
+     - 趋势查询窗口改为应用日期。
+     - 跨午夜刷新按 Asia/Shanghai 下一天 00:00:05。
+     - 旧后端 `scheduledAt` 兜底复用统一工具。
+   - `src/frontend/src/pages/Medications.tsx`
+     - 旧后端 `scheduledAt` 兜底复用统一工具。
+   - `src/frontend/src/pages/Charts.tsx`
+     - 趋势查询窗口改为应用日期。
+   - `src/frontend/src/pages/HealthInsights.tsx`
+     - 数据拉取窗口和 medication log 日期改为应用日期。
+   - `src/frontend/src/pages/Profile.tsx`
+     - 近 30 天报告区间和移植后天数计算改为应用日期。
+   - `src/frontend/src/pages/Records.tsx`
+     - 默认记录日期和短日期展示改为应用日期工具。
+   - `src/frontend/src/pages/RecordForm.tsx`
+     - 默认记录日期改为应用日期。
+   - `src/frontend/src/pages/OCRUpload.tsx`
+     - 默认报告日期改为应用日期。
+   - `src/frontend/src/pages/RecordDetail.tsx`
+     - `YYYY-MM-DD` 展示不再通过 `new Date()`，避免非北京时间设备显示前一天。
+   - `src/frontend/src/pages/Alerts.tsx`
+     - 消息时间按 Asia/Shanghai 展示。
+   - `src/frontend/src/services/insights/trendAnalyzer.ts`
+     - 洞察趋势窗口按应用日期计算。
+
+### 已完成验证
+
+- 后端构建通过：
+  ```bash
+  cd src/backend && npm run build
+  ```
+- 前端构建通过：
+  ```bash
+  cd src/frontend && npm run build
+  ```
+- 日期/时区 smoke test 通过：
+  - `2026-05-28T15:59:00Z` → `2026-05-28`
+  - `2026-05-28T16:01:00Z` → `2026-05-29`
+  - `getAppDateWindow(30, '2026-05-29')` → `2026-04-29` 至 `2026-05-29`
+- 搜索确认主要旧问题入口已清理：
+  - 前后端业务代码里不再有直接用 `new Date().toISOString().split('T')[0]` 生成当前业务日期。
+  - 剩余 `toISOString().split('T')[0]` 仅在 `utils/app-date.ts` 的 date-only 格式化工具内部。
+
+### 下次开启新会话建议动作
+
+1. 先执行 `git status --short`，确认未提交改动仍是本条记录列出的 `P1-07` 范围。
+2. 如果用户已经本地测试通过，提交这些未提交改动，建议提交信息：
+   ```bash
+   fix: unify app date timezone handling
+   ```
+3. 若用户还未测试，优先协助本地复测 Dashboard 今日打卡、趋势图、健康洞察、报告导出、用药列表/服药记录。
+4. `P1-07` 测试/提交完成后，下一项开发直接进入：
+   - `P1-08 健康记录输入校验与趋势指标白名单`
+   - 重点文件：`src/backend/src/services/health-record.service.ts`、`src/backend/src/controllers/health-record.controller.ts`、`src/backend/src/utils/validators.ts`
+   - 验收：非法日期、非法数值、未知趋势指标都返回明确 400，不暴露 Prisma 错误。
+
+---
+
+## 2026-05-29 — 代码审计待办补充 + OCR 所有权修复 + Refresh Token 加固 + Redis 验证码/限流 + 日期时区统一
 
 ### 今日完成
 
@@ -13,14 +120,14 @@
    - 更新 `docs/next-agent-todos.md`：
      - 将 2026-05-28 代码审计发现的问题整理为可执行任务包。
      - 调整推荐执行顺序，当前建议下一步优先：
-       1. `P1-07 日期/时区工具统一`
-       2. `P1-08 健康记录输入校验与趋势指标白名单`
-       3. `P1-01 健康洞察接入日常数据`
+       1. `P1-08 健康记录输入校验与趋势指标白名单`
+       2. `P1-01 健康洞察接入日常数据`
+       3. `P1-02 统一健康记录录入体验`
    - 新增/更新待办覆盖：
      - Refresh Token 签名验证与轮换加固已于本日完成。
      - 验证码 Redis 存储已于本日完成。
      - 生产限流 Redis/共享存储已于本日完成。
-     - Dashboard/趋势/部分前端日期仍用 UTC `toISOString()`，与用药模块 Asia/Shanghai 日期逻辑不一致。
+     - 日期/时区工具统一已于本日完成。
      - 健康记录创建/更新与趋势 metrics 需要输入校验和白名单。
      - 他克莫司固定 `5-15 ng/mL` 仍残留在 `RecordForm.tsx`、`RecordDetail.tsx`、`drug-concentration.service.ts`。
      - `ProfileEdit.tsx` 仍直接 `fetch('/api/users/profile')`，需改用统一 `userApi`。
@@ -92,6 +199,24 @@
      - 开发环境继续使用内存 Map，保持本地启动成本低。
      - 生产环境 Redis 不可用时返回 `503`，不会静默回退或放行。
 
+6. **完成 `P1-07 日期/时区工具统一`**
+   - 问题：
+     - 用药模块和预警模块各自复制 Asia/Shanghai 日期工具。
+     - Dashboard 今日打卡、趋势查询、健康洞察、报告默认区间和部分前端表单默认日期仍使用 UTC `toISOString().split('T')[0]`。
+     - 部分日期展示用 `new Date('YYYY-MM-DD')`，在非北京时间设备上可能显示成前一天。
+   - 修复：
+     - 后端新增 `src/backend/src/utils/app-date.ts`
+       - 统一 `getAppDateString()`、`getAppDateTime()`、`addAppDays()`、`getAppDateRange()`。
+       - 对数据库 `@db.Date` 另提供 `getDateOnlyValue()` / `getDateOnlyRange()`，避免把 `+08:00` 时间点误用于 date-only 字段。
+     - 前端新增 `src/frontend/src/utils/appDate.ts`
+       - 统一应用日期、日期窗口、跨应用午夜刷新、旧后端 `scheduledAt` 兜底和日期展示。
+     - 更新后端：
+       - `medication.service.ts`、`alert.service.ts` 复用统一工具。
+       - `dashboard.service.ts` 今日打卡按应用日期查询，问候语和首页日期按应用时区。
+       - `health-record.service.ts`、`drug-concentration.service.ts`、`ocr.service.ts`、`user.service.ts`、`report.controller.ts`、`report.service.ts` 使用 date-only 工具处理日期字段。
+     - 更新前端：
+       - Dashboard、Charts、HealthInsights、Profile、Records、RecordForm、OCRUpload、RecordDetail、Alerts 和洞察趋势窗口改用应用日期工具。
+
 ### 验证情况
 
 - 后端构建通过：
@@ -104,12 +229,20 @@
 - 限流 smoke test 通过：
   - 开发环境同一 key 第三次请求返回 `429`，前两次正常进入 `next()`。
   - 生产环境 Redis 不可用时返回 `503`，不会进入 `next()`。
+- 日期/时区 smoke test 通过：
+  - `2026-05-28T15:59:00Z` → `2026-05-28`
+  - `2026-05-28T16:01:00Z` → `2026-05-29`
+  - `getAppDateWindow(30, '2026-05-29')` → `2026-04-29` 至 `2026-05-29`
+- 前端构建通过：
+  ```bash
+  cd src/frontend && npm run build
+  ```
 
 ### 当前注意点 / 下次优先
 
-1. **下一个任务建议先做 `P1-07 日期/时区工具统一`**
-   - 用药模块已经按 Asia/Shanghai 处理部分日期，Dashboard 今日打卡、趋势查询和部分前端页面仍有 UTC `toISOString()` 用法。
-   - 建议先统一工具函数和调用点，再做健康记录输入校验。
+1. **下一个任务建议先做 `P1-08 健康记录输入校验与趋势指标白名单`**
+   - 健康记录创建/更新仍需要统一数值范围校验。
+   - 趋势 metrics 仍需白名单，避免未知字段触发 Prisma 错误。
 
 2. **生产化 P0 仍未完成**
    - 文档要求 HttpOnly Cookie，但前端实际使用 localStorage 存 token；这是后续安全加固方向。
@@ -130,6 +263,9 @@
      - `src/backend/.env.example`
      - `docs/quick-deploy.md`
      - `src/backend/src/middleware/security.middleware.ts`
+     - `src/backend/src/utils/app-date.ts`
+     - `src/frontend/src/utils/appDate.ts`
+     - 日期/时区统一涉及的前后端页面与服务文件
    - 工作区原本已有 Dashboard、Charts、Profile、dashboardStore、alert/dashboard/report service 等移植风险与报告相关改动。后续 agent 应基于现有状态继续开发，不要误认为这些都是本轮 OCR 修复产生的改动。
 
 ---

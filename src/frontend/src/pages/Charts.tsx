@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { healthRecordApi } from '../services/api'
 import { useAuthStore } from '../stores/authStore'
 import { ALL_METRICS, METRIC_SCOPE_OPTIONS, getVisibleMetricsByScope, type MetricScope } from './Dashboard'
+import { getAppDateWindow } from '../utils/appDate'
 import toast from 'react-hot-toast'
 
 const timeRanges = [
@@ -42,10 +43,7 @@ export default function Charts() {
   const fetchTrends = async () => {
     setLoading(true)
     try {
-      const endDate = new Date().toISOString().split('T')[0]
-      const startDate = new Date(Date.now() - selectedRange.days * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split('T')[0]
+      const { startDate, endDate } = getAppDateWindow(selectedRange.days)
 
       const response: any = await healthRecordApi.getTrends({
         metrics: selectedMetric.key,

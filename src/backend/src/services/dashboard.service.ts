@@ -3,6 +3,12 @@ import { AppError } from '../utils/errors';
 import { getRecentMetrics } from './health-record.service';
 import { getTodayMedications } from './medication.service';
 import { getUnreadAlertCount, getAlerts } from './alert.service';
+import {
+  formatAppDisplayDate,
+  formatDateOnly,
+  getAppHour,
+  getDateOnlyRange,
+} from '../utils/app-date';
 
 function getBloodPressureStatus(
   systolic?: number | null,
@@ -45,7 +51,7 @@ export async function getDashboardData(userId: string) {
   }
 
   // 获取问候语
-  const hour = new Date().getHours();
+  const hour = getAppHour();
   let greeting = '早上好';
   if (hour >= 12 && hour < 18) {
     greeting = '下午好';
@@ -53,19 +59,15 @@ export async function getDashboardData(userId: string) {
     greeting = '晚上好';
   }
 
-  // 获取今日打卡状态（使用UTC日期避免时区偏移导致查不到当天记录）
-  const todayStr = new Date().toISOString().split('T')[0];
-  const today = new Date(todayStr);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const todayRange = getDateOnlyRange();
 
   // 查询当天所有记录（按创建时间倒序，最新的在前面）
   const todayRecords = await prisma.healthRecord.findMany({
     where: {
       userId,
       recordDate: {
-        gte: today,
-        lt: tomorrow,
+        gte: todayRange.start,
+        lt: todayRange.end,
       },
     },
     orderBy: {
@@ -103,11 +105,11 @@ export async function getDashboardData(userId: string) {
       userType: user.profile?.userType,
       primaryDisease: user.profile?.primaryDisease,
       hasTransplant: user.profile?.hasTransplant,
-      transplantDate: user.profile?.transplantDate?.toISOString().split('T')[0],
+      transplantDate: formatDateOnly(user.profile?.transplantDate),
       baselineCreatinine: user.profile?.baselineCreatinine,
     },
     today: {
-      date: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }),
+      date: formatAppDisplayDate(),
       checkIn: {
         weight: {
           recorded: latestWeight != null,
