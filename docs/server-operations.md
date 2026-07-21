@@ -195,6 +195,72 @@ sudo nano /opt/HealthMonitoringAssistant/nginx/default.conf
 sudo docker-compose restart nginx
 ```
 
+### HTTPS 与域名配置
+
+生产环境实际使用根目录部署：
+
+```bash
+cd /opt/HealthMonitoringAssistant
+```
+
+关键文件：
+
+| 用途 | 路径 |
+|------|------|
+| Compose | `/opt/HealthMonitoringAssistant/docker-compose.yml` |
+| Nginx | `/opt/HealthMonitoringAssistant/nginx/default.conf` |
+| 证书 | `/opt/HealthMonitoringAssistant/nginx/ssl/fullchain.pem` |
+| 私钥 | `/opt/HealthMonitoringAssistant/nginx/ssl/privkey.pem` |
+| ACME Webroot | `/opt/HealthMonitoringAssistant/nginx/www/` |
+
+HTTPS 配置检查：
+
+```bash
+cd /opt/HealthMonitoringAssistant
+sudo bash infrastructure/scripts/test-https-config.sh
+sudo docker compose config >/tmp/hma-compose.out
+sudo docker compose exec nginx nginx -t
+```
+
+证书替换或续期后热加载：
+
+```bash
+cd /opt/HealthMonitoringAssistant
+sudo docker compose exec nginx nginx -s reload
+```
+
+上线验收：
+
+```bash
+DOMAIN=你的域名
+curl -I "http://$DOMAIN/"
+curl -I "https://$DOMAIN/"
+curl -I "https://$DOMAIN/records"
+curl -i -X POST "https://$DOMAIN/api/auth/verification-code" \
+  -H "Content-Type: application/json" \
+  -d '{"phone":"13800138099","type":"register"}'
+```
+
+预期：
+
+- HTTP 返回 301 到 HTTPS。
+- HTTPS 首页返回 200。
+- `/records`、`/privacy-security` 等 SPA 路由刷新不返回 404。
+- `/api/auth/verification-code` 返回 200 或业务 4xx，不应是 404/502。
+- 浏览器控制台无 mixed content 报错。
+
+回滚：
+
+```bash
+cd /opt/HealthMonitoringAssistant
+sudo cp nginx/default.conf nginx/default.conf.failed-https.$(date +%Y%m%d%H%M%S)
+sudo git checkout -- nginx/default.conf docker-compose.yml
+sudo docker compose up -d nginx
+curl -I "http://服务器公网IP/"
+```
+
+如果服务器上有未提交的手工配置，先备份再恢复，避免覆盖真实证书路径或运维备注。
+
 ---
 
 ## 监控检查
@@ -212,8 +278,11 @@ top
 ### 检查服务健康
 
 ```bash
-# 测试后端 API
-curl http://localhost:3001/api/health
+# 测试后端直连健康检查
+curl http://localhost:3001/health
+
+# 测试 Nginx API 代理
+curl http://localhost/api/health
 
 # 测试前端
 curl -I http://localhost:80

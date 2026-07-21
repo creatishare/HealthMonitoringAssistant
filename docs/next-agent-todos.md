@@ -38,7 +38,7 @@
 5. ~~P1-04 健康记录字段扩展 migration~~ — 已完成（2026-05-30）
 6. ~~P1-05 移植风险规则抽离与报告接入~~ — 已完成（2026-05-30）
 7. ~~P1-06 预警动作化~~ — 已完成（2026-05-30）
-8. P0-02 HTTPS 与域名生产化
+8. ~~P0-02 HTTPS 与域名生产化~~ — 已完成（2026-06-05）
 
 ---
 
@@ -636,6 +636,25 @@ P1-04 已完成基础字段和数据通路。本任务可以直接基于 `heartR
 
 - 不要只改本地 nginx 模板，必须确认生产实际使用的配置路径。
 - 前端 Docker 缓存可能导致旧包未更新，必要时按文档 no-cache 构建。
+
+### 完成记录
+
+2026-06-05 已完成仓库侧生产化配置：
+
+- 确认当前 ECS/IP 直连部署实际使用根目录 `/opt/HealthMonitoringAssistant/docker-compose.yml` 与 `/opt/HealthMonitoringAssistant/nginx/default.conf`。
+- 根目录 `docker-compose.yml` 暴露 80/443，并挂载 `nginx/ssl` 与 `nginx/www`。
+- `nginx/default.conf` 改为 HTTP ACME challenge + 301 HTTPS 跳转 + 443 TLS 主站，保留 `/api/` → `backend:3001/` 去前缀代理规则，避免验证码接口重新 404。
+- 新增 `infrastructure/scripts/test-https-config.sh`，静态校验 443、证书挂载、HSTS、mixed-content 防护和 API 代理规则。
+- 更新 `docs/deployment-guide.md`、`docs/server-operations.md`、`docs/quick-deploy.md`，记录实际生产路径、证书放置方式、验证命令和回滚步骤。
+
+验证：
+
+```bash
+bash infrastructure/scripts/test-https-config.sh
+docker compose config --no-interpolate
+```
+
+均通过。本地没有 `.env`，所以 Compose 渲染使用 `--no-interpolate`；生产服务器有 `.env` 时可直接运行 `docker compose config`。本轮未执行真实域名 DNS、证书签发和线上 curl 验收，因为仓库环境没有真实域名、证书和 ECS 登录态；上线时必须按文档执行并记录真实域名验证结果。
 
 ---
 

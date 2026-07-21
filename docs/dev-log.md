@@ -5,6 +5,60 @@
 
 ---
 
+## 2026-06-05 — 完成 P0-02 HTTPS 与域名生产化配置
+
+### 今日完成
+
+1. **确认部署入口**
+   - 当前线上/IP 直连部署以根目录 `/opt/HealthMonitoringAssistant/docker-compose.yml` 和 `/opt/HealthMonitoringAssistant/nginx/default.conf` 为实际生产路径。
+   - `infrastructure/docker/*` 保留为历史/模板配置，本轮没有把业务部署切到另一套 Compose。
+
+2. **HTTPS 配置落地**
+   - `docker-compose.yml` 的 nginx 服务新增 `443:443`，并挂载：
+     - `./nginx/ssl:/etc/nginx/ssl:ro`
+     - `./nginx/www:/var/www/certbot:ro`
+   - `nginx/default.conf` 改为：
+     - 80 端口保留 ACME challenge 和 `/health`。
+     - 其他 HTTP 请求 301 跳转 HTTPS。
+     - 443 端口启用 TLS、HSTS、安全响应头和 `upgrade-insecure-requests`。
+     - `/api/` 继续代理到 `http://backend:3001/`，保持去掉 `/api/` 前缀，避免验证码接口 404。
+     - 前端路由继续代理到 `frontend` 容器，由前端 nginx 的 `try_files` 支持 SPA 刷新。
+
+3. **证书目录与忽略规则**
+   - 新增 `nginx/ssl/.gitkeep` 和 `nginx/www/.gitkeep`。
+   - `.gitignore` 忽略真实证书、私钥和 ACME challenge 文件，只保留目录占位。
+
+4. **回归脚本与文档**
+   - 新增 `infrastructure/scripts/test-https-config.sh`：
+     - 校验 80/443 暴露、证书挂载、HTTP 到 HTTPS 跳转、HSTS、CSP、API 去前缀代理。
+     - 扫描前端源码中硬编码 `http://`，降低 mixed content 风险。
+   - 更新 `docs/deployment-guide.md`、`docs/server-operations.md`、`docs/quick-deploy.md`：
+     - 记录实际生产配置路径。
+     - 补充阿里云证书与 Let's Encrypt 两种证书放置方式。
+     - 补充 DNS、验证命令、浏览器检查点和回滚步骤。
+
+### 验证
+
+```bash
+bash infrastructure/scripts/test-https-config.sh
+docker compose config --no-interpolate
+```
+
+均通过。
+
+### 未完成/上线注意
+
+- 本轮没有真实执行 DNS 解析、证书签发和线上 HTTPS curl 验收，因为本地仓库环境没有正式域名、证书和 ECS 登录态。
+- 本地没有 `.env`，因此 Compose 验证使用 `--no-interpolate`；生产服务器有 `.env` 时应再执行 `docker compose config`。
+- 上线时必须按文档记录真实域名、证书来源、`curl -I https://域名/records`、`/api/auth/verification-code` 返回结果，以及浏览器 mixed content 检查结果。
+- 如果证书文件不存在，新的 HTTPS nginx 配置会启动失败；首次上线前必须先放置 `nginx/ssl/fullchain.pem` 和 `nginx/ssl/privkey.pem`。
+
+### 下一项建议
+
+继续清理 `docs/next-agent-todos.md` 中剩余的 P1-09 他克莫司固定参考范围残留，重点检查 `drug-concentration.service.ts` 是否仍有通用 `5-15 ng/mL` 判断。
+
+---
+
 ## 2026-05-30 — 完成 P1-06 预警动作化
 
 ### 今日完成

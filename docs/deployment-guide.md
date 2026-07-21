@@ -163,6 +163,141 @@ docker-compose --version
 
 ---
 
+## 第七步：正式域名 + HTTPS 上线
+
+当前生产路径按根目录 Docker Compose 部署维护：
+
+```bash
+cd /opt/HealthMonitoringAssistant
+```
+
+实际生效文件：
+
+| 配置 | 生产路径 |
+|------|----------|
+| Docker Compose | `/opt/HealthMonitoringAssistant/docker-compose.yml` |
+| Nginx 站点配置 | `/opt/HealthMonitoringAssistant/nginx/default.conf` |
+| TLS 证书 | `/opt/HealthMonitoringAssistant/nginx/ssl/fullchain.pem` |
+| TLS 私钥 | `/opt/HealthMonitoringAssistant/nginx/ssl/privkey.pem` |
+| ACME Webroot | `/opt/HealthMonitoringAssistant/nginx/www/` |
+
+### 1. 配置域名解析
+
+在域名 DNS 控制台添加 A 记录：
+
+| 主机记录 | 类型 | 记录值 |
+|----------|------|--------|
+| `@` 或 `www` | A | ECS 公网 IP |
+
+等待解析生效：
+
+```bash
+dig +short 你的域名
+```
+
+输出应包含 ECS 公网 IP。
+
+### 2. 准备 HTTPS 证书
+
+可选方案 A：阿里云免费 DV 证书。
+
+1. 在阿里云 SSL 证书控制台申请并签发证书。
+2. 下载 Nginx 格式证书。
+3. 上传并重命名：
+   ```bash
+   cd /opt/HealthMonitoringAssistant
+   sudo mkdir -p nginx/ssl nginx/www
+   sudo cp 证书文件.pem nginx/ssl/fullchain.pem
+   sudo cp 私钥文件.key nginx/ssl/privkey.pem
+   sudo chmod 600 nginx/ssl/privkey.pem
+   ```
+
+可选方案 B：Let's Encrypt。
+
+首次签发时需要 80 端口可用：
+
+```bash
+cd /opt/HealthMonitoringAssistant
+sudo mkdir -p nginx/ssl nginx/www
+sudo docker compose stop nginx
+sudo docker run --rm -p 80:80 \
+  -v "$PWD/nginx/ssl:/etc/letsencrypt" \
+  certbot/certbot certonly --standalone \
+  -d 你的域名 \
+  --email 你的邮箱 \
+  --agree-tos \
+  --no-eff-email
+sudo cp nginx/ssl/live/你的域名/fullchain.pem nginx/ssl/fullchain.pem
+sudo cp nginx/ssl/live/你的域名/privkey.pem nginx/ssl/privkey.pem
+sudo chmod 600 nginx/ssl/privkey.pem
+```
+
+续期可走 Webroot：
+
+```bash
+cd /opt/HealthMonitoringAssistant
+sudo docker run --rm \
+  -v "$PWD/nginx/ssl:/etc/letsencrypt" \
+  -v "$PWD/nginx/www:/var/www/certbot" \
+  certbot/certbot renew --webroot -w /var/www/certbot
+sudo cp nginx/ssl/live/你的域名/fullchain.pem nginx/ssl/fullchain.pem
+sudo cp nginx/ssl/live/你的域名/privkey.pem nginx/ssl/privkey.pem
+sudo docker compose exec nginx nginx -s reload
+```
+
+### 3. 启动 HTTPS 配置
+
+```bash
+cd /opt/HealthMonitoringAssistant
+sudo bash infrastructure/scripts/test-https-config.sh
+sudo docker compose config >/tmp/hma-compose.out
+sudo docker compose up -d --build nginx
+sudo docker compose exec nginx nginx -t
+```
+
+### 4. 验收命令
+
+```bash
+DOMAIN=你的域名
+
+# HTTP 应跳转 HTTPS
+curl -I "http://$DOMAIN/"
+
+# HTTPS 首页可访问
+curl -I "https://$DOMAIN/"
+
+# SPA 路由刷新不 404
+curl -I "https://$DOMAIN/records"
+curl -I "https://$DOMAIN/privacy-security"
+
+# API 代理不应 404/502；生产真实手机号会触发短信，谨慎使用测试号码
+curl -i -X POST "https://$DOMAIN/api/auth/verification-code" \
+  -H "Content-Type: application/json" \
+  -d '{"phone":"13800138099","type":"register"}'
+```
+
+浏览器验证：
+
+- 地址栏显示 HTTPS 锁。
+- DevTools Console 没有 mixed content 报错。
+- Network 中 `/api/auth/verification-code` 请求走 `https://域名/api/...`。
+
+### 5. 回滚步骤
+
+如果证书或 HTTPS 配置导致 Nginx 无法启动，先恢复 IP 直连内测服务：
+
+```bash
+cd /opt/HealthMonitoringAssistant
+sudo cp nginx/default.conf nginx/default.conf.https.bak
+sudo git checkout -- nginx/default.conf docker-compose.yml
+sudo docker compose up -d nginx
+curl -I "http://服务器公网IP/"
+```
+
+如果本地有未提交的生产修改，不要直接 `git checkout --` 覆盖；先备份 `nginx/default.conf` 和 `docker-compose.yml`，再按旧 HTTP 配置恢复。
+
+---
+
 ## 准备完成后的检查清单
 
 在购买服务器并执行完上述步骤后，请确认：
@@ -173,6 +308,7 @@ docker-compose --version
 - [ ] 能通过 SSH 连接到服务器
 - [ ] Docker 和 Docker Compose 已安装
 - [ ] 安全组已配置（22、80、443端口）
+- [ ] TLS 证书已放到 `nginx/ssl/fullchain.pem` 和 `nginx/ssl/privkey.pem`
 - [ ] 服务器系统时间正确（`date` 命令显示北京时间）
 
 ---

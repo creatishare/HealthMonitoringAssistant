@@ -39,6 +39,16 @@ src/backend/uploads/
 logs/
 *.log
 
+# TLS certificates and ACME challenge files
+nginx/ssl/*
+!nginx/ssl/.gitkeep
+nginx/www/*
+!nginx/www/.gitkeep
+infrastructure/nginx/ssl/*
+!infrastructure/nginx/ssl/.gitkeep
+infrastructure/nginx/www/*
+!infrastructure/nginx/www/.gitkeep
+
 # IDE
 .idea/
 .vscode/

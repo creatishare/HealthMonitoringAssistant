@@ -8,7 +8,8 @@
 
 - [ ] 已购买云服务器（2核4G，Ubuntu 22.04）
 - [ ] 已通过 SSH 连接到服务器
-- [ ] 安全组已开放 **80 端口**（HTTP）
+- [ ] IP 直连内测：安全组已开放 **80 端口**（HTTP）
+- [ ] 正式域名上线：安全组已开放 **80 和 443 端口**（HTTP/HTTPS）
 
 ---
 
@@ -130,7 +131,28 @@ sudo docker-compose logs -f backend
 
 1. **购买域名** + 实名认证
 2. **ICP 备案**（7-20 天）
-3. **配置 HTTPS**（域名备案后，用 Let's Encrypt 免费证书）
+3. **配置 HTTPS**（域名备案后，用阿里云 DV 证书或 Let's Encrypt）
 4. **将 `http://IP` 切换为 `https://域名`**
 
-域名备案通过后，只需修改 Nginx 配置并重新部署即可。
+当前仓库已准备好正式 HTTPS 模板，实际生产路径为：
+
+- Compose：`/opt/HealthMonitoringAssistant/docker-compose.yml`
+- Nginx：`/opt/HealthMonitoringAssistant/nginx/default.conf`
+- 证书：`/opt/HealthMonitoringAssistant/nginx/ssl/fullchain.pem`
+- 私钥：`/opt/HealthMonitoringAssistant/nginx/ssl/privkey.pem`
+
+域名备案通过后，按 `docs/deployment-guide.md` 的“正式域名 + HTTPS 上线”章节放置证书并启动：
+
+```bash
+cd /opt/HealthMonitoringAssistant
+sudo bash infrastructure/scripts/test-https-config.sh
+sudo docker compose up -d --build nginx
+sudo docker compose exec nginx nginx -t
+```
+
+验收重点：
+
+- `http://域名/` 自动跳转 `https://域名/`
+- `https://域名/records` 刷新不 404
+- `https://域名/api/auth/verification-code` 不返回 404/502
+- 浏览器控制台无 mixed content 报错
