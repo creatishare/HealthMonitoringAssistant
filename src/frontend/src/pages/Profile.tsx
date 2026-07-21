@@ -14,6 +14,7 @@ import {
   Share2,
   Shield,
 } from 'lucide-react'
+import Spinner from '../components/ui/Spinner'
 import { useAuthStore } from '../stores/authStore'
 import { reportApi, userApi } from '../services/api'
 import { getTransplantProfileChecklist } from '../services/transplantProfile'
@@ -218,7 +219,7 @@ export default function Profile() {
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-9 w-9 animate-spin rounded-full border-b-2 border-primary" />
+        <Spinner />
       </div>
     )
   }

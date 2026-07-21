@@ -1,6 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Moon, Bell, Shield, Info, LucideIcon } from 'lucide-react'
+import { Moon, Bell, Shield, Info, LucideIcon } from 'lucide-react'
+import BackButton from '../components/ui/BackButton'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { useThemeStore } from '../stores/themeStore'
 import { useNotificationStore } from '../stores/notificationStore'
 
@@ -17,6 +19,7 @@ export default function Settings() {
   const navigate = useNavigate()
   const { isDark, toggleTheme } = useThemeStore()
   const { enabled: notificationEnabled, toggle: toggleNotification, init: initNotification } = useNotificationStore()
+  const [showAbout, setShowAbout] = useState(false)
 
   useEffect(() => {
     initNotification()
@@ -26,15 +29,13 @@ export default function Settings() {
     { icon: Moon, label: '深色模式', type: 'toggle', value: isDark, onToggle: toggleTheme },
     { icon: Bell, label: '消息通知', type: 'toggle', value: notificationEnabled, onToggle: toggleNotification },
     { icon: Shield, label: '隐私政策', type: 'link', onClick: () => navigate('/privacy-policy') },
-    { icon: Info, label: '关于我们', type: 'link', onClick: () => alert('健康监测助手 v1.2.0\n\n为肾衰竭患者提供便捷的健康管理服务') },
+    { icon: Info, label: '关于我们', type: 'link', onClick: () => setShowAbout(true) },
   ]
 
   return (
     <div className="page-shell">
       <div className="page-header-compact">
-        <button onClick={() => navigate(-1)} className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-border bg-white/65 text-gray-text-primary backdrop-blur-xl dark:bg-white/5">
-          <ChevronLeft size={20} />
-        </button>
+        <BackButton />
         <div>
           <p className="section-kicker">偏好</p>
           <h1 className="mt-2 text-page-title text-gray-text-primary">系统设置</h1>
@@ -79,6 +80,13 @@ export default function Settings() {
       </section>
 
       <p className="text-center text-small text-gray-text-helper">健康监测助手 v1.0.0</p>
+
+      <ConfirmDialog
+        open={showAbout}
+        title="关于我们"
+        message={'健康监测助手 v1.0.0\n\n为肾衰竭患者提供便捷的健康管理服务'}
+        onConfirm={() => setShowAbout(false)}
+      />
     </div>
   )
 }

@@ -1,5 +1,4 @@
-import { useNavigate } from 'react-router-dom'
-import { ChevronLeft } from 'lucide-react'
+import BackButton from '../components/ui/BackButton'
 
 interface Section {
   title: string
@@ -96,20 +95,16 @@ const sections: Section[] = [
 ]
 
 export default function PrivacyPolicy() {
-  const navigate = useNavigate()
-
   return (
     <div className="space-y-4 max-w-3xl mx-auto">
       {/* 头部 */}
       <div className="flex items-center gap-4">
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2" aria-label="back">
-          <ChevronLeft size={24} className="text-gray-text-primary" />
-        </button>
+        <BackButton />
         <h1 className="text-page-title font-semibold text-gray-text-primary">隐私政策</h1>
       </div>
 
       {/* 更新日期 */}
-      <p className="text-helper text-gray-secondary">
+      <p className="text-helper text-gray-text-secondary">
         更新日期：2026年4月18日
       </p>
 

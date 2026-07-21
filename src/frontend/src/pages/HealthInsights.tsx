@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, AlertTriangle, AlertCircle, Info, Pill, TrendingUp, ShieldAlert } from 'lucide-react'
+import { AlertTriangle, AlertCircle, Info, Pill, TrendingUp, ShieldAlert } from 'lucide-react'
+import BackButton from '../components/ui/BackButton'
 import { useAuthStore } from '../stores/authStore'
 import { healthRecordApi, medicationApi, userApi } from '../services/api'
 import { generateInsightReport, type InsightReport, type HealthInsight } from '../services/insights/engine'
@@ -20,7 +20,6 @@ const COLORS: Record<HealthInsight['severity'], string> = {
 }
 
 export default function HealthInsightsPage() {
-  const navigate = useNavigate()
   const { user } = useAuthStore()
   const [report, setReport] = useState<InsightReport | null>(null)
   const [loading, setLoading] = useState(true)
@@ -97,9 +96,7 @@ export default function HealthInsightsPage() {
     return (
       <div className="page-shell">
         <div className="page-header-compact">
-          <button aria-label="back" onClick={() => navigate(-1)} className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-border bg-white/65 text-gray-text-primary backdrop-blur-xl dark:bg-white/5">
-            <ArrowLeft size={20} />
-          </button>
+          <BackButton />
           <div>
             <p className="section-kicker">本地分析</p>
             <h1 className="mt-2 text-page-title text-gray-text-primary">健康洞察</h1>
@@ -115,9 +112,7 @@ export default function HealthInsightsPage() {
   return (
     <div className="page-shell">
       <div className="page-header-compact">
-        <button aria-label="back" onClick={() => navigate(-1)} className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-border bg-white/65 text-gray-text-primary backdrop-blur-xl dark:bg-white/5">
-          <ArrowLeft size={20} />
-        </button>
+        <BackButton />
         <div>
           <p className="section-kicker">本地分析</p>
           <h1 className="mt-2 text-page-title text-gray-text-primary">健康洞察</h1>
@@ -214,7 +209,7 @@ function InsightCard({ insight }: { insight: HealthInsight }) {
           <p className="mt-1 text-helper leading-relaxed text-gray-text-secondary">{insight.content}</p>
         </div>
       </div>
-      {insight.disclaimer && <p className="mt-3 border-t border-gray-border pt-3 text-small text-gray-text-helper">{insight.disclaimer}</p>}
+      {insight.disclaimer && <p className="mt-3 border-t border-gray-border pt-3 text-helper text-gray-text-helper">{insight.disclaimer}</p>}
     </div>
   )
 }

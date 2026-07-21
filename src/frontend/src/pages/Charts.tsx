@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, TrendingUp } from 'lucide-react'
+import { TrendingUp } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
+import BackButton from '../components/ui/BackButton'
+import SegmentedControl from '../components/ui/SegmentedControl'
+import Spinner from '../components/ui/Spinner'
 import { healthRecordApi } from '../services/api'
 import { useAuthStore } from '../stores/authStore'
 import { ALL_METRICS, METRIC_SCOPE_OPTIONS, getVisibleMetricsByScope, type MetricScope } from './Dashboard'
 import { getAppDateWindow } from '../utils/appDate'
+import { useChartTheme } from '../utils/chartTheme'
 import toast from 'react-hot-toast'
 
 const timeRanges = [
@@ -28,13 +31,13 @@ const metricRanges: Record<string, { min?: number; max?: number }> = {
 }
 
 export default function Charts() {
-  const navigate = useNavigate()
   const { user } = useAuthStore()
   const [selectedMetric, setSelectedMetric] = useState(ALL_METRICS[0])
   const [selectedRange, setSelectedRange] = useState(timeRanges[0])
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [metricScope, setMetricScope] = useState<MetricScope>('core')
+  const chartTheme = useChartTheme()
 
   useEffect(() => {
     fetchTrends()
@@ -75,9 +78,7 @@ export default function Charts() {
   return (
     <div className="page-shell">
       <div className="page-header-compact">
-        <button onClick={() => navigate(-1)} className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-border bg-white/65 text-gray-text-primary backdrop-blur-xl dark:bg-white/5">
-          <ChevronLeft size={20} />
-        </button>
+        <BackButton />
         <div>
           <p className="section-kicker">长期观察</p>
           <h1 className="mt-2 text-page-title text-gray-text-primary">趋势图表</h1>
@@ -91,21 +92,12 @@ export default function Charts() {
             <p className="mt-1 text-helper text-gray-text-secondary">按当前档案展示核心、推荐和全部指标。</p>
           </div>
         </div>
-        <div className="mt-4 grid grid-cols-3 gap-2 rounded-[18px] border border-gray-border bg-white/56 p-1 dark:bg-slate-900/30">
-          {METRIC_SCOPE_OPTIONS.map((option) => (
-            <button
-              key={option.key}
-              onClick={() => setMetricScope(option.key)}
-              className={`h-9 rounded-[14px] text-helper font-medium transition-all ${
-                metricScope === option.key
-                  ? 'bg-primary text-white shadow-[0_10px_22px_rgba(62,99,221,0.18)]'
-                  : 'text-gray-text-secondary hover:text-primary'
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          className="mt-4"
+          options={METRIC_SCOPE_OPTIONS.map((option) => ({ label: option.label, value: option.key }))}
+          value={metricScope}
+          onChange={setMetricScope}
+        />
         <div className="mt-4 flex flex-wrap gap-2">
           {visibleMetrics.map((metric) => (
             <button
@@ -163,7 +155,7 @@ export default function Charts() {
 
         {loading ? (
           <div className="flex justify-center py-16">
-            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
+            <Spinner />
           </div>
         ) : data.length === 0 ? (
           <div className="flex min-h-[280px] flex-col items-center justify-center text-center text-gray-text-secondary">
@@ -178,19 +170,17 @@ export default function Charts() {
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(145,161,196,0.28)" />
                 <XAxis
                   dataKey="date"
-                  tick={{ fontSize: 12, fill: '#8A94AB' }}
+                  tick={chartTheme.tickStyle}
                   tickFormatter={(value) => {
                     const date = new Date(value)
                     return `${date.getMonth() + 1}/${date.getDate()}`
                   }}
                 />
-                <YAxis tick={{ fontSize: 12, fill: '#8A94AB' }} domain={['auto', 'auto']} />
+                <YAxis tick={chartTheme.tickStyle} domain={['auto', 'auto']} />
                 <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'rgba(255,255,255,0.96)',
-                    border: '1px solid rgba(145,161,196,0.24)',
-                    borderRadius: '16px',
-                  }}
+                  contentStyle={chartTheme.tooltipContentStyle}
+                  labelStyle={chartTheme.tooltipLabelStyle}
+                  itemStyle={chartTheme.tooltipItemStyle}
                   formatter={(value: any) => [`${value} ${selectedMetric.unit}`, selectedMetric.name]}
                 />
                 {hasRange && (

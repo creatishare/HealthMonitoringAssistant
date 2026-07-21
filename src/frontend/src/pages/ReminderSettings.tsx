@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, ChevronLeft, Clock, Pill, Smartphone } from 'lucide-react'
+import { Bell, Clock, Pill, Smartphone } from 'lucide-react'
+import BackButton from '../components/ui/BackButton'
 import { useNotificationStore } from '../stores/notificationStore'
 
 export default function ReminderSettings() {
@@ -43,9 +44,7 @@ export default function ReminderSettings() {
   return (
     <div className="page-shell">
       <div className="page-header-compact">
-        <button onClick={() => navigate(-1)} className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-border bg-white/65 text-gray-text-primary backdrop-blur-xl dark:bg-white/5">
-          <ChevronLeft size={20} />
-        </button>
+        <BackButton />
         <div>
           <p className="section-kicker">提醒</p>
           <h1 className="mt-2 text-page-title text-gray-text-primary">提醒设置</h1>

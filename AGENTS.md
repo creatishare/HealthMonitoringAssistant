@@ -26,6 +26,8 @@
 - **2026-04-25**: 修复用药提醒跨天状态不更新（后端返回 `scheduledAt`，前端直接回传；记录服药改幂等 update/create；Dashboard 跨午夜刷新）、修复消息中心不补发过期用药提醒（`getAlerts`/`getUnreadAlertCount` 查询前同步 missed 服药日志和预警）、修复线上旧后端没有 `scheduledAt` 时点击“服用”提示成功但状态不变（前端兜底改用 UTC 同一提醒时刻）、新增报告导出接口 `/reports/follow-up`、修复 PDF 中文乱码（pdfkit 注册中文字体 + Docker CJK 字体）、重构“我的/用药/健康记录”页面为截图风格，新增提醒设置、隐私与安全、帮助中心独立页面。
 - **2026-05-18**: Dashboard 指标趋势交互重构为“核心 / 推荐 / 全部”，移除旧“更多/收起”；肾移植用户新增基于 `baselineCreatinine` 的肌酐风险提示（>10% 黄色复查，>25% 红色联系移植医生，连续 3 次上升提示复诊核对）；后端预警规则同步拆成 10%/25% 两档；Dashboard API 返回 `hasTransplant` / `transplantDate` / `baselineCreatinine`；Charts 和 PDF 报告移除他克莫司固定 5-15 参考范围，改为医生目标范围提示；Profile 独立“近30天健康报告”模块，移植用户突出个人基线、趋势偏移、血药浓度、复诊提醒。
 - **2026-05-30**: 完成健康记录输入校验与趋势指标白名单（含后端回归测试）；健康洞察接入 records 中的血压、尿量、体重、血糖、他克莫司趋势，补充日常数据完整度摘要；统一 `/records`、`/records/new`、编辑页健康记录表单，移除记录表单/详情中的他克莫司固定 `5-15`；移植用户 onboarding/Profile/Dashboard 增加个人基线引导，ProfileEdit 改用统一 `userApi`；新增健康记录正式 `heartRate`、eGFR、尿蛋白/肌酐比、尿白蛋白/肌酐比、尿潜血、BK/CMV/EBV 病毒载量字段，以及用户档案他克莫司医生目标范围；移植风险规则抽离到前后端独立模块并接入 Dashboard、HealthInsights、预警和 PDF 医生摘要；预警动作化已完成，Dashboard/Alerts 支持查看记录、查看用药、生成报告、标为已读；Vitest 单测入口排除 Playwright E2E。
+- **2026-06-05**: 完成 P0-02 HTTPS 与域名生产化仓库配置：根目录 `docker-compose.yml` 暴露 80/443 并挂载 `nginx/ssl`、`nginx/www`；`nginx/default.conf` 启用 HTTP ACME challenge、301 HTTPS 跳转、443 TLS、HSTS 和 mixed-content 防护；保留 `/api/` → `backend:3001/` 去前缀代理；新增 `infrastructure/scripts/test-https-config.sh` 回归检查；更新部署、运维、快速部署和 dev-log 文档，记录实际生产路径、验证命令和回滚步骤。
+- **2026-07-20**: 前端设计评审整改：修复 8 文件 75 处失效类名 `text-gray-secondary/helper`（正确类名是嵌套结构 `text-gray-text-secondary/helper`，`text-gray-hint` 也不存在）；`--color-text-helper` 调深至 `#5b6478`（5.9:1）、warning `#A06200`、success `#1F7A4D`，均达 WCAG AA；医疗提示/免责声明字号下限 14px；新增 `utils/chartTheme.ts` 统一 Recharts 深浅色 tick/tooltip（13px），Dashboard 趋势图最多 2 指标 + 单位不同自动双 Y 轴 + Legend；新建 `components/ui/`（BackButton 44px 统一返回样式、SegmentedControl、Spinner、ConfirmDialog）并替换全站复制粘贴块，`window.confirm`/`alert` 已替换为 ConfirmDialog；RecordDetail 编辑/删除按钮提升至 44px；修复 Records 列表假时间、Medications 按钮阴影色残留、版本号不一致（统一 v1.0.0）、Alerts 卡片圆角跳变；删除 tailwind.config 未使用的 spacing token；`docs/design-system.md` 回写至 v2.0.0（与实现对齐）。
 
 ### 当前已知问题（下次开发优先处理）
 
@@ -40,23 +42,19 @@
 
 ### 当前进行中的工作（未完成）
 
-#### P0-02 HTTPS 与域名生产化（下一项）
-**需求**：生产环境配置正式域名和 HTTPS，保证健康数据产品的基础安全体验，并避免影响分享、PWA、浏览器权限和移动端能力。
+#### 下一项建议：P1-09 清理他克莫司固定参考范围残留
+**需求**：继续确认移植相关页面和血药浓度服务不再把他克莫司 `5-15 ng/mL` 显示或判断为通用正常范围，统一改为“医生目标范围/按医嘱处理”的描述。
 
 **建议范围**：
-- `docs/deployment-guide.md`
-- `docs/server-operations.md`
-- `docs/quick-deploy.md`
-- `infrastructure/`
-- `docker-compose.yml`
-- nginx 配置文件
+- `src/frontend/src/pages/RecordForm.tsx`
+- `src/frontend/src/pages/RecordDetail.tsx`
+- `src/backend/src/services/drug-concentration.service.ts`
+- 相关单测/构建
 
 **验收标准**：
-- 域名 HTTPS 可访问前端。
-- SPA 刷新任意路由不 404。
-- `/api/auth/verification-code` 等 API 正常。
-- 浏览器无 mixed content。
-- 必须记录实际生产配置路径、验证命令和回滚步骤。
+- 移植相关页面不再把他克莫司 `5-15` 显示为通用正常范围。
+- 后端血药浓度服务不再基于固定 `5-15` 输出异常结论。
+- 保持医学安全边界：只提示复核目标范围、联系移植医生、按医嘱处理，不建议调药。
 
 ### 开放待办 (按优先级)
 
@@ -103,7 +101,7 @@
 src/frontend/src/
 ├── components/
 │   ├── common/           # Layout.tsx, BottomNav.tsx
-│   └── ui/               # 可复用UI组件
+│   └── ui/               # BackButton / SegmentedControl / Spinner / ConfirmDialog（2026-07-20 抽取，新页面必须复用）
 ├── pages/                # 路由页面组件（每个页面对应一个路由）
 │   ├── Dashboard.tsx
 │   ├── HealthInsights.tsx   ← 新增：健康洞察页面
@@ -126,27 +124,31 @@ src/frontend/src/
 ├── stores/
 │   ├── authStore.ts      # 认证状态
 │   └── themeStore.ts     # 深色模式
+├── utils/
+│   └── chartTheme.ts     # 图表主题：Recharts tick/tooltip 随深浅色切换（2026-07-20 新增）
 ├── App.tsx               # 路由定义
 └── index.css             # CSS变量 + 全局样式
 ```
 
 ### 2. 主题与样式约定
 
-**CSS变量驱动深色模式** (`src/index.css`)：
+**CSS变量驱动深色模式** (`src/index.css`，2026-07-20 与实现对齐)：
 ```css
 :root {
-  --color-bg: #F5F5F5;
-  --color-card: #FFFFFF;
-  --color-text-primary: #262626;
-  --color-text-secondary: #595959;
-  --color-border: #D9D9D9;
+  --color-bg: #f4f6fb;
+  --color-card: rgba(255, 255, 255, 0.82);
+  --color-text-primary: #1f2a44;
+  --color-text-secondary: #5e6b85;
+  --color-text-helper: #5b6478;   /* 白底约 5.9:1，达标 WCAG AA */
+  --color-border: rgba(145, 161, 196, 0.26);
 }
 .dark {
-  --color-bg: #141414;
-  --color-card: #1F1F1F;
-  --color-text-primary: #E6E6E6;
-  --color-text-secondary: #B3B3B3;
-  --color-border: #434343;
+  --color-bg: #0f1728;
+  --color-card: rgba(18, 28, 48, 0.82);
+  --color-text-primary: #eef3ff;
+  --color-text-secondary: #b5c0d8;
+  --color-text-helper: #7f8aa7;
+  --color-border: rgba(139, 160, 206, 0.18);
 }
 ```
 

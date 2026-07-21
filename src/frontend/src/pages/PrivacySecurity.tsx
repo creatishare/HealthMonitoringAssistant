@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, KeyRound, Lock, ShieldCheck } from 'lucide-react'
+import { KeyRound, Lock, ShieldCheck } from 'lucide-react'
+import BackButton from '../components/ui/BackButton'
 import { authApi } from '../services/api'
 import toast from 'react-hot-toast'
 
@@ -41,9 +42,7 @@ export default function PrivacySecurity() {
   return (
     <div className="page-shell">
       <div className="page-header-compact">
-        <button onClick={() => navigate(-1)} className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-border bg-white/65 text-gray-text-primary backdrop-blur-xl dark:bg-white/5">
-          <ChevronLeft size={20} />
-        </button>
+        <BackButton />
         <div>
           <p className="section-kicker">账号</p>
           <h1 className="mt-2 text-page-title text-gray-text-primary">隐私与安全</h1>

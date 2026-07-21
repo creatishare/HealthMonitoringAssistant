@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, AlertTriangle, CheckCircle, Info, Trash2, FileText, ClipboardList, Pill } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Info, Trash2, FileText, ClipboardList, Pill } from 'lucide-react'
+import BackButton from '../components/ui/BackButton'
+import Spinner from '../components/ui/Spinner'
 import { alertApi } from '../services/api'
 import { getAlertActions, type AlertAction, type AlertActionSource } from '../services/alertActions'
 import { downloadFollowUpReport, getApiErrorMessage } from '../services/reportDownload'
@@ -158,9 +160,7 @@ export default function Alerts() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="p-2 -ml-2">
-            <ChevronLeft size={24} className="text-gray-text-primary" />
-          </button>
+          <BackButton />
           <h1 className="text-page-title font-semibold text-gray-text-primary">预警中心</h1>
         </div>
         <div className="flex items-center gap-3">
@@ -187,15 +187,15 @@ export default function Alerts() {
 
       {/* 未读统计 */}
       <div className="grid grid-cols-3 gap-3">
-        <div className={`${levelConfig.critical.statBg} rounded-lg p-3 text-center`}>
+        <div className={`${levelConfig.critical.statBg} rounded-card p-3 text-center`}>
           <p className="text-metric text-danger">{unreadCount.critical}</p>
           <p className="text-small text-gray-text-secondary">严重</p>
         </div>
-        <div className={`${levelConfig.warning.statBg} rounded-lg p-3 text-center`}>
+        <div className={`${levelConfig.warning.statBg} rounded-card p-3 text-center`}>
           <p className="text-metric text-warning">{unreadCount.warning}</p>
           <p className="text-small text-gray-text-secondary">警告</p>
         </div>
-        <div className={`${levelConfig.info.statBg} rounded-lg p-3 text-center`}>
+        <div className={`${levelConfig.info.statBg} rounded-card p-3 text-center`}>
           <p className="text-metric text-primary">{unreadCount.info}</p>
           <p className="text-small text-gray-text-secondary">提示</p>
         </div>
@@ -204,7 +204,7 @@ export default function Alerts() {
       {/* 预警列表 */}
       {loading ? (
         <div className="flex justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <Spinner />
         </div>
       ) : alerts.length === 0 ? (
         <div className="card text-center py-12">

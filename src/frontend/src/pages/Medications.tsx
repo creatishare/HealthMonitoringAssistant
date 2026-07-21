@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bell, Check, Clock, MoreVertical, Pencil, Pill, Plus, Trash2 } from 'lucide-react'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
+import Spinner from '../components/ui/Spinner'
 import { medicationApi } from '../services/api'
 import { getFallbackScheduledAtForAppDate } from '../utils/appDate'
 import toast from 'react-hot-toast'
@@ -88,6 +90,7 @@ export default function Medications() {
   const [loading, setLoading] = useState(false)
   const [todayLoading, setTodayLoading] = useState(false)
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchMedications()
@@ -168,15 +171,12 @@ export default function Medications() {
     handleResume(med.id)
   }
 
-  const handleDelete = async (id: string) => {
-    setActionMenuId(null)
-
-    if (!window.confirm('确定要删除该用药提醒吗？此操作不可恢复。')) {
-      return
-    }
+  const handleDelete = async () => {
+    if (!deleteTargetId) return
+    setDeleteTargetId(null)
 
     try {
-      await medicationApi.delete(id)
+      await medicationApi.delete(deleteTargetId)
       toast.success('已删除用药提醒')
       fetchMedications()
       fetchTodayMedications()
@@ -203,7 +203,7 @@ export default function Medications() {
 
         {todayLoading ? (
           <div className="flex justify-center py-10">
-            <div className="h-7 w-7 animate-spin rounded-full border-b-2 border-primary" />
+            <Spinner />
           </div>
         ) : todayGroups.length === 0 ? (
           <div className="py-10 text-center">
@@ -246,7 +246,7 @@ export default function Medications() {
                               已服
                             </span>
                           ) : (
-                            <button onClick={() => handleMarkTaken(med)} className="inline-flex h-9 shrink-0 items-center gap-2 rounded-button bg-primary px-4 text-helper font-semibold text-white shadow-[0_8px_18px_rgba(0,145,160,0.24)] transition-all hover:-translate-y-0.5 hover:bg-primary-dark hover:shadow-[0_10px_22px_rgba(0,145,160,0.3)] active:translate-y-0">
+                            <button onClick={() => handleMarkTaken(med)} className="inline-flex h-9 shrink-0 items-center gap-2 rounded-button bg-primary px-4 text-helper font-semibold text-white shadow-[0_8px_18px_rgba(62,99,221,0.24)] transition-all hover:-translate-y-0.5 hover:bg-primary-dark hover:shadow-[0_10px_22px_rgba(62,99,221,0.3)] active:translate-y-0">
                               <Check size={15} />
                               服用
                             </button>
@@ -284,7 +284,7 @@ export default function Medications() {
 
         {loading ? (
           <div className="flex justify-center py-10">
-            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
+            <Spinner />
           </div>
         ) : medications.length === 0 ? (
           <div className="py-10 text-center">
@@ -322,7 +322,10 @@ export default function Medications() {
                         编辑
                       </button>
                       <button
-                        onClick={() => handleDelete(med.id)}
+                        onClick={() => {
+                          setActionMenuId(null)
+                          setDeleteTargetId(med.id)
+                        }}
                         className="flex w-full items-center gap-2 rounded-[12px] px-3 py-2 text-left text-helper text-danger transition-colors hover:bg-red-50/80 dark:hover:bg-red-950/20"
                       >
                         <Trash2 size={15} />
@@ -366,6 +369,16 @@ export default function Medications() {
           <p className="mt-4 text-center text-small text-gray-text-helper">{activeCount} 种药物正在提醒</p>
         )}
       </section>
+
+      <ConfirmDialog
+        open={deleteTargetId !== null}
+        title="删除用药提醒"
+        message="确定要删除该用药提醒吗？此操作不可恢复。"
+        confirmText="删除"
+        danger
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTargetId(null)}
+      />
     </div>
   )
 }

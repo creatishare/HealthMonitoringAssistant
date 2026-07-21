@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, Camera } from 'lucide-react'
+import { Camera } from 'lucide-react'
+import BackButton from '../components/ui/BackButton'
+import Spinner from '../components/ui/Spinner'
 import HealthRecordForm from '../components/health/HealthRecordForm'
 import { healthRecordApi } from '../services/api'
 import {
@@ -73,7 +75,7 @@ export default function RecordForm() {
   if (loading && isEdit) {
     return (
       <div className="flex justify-center py-12">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
+        <Spinner />
       </div>
     )
   }
@@ -82,9 +84,7 @@ export default function RecordForm() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="p-2 -ml-2">
-            <ChevronLeft size={24} className="text-gray-text-primary" />
-          </button>
+          <BackButton />
           <h1 className="text-page-title font-semibold text-gray-text-primary">
             {pageTitle}
           </h1>

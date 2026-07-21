@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ChevronLeft, Plus, X, Trash2, ChevronRight } from 'lucide-react'
+import { Plus, X, Trash2, ChevronRight } from 'lucide-react'
+import BackButton from '../components/ui/BackButton'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
+import Spinner from '../components/ui/Spinner'
 import { medicationApi } from '../services/api'
 import { useAuthStore } from '../stores/authStore'
 import type { UserType, PrimaryDisease } from '../stores/authStore'
@@ -109,7 +112,7 @@ function BottomSelector({
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-border">
           <h3 className="text-body font-medium text-gray-text-primary">{title}</h3>
           <button onClick={onClose} className="p-1">
-            <X size={20} className="text-gray-secondary" />
+            <X size={20} className="text-gray-text-secondary" />
           </button>
         </div>
         <div className="overflow-y-auto flex-1 min-h-0 pb-20">
@@ -119,7 +122,7 @@ function BottomSelector({
                 <div className="mx-4 border-t border-gray-border" />
               )}
               {opt.isSection ? (
-                <div className="px-4 py-2 text-xs text-gray-secondary bg-gray-bg/50">
+                <div className="px-4 py-2 text-xs text-gray-text-secondary bg-gray-bg/50">
                   {opt.label}
                 </div>
               ) : (
@@ -137,7 +140,7 @@ function BottomSelector({
                   <span className={`text-body ${opt.isOther ? 'text-gray-text-secondary' : 'text-gray-text-primary'}`}>
                     {opt.label}
                   </span>
-                  <ChevronRight size={18} className="text-gray-secondary" />
+                  <ChevronRight size={18} className="text-gray-text-secondary" />
                 </button>
               )}
             </div>
@@ -155,6 +158,7 @@ export default function MedicationForm() {
   const { user } = useAuthStore()
   const [loading, setLoading] = useState(false)
   const [fetchLoading, setFetchLoading] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // 表单数据
   const [formData, setFormData] = useState({
@@ -283,16 +287,15 @@ export default function MedicationForm() {
 
   const handleDelete = async () => {
     if (!id) return
-    if (window.confirm('确定要删除该用药提醒吗？此操作不可恢复。')) {
-      setLoading(true)
-      try {
-        await medicationApi.delete(id)
-        toast.success('已删除用药提醒')
-        navigate('/medications')
-      } catch (error: any) {
-        toast.error(error.response?.data?.message || '删除失败')
-        setLoading(false)
-      }
+    setShowDeleteConfirm(false)
+    setLoading(true)
+    try {
+      await medicationApi.delete(id)
+      toast.success('已删除用药提醒')
+      navigate('/medications')
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || '删除失败')
+      setLoading(false)
     }
   }
 
@@ -368,18 +371,16 @@ export default function MedicationForm() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="p-2 -ml-2">
-            <ChevronLeft size={24} className="text-gray-text-primary" />
-          </button>
+          <BackButton />
           <h1 className="text-page-title font-semibold text-gray-text-primary">
             {isEdit ? '编辑用药' : '添加用药'}
           </h1>
         </div>
         {isEdit && (
           <button
-            onClick={handleDelete}
+            onClick={() => setShowDeleteConfirm(true)}
             disabled={loading}
-            className="p-2 text-gray-secondary hover:text-danger flex items-center gap-1"
+            className="p-2 text-gray-text-secondary hover:text-danger flex items-center gap-1"
           >
             <Trash2 size={18} />
             <span className="text-sm">删除</span>
@@ -389,7 +390,7 @@ export default function MedicationForm() {
 
       {fetchLoading ? (
         <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-medication"></div>
+          <Spinner tone="medication" />
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -398,7 +399,7 @@ export default function MedicationForm() {
             <div className="space-y-4">
               {/* 药品名称 */}
               <div>
-                <label className="block text-helper text-gray-secondary mb-2">药品名称 *</label>
+                <label className="block text-helper text-gray-text-secondary mb-2">药品名称 *</label>
                 {nameMode === 'select' && !isEdit ? (
                   <button
                     type="button"
@@ -408,7 +409,7 @@ export default function MedicationForm() {
                     <span className={formData.name ? 'text-gray-text-primary' : 'text-gray-text-helper'}>
                       {formData.name || '点击选择常用药品'}
                     </span>
-                    <ChevronRight size={18} className="text-gray-secondary" />
+                    <ChevronRight size={18} className="text-gray-text-secondary" />
                   </button>
                 ) : (
                   <input
@@ -436,7 +437,7 @@ export default function MedicationForm() {
 
               {/* 规格 */}
               <div>
-                <label className="block text-helper text-gray-secondary mb-2">规格</label>
+                <label className="block text-helper text-gray-text-secondary mb-2">规格</label>
                 {specMode === 'select' && selectedCommonMed ? (
                   <button
                     type="button"
@@ -446,7 +447,7 @@ export default function MedicationForm() {
                     <span className={formData.specification ? 'text-gray-text-primary' : 'text-gray-text-helper'}>
                       {formData.specification || '点击选择规格'}
                     </span>
-                    <ChevronRight size={18} className="text-gray-secondary" />
+                    <ChevronRight size={18} className="text-gray-text-secondary" />
                   </button>
                 ) : (
                   <input
@@ -483,7 +484,7 @@ export default function MedicationForm() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-helper text-gray-secondary mb-2">每次剂量 *</label>
+                  <label className="block text-helper text-gray-text-secondary mb-2">每次剂量 *</label>
                   <input
                     type="number"
                     step="0.1"
@@ -495,7 +496,7 @@ export default function MedicationForm() {
                   />
                 </div>
                 <div>
-                  <label className="block text-helper text-gray-secondary mb-2">单位 *</label>
+                  <label className="block text-helper text-gray-text-secondary mb-2">单位 *</label>
                   <select
                     value={formData.dosageUnit}
                     onChange={(e) => handleChange('dosageUnit', e.target.value)}
@@ -510,7 +511,7 @@ export default function MedicationForm() {
                 </div>
               </div>
               <div>
-                <label className="block text-helper text-gray-secondary mb-2">服药频率 *</label>
+                <label className="block text-helper text-gray-text-secondary mb-2">服药频率 *</label>
                 <select
                   value={formData.frequency}
                   onChange={(e) => handleChange('frequency', e.target.value)}
@@ -530,7 +531,7 @@ export default function MedicationForm() {
             <h2 className="text-card-title font-medium text-gray-text-primary mb-4">提醒设置</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-helper text-gray-secondary mb-2">提醒时间 *</label>
+                <label className="block text-helper text-gray-text-secondary mb-2">提醒时间 *</label>
                 <div className="space-y-2">
                   {formData.reminderTimes.map((time, index) => (
                     <div key={index} className="flex items-center gap-2">
@@ -545,7 +546,7 @@ export default function MedicationForm() {
                         <button
                           type="button"
                           onClick={() => removeReminderTime(index)}
-                          className="p-2 text-gray-secondary hover:text-danger"
+                          className="p-2 text-gray-text-secondary hover:text-danger"
                         >
                           <X size={20} />
                         </button>
@@ -563,7 +564,7 @@ export default function MedicationForm() {
                 </div>
               </div>
               <div>
-                <label className="block text-helper text-gray-secondary mb-2">提前提醒（分钟）</label>
+                <label className="block text-helper text-gray-text-secondary mb-2">提前提醒（分钟）</label>
                 <select
                   value={formData.reminderMinutesBefore}
                   onChange={(e) => handleChange('reminderMinutesBefore', parseInt(e.target.value))}
@@ -600,6 +601,16 @@ export default function MedicationForm() {
         options={specOptions}
         onSelect={handleSelectSpec}
         onClose={() => setSpecSelectorOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="删除用药提醒"
+        message="确定要删除该用药提醒吗？此操作不可恢复。"
+        confirmText="删除"
+        danger
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
       />
     </div>
   )

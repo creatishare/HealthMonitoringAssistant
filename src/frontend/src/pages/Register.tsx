@@ -80,12 +80,12 @@ export default function Register() {
       <div className="w-full max-w-md mx-auto">
         <div className="mb-8">
           <h1 className="text-title text-gray-text-primary mb-2">创建账号</h1>
-          <p className="text-helper text-gray-secondary">注册新账号开始使用</p>
+          <p className="text-helper text-gray-text-secondary">注册新账号开始使用</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-helper text-gray-secondary mb-2">手机号</label>
+          <label className="block text-helper text-gray-text-secondary mb-2">手机号</label>
           <input
             type="tel"
             value={phone}
@@ -97,7 +97,7 @@ export default function Register() {
         </div>
 
         <div>
-          <label className="block text-helper text-gray-secondary mb-2">验证码</label>
+          <label className="block text-helper text-gray-text-secondary mb-2">验证码</label>
           <div className="flex gap-2">
             <input
               type="text"
@@ -119,7 +119,7 @@ export default function Register() {
         </div>
 
         <div>
-          <label className="block text-helper text-gray-secondary mb-2">密码</label>
+          <label className="block text-helper text-gray-text-secondary mb-2">密码</label>
           <div className="relative">
             <input
               type={showPassword ? 'text' : 'password'}
@@ -141,7 +141,7 @@ export default function Register() {
         </div>
 
         <div>
-          <label className="block text-helper text-gray-secondary mb-2">确认密码</label>
+          <label className="block text-helper text-gray-text-secondary mb-2">确认密码</label>
           <div className="relative">
             <input
               type={showConfirmPassword ? 'text' : 'password'}
@@ -169,7 +169,7 @@ export default function Register() {
             onChange={(e) => setAgreed(e.target.checked)}
             className="mt-1 w-4 h-4 rounded border-gray-border text-primary focus:ring-primary"
           />
-          <span className="text-small text-gray-secondary leading-relaxed">
+          <span className="text-small text-gray-text-secondary leading-relaxed">
             我已阅读并同意
             <Link to="/privacy-policy" className="text-primary hover:underline">
               《隐私政策》
@@ -187,7 +187,7 @@ export default function Register() {
         </button>
       </form>
 
-      <p className="text-center mt-6 text-helper text-gray-secondary">
+      <p className="text-center mt-6 text-helper text-gray-text-secondary">
         已有账号？
         <button
           onClick={() => navigate('/login')}

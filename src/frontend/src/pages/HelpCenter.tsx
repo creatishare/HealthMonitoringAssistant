@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ChevronDown, ChevronLeft, FileText, HelpCircle, Pill, TrendingUp } from 'lucide-react'
+import { ChevronDown, FileText, HelpCircle, Pill, TrendingUp } from 'lucide-react'
+import BackButton from '../components/ui/BackButton'
 
 const guides = [
   {
@@ -40,15 +40,12 @@ const faqs = [
 ]
 
 export default function HelpCenter() {
-  const navigate = useNavigate()
   const [openFaq, setOpenFaq] = useState(0)
 
   return (
     <div className="page-shell">
       <div className="page-header-compact">
-        <button onClick={() => navigate(-1)} className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-border bg-white/65 text-gray-text-primary backdrop-blur-xl dark:bg-white/5">
-          <ChevronLeft size={20} />
-        </button>
+        <BackButton />
         <div>
           <p className="section-kicker">支持</p>
           <h1 className="mt-2 text-page-title text-gray-text-primary">帮助中心</h1>

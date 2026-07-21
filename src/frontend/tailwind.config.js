@@ -14,8 +14,8 @@ export default {
           light: '#E8EEFF',
           soft: '#F4F7FF',
         },
-        success: '#2F9E6D',
-        warning: '#D98E04',
+        success: '#1F7A4D',
+        warning: '#A06200',
         danger: '#D9485F',
         medication: {
           DEFAULT: '#6F5BD3',
@@ -44,15 +44,6 @@ export default {
         'helper': ['14px', { lineHeight: '1.55' }],
         'small': ['12px', { lineHeight: '1.5' }],
         'metric': ['30px', { lineHeight: '1.15', fontWeight: '700' }],
-      },
-      spacing: {
-        'xs': '4px',
-        'sm': '8px',
-        'md': '12px',
-        'lg': '16px',
-        'xl': '24px',
-        '2xl': '32px',
-        '3xl': '48px',
       },
       borderRadius: {
         'card': '24px',

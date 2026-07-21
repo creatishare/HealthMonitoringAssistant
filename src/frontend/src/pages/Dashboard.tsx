@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Plus, Bell, AlertTriangle, ChevronRight, Clock, TrendingUp, Sparkles, CheckCircle, FileText, ClipboardList, Pill } from 'lucide-react'
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, Legend } from 'recharts'
 import { useDashboardStore, type UserType, type PrimaryDisease } from '../stores/dashboardStore'
 import { alertApi, healthRecordApi, medicationApi } from '../services/api'
 import { getTransplantBaselinePrompt } from '../services/transplantProfile'
@@ -13,6 +13,9 @@ import {
   getFallbackScheduledAtForAppDate,
   getMillisecondsUntilNextAppDay,
 } from '../utils/appDate'
+import { useChartTheme } from '../utils/chartTheme'
+import SegmentedControl from '../components/ui/SegmentedControl'
+import Spinner from '../components/ui/Spinner'
 import toast from 'react-hot-toast'
 
 interface TrendData {
@@ -146,6 +149,9 @@ function getMetricName(metricKey: string) {
   return ALL_METRICS.find((metric) => metric.key === metricKey)?.name || metricKey
 }
 
+// 趋势图最多同时显示 2 项指标，避免多量纲共用 Y 轴把低值曲线压平
+const MAX_TREND_METRICS = 2
+
 function getRiskToneClass(tone: TransplantRiskTone) {
   switch (tone) {
     case 'red':
@@ -180,6 +186,7 @@ export default function Dashboard() {
   const [metricScope, setMetricScope] = useState<MetricScope>('core')
   const [hasInitializedMetrics, setHasInitializedMetrics] = useState(false)
   const [alertActionLoading, setAlertActionLoading] = useState<string | null>(null)
+  const chartTheme = useChartTheme()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -234,7 +241,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (data?.user && !hasInitializedMetrics) {
-      setSelectedMetrics(getCoreMetrics(data.user.userType, data.user.primaryDisease))
+      setSelectedMetrics(getCoreMetrics(data.user.userType, data.user.primaryDisease).slice(0, MAX_TREND_METRICS))
       setHasInitializedMetrics(true)
     }
   }, [data?.user?.userType, data?.user?.primaryDisease, hasInitializedMetrics])
@@ -264,9 +271,14 @@ export default function Dashboard() {
   }
 
   const toggleMetric = (metricKey: string) => {
-    setSelectedMetrics((prev) =>
-      prev.includes(metricKey) ? prev.filter((m) => m !== metricKey) : [...prev, metricKey]
-    )
+    if (!selectedMetrics.includes(metricKey) && selectedMetrics.length >= MAX_TREND_METRICS) {
+      toast(`趋势图最多同时显示${MAX_TREND_METRICS}项指标，已替换最早选择的指标`, { icon: 'ℹ️' })
+    }
+    setSelectedMetrics((prev) => {
+      if (prev.includes(metricKey)) return prev.filter((m) => m !== metricKey)
+      if (prev.length >= MAX_TREND_METRICS) return [...prev.slice(1), metricKey]
+      return [...prev, metricKey]
+    })
   }
 
   const handleMarkTaken = async (med: TodayMedication) => {
@@ -311,7 +323,7 @@ export default function Dashboard() {
   if (loading || !data) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-9 w-9 animate-spin rounded-full border-b-2 border-primary" />
+        <Spinner />
       </div>
     )
   }
@@ -328,6 +340,12 @@ export default function Dashboard() {
   })
 
   const hasTrendData = trendData.length > 0 && selectedMetrics.some((m) => trendData.some((d) => d[m as keyof TrendData] !== undefined && d[m as keyof TrendData] !== null))
+
+  const selectedMetricDefs = selectedMetrics
+    .map((key) => ALL_METRICS.find((m) => m.key === key))
+    .filter((m): m is (typeof ALL_METRICS)[number] => Boolean(m))
+  // 两项指标单位不同（如血压 mmHg 与血钾 mmol/L）时启用左右双 Y 轴，避免低值曲线被压平
+  const useDualYAxis = selectedMetricDefs.length === 2 && selectedMetricDefs[0].unit !== selectedMetricDefs[1].unit
 
   const isTransplantDashboardUser = data?.user?.userType === 'kidney_transplant' || data?.user?.hasTransplant === true
   const coreMetricKeys = getCoreMetrics(data?.user?.userType, data?.user?.primaryDisease)
@@ -563,21 +581,12 @@ export default function Dashboard() {
             </button>
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-2 rounded-[18px] border border-gray-border bg-white/56 p-1 dark:bg-slate-900/30">
-            {METRIC_SCOPE_OPTIONS.map((option) => (
-              <button
-                key={option.key}
-                onClick={() => setMetricScope(option.key)}
-                className={`h-9 rounded-[14px] text-helper font-medium transition-all ${
-                  metricScope === option.key
-                    ? 'bg-primary text-white shadow-[0_10px_22px_rgba(62,99,221,0.18)]'
-                    : 'text-gray-text-secondary hover:text-primary'
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            className="mt-4"
+            options={METRIC_SCOPE_OPTIONS.map((option) => ({ label: option.label, value: option.key }))}
+            value={metricScope}
+            onChange={setMetricScope}
+          />
 
           <div className="mt-3 flex items-start gap-2 rounded-[18px] border border-primary/15 bg-primary/10 p-3 text-helper text-gray-text-secondary dark:bg-primary/10">
             <Sparkles size={16} className="mt-0.5 shrink-0 text-primary" />
@@ -621,7 +630,7 @@ export default function Dashboard() {
           <div className="mt-5 h-56 md:h-72">
             {trendLoading ? (
               <div className="flex justify-center py-12">
-                <div className="h-7 w-7 animate-spin rounded-full border-b-2 border-primary" />
+                <Spinner />
               </div>
             ) : hasTrendData ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -629,20 +638,20 @@ export default function Dashboard() {
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(145,161,196,0.28)" />
                   <XAxis
                     dataKey="date"
-                    tick={{ fontSize: 11, fill: '#8A94AB' }}
+                    tick={chartTheme.tickStyle}
                     tickFormatter={(value) => {
                       const date = new Date(value)
                       return `${date.getMonth() + 1}/${date.getDate()}`
                     }}
                   />
-                  <YAxis tick={{ fontSize: 11, fill: '#8A94AB' }} domain={['auto', 'auto']} />
+                  <YAxis yAxisId="left" tick={chartTheme.tickStyle} domain={['auto', 'auto']} />
+                  {useDualYAxis && (
+                    <YAxis yAxisId="right" orientation="right" tick={chartTheme.tickStyle} domain={['auto', 'auto']} />
+                  )}
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'rgba(255,255,255,0.96)',
-                      border: '1px solid rgba(145,161,196,0.24)',
-                      borderRadius: '16px',
-                      fontSize: '12px',
-                    }}
+                    contentStyle={chartTheme.tooltipContentStyle}
+                    labelStyle={chartTheme.tooltipLabelStyle}
+                    itemStyle={chartTheme.tooltipItemStyle}
                     labelFormatter={(label) => {
                       const date = new Date(label)
                       return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -652,7 +661,13 @@ export default function Dashboard() {
                       return [`${value} ${metric?.unit || ''}`, metric?.name || name]
                     }}
                   />
-                  {selectedMetrics.map((metricKey) => {
+                  {selectedMetrics.length >= 2 && (
+                    <Legend
+                      formatter={(value: string) => getMetricName(value)}
+                      wrapperStyle={{ fontSize: '13px' }}
+                    />
+                  )}
+                  {selectedMetrics.map((metricKey, index) => {
                     const metric = ALL_METRICS.find((m) => m.key === metricKey)
                     if (!metric) return null
                     return (
@@ -661,6 +676,7 @@ export default function Dashboard() {
                         type="monotone"
                         dataKey={metricKey}
                         name={metricKey}
+                        yAxisId={useDualYAxis && index === 1 ? 'right' : 'left'}
                         stroke={metric.color}
                         strokeWidth={2.5}
                         dot={{ fill: metric.color, strokeWidth: 0, r: 3.5 }}

@@ -97,7 +97,7 @@ export default function ForgotPassword() {
         {/* 返回按钮 */}
         <button
           onClick={() => navigate('/login')}
-          className="mb-6 text-gray-secondary hover:text-gray-text-primary"
+          className="mb-6 text-gray-text-secondary hover:text-gray-text-primary"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -110,7 +110,7 @@ export default function ForgotPassword() {
           {step === 'verify' && '验证手机号'}
           {step === 'reset' && '设置新密码'}
         </h1>
-        <p className="text-helper text-gray-secondary">
+        <p className="text-helper text-gray-text-secondary">
           {step === 'phone' && '请输入注册时使用的手机号'}
           {step === 'verify' && `验证码已发送至 ${phone}`}
           {step === 'reset' && '请设置新的登录密码'}
@@ -121,7 +121,7 @@ export default function ForgotPassword() {
       {step === 'phone' && (
         <form onSubmit={handlePhoneSubmit} className="space-y-4">
           <div>
-            <label className="block text-helper text-gray-secondary mb-2">手机号</label>
+            <label className="block text-helper text-gray-text-secondary mb-2">手机号</label>
             <input
               type="tel"
               value={phone}
@@ -146,7 +146,7 @@ export default function ForgotPassword() {
       {step === 'verify' && (
         <form onSubmit={handleVerifySubmit} className="space-y-4">
           <div>
-            <label className="block text-helper text-gray-secondary mb-2">验证码</label>
+            <label className="block text-helper text-gray-text-secondary mb-2">验证码</label>
             <input
               type="text"
               value={verificationCode}
@@ -167,7 +167,7 @@ export default function ForgotPassword() {
 
           <div className="text-center mt-4">
             {countdown > 0 ? (
-              <span className="text-helper text-gray-hint">{countdown}秒后可重新发送</span>
+              <span className="text-helper text-gray-text-helper">{countdown}秒后可重新发送</span>
             ) : (
               <button
                 type="button"
@@ -186,7 +186,7 @@ export default function ForgotPassword() {
       {step === 'reset' && (
         <form onSubmit={handleResetSubmit} className="space-y-4">
           <div>
-            <label className="block text-helper text-gray-secondary mb-2">新密码</label>
+            <label className="block text-helper text-gray-text-secondary mb-2">新密码</label>
             <div className="relative">
               <input
                 type={showNewPassword ? 'text' : 'password'}
@@ -208,7 +208,7 @@ export default function ForgotPassword() {
           </div>
 
           <div>
-            <label className="block text-helper text-gray-secondary mb-2">确认密码</label>
+            <label className="block text-helper text-gray-text-secondary mb-2">确认密码</label>
             <div className="relative">
               <input
                 type={showConfirmPassword ? 'text' : 'password'}
@@ -239,7 +239,7 @@ export default function ForgotPassword() {
         </form>
       )}
 
-      <p className="text-center mt-6 text-helper text-gray-secondary">
+      <p className="text-center mt-6 text-helper text-gray-text-secondary">
         想起密码了？
         <button
           onClick={() => navigate('/login')}

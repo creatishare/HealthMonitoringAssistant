@@ -112,7 +112,7 @@ export default function Onboarding() {
           <>
             <div className="mb-8 text-center">
               <h1 className="text-title text-gray-text-primary mb-2">完善您的初始信息</h1>
-              <p className="text-helper text-gray-secondary">
+              <p className="text-helper text-gray-text-secondary">
                 首次登录请选择最符合您的身份，后续可在个人档案中修改。
               </p>
             </div>
@@ -134,7 +134,7 @@ export default function Onboarding() {
                     <div className="text-body font-medium text-gray-text-primary mb-1">
                       {option.title}
                     </div>
-                    <div className="text-helper text-gray-secondary">{option.description}</div>
+                    <div className="text-helper text-gray-text-secondary">{option.description}</div>
                   </button>
                 )
               })}
@@ -155,7 +155,7 @@ export default function Onboarding() {
           <>
             <div className="mb-8 text-center">
               <h1 className="text-title text-gray-text-primary mb-2">选择原发疾病</h1>
-              <p className="text-helper text-gray-secondary">
+              <p className="text-helper text-gray-text-secondary">
                 请选择导致您肾脏问题的原发疾病类型，以便我们为您推荐更合适的关注指标。
               </p>
             </div>
@@ -207,14 +207,14 @@ export default function Onboarding() {
           <>
             <div className="mb-8 text-center">
               <h1 className="text-title text-gray-text-primary mb-2">补全基本信息</h1>
-              <p className="text-helper text-gray-secondary">
+              <p className="text-helper text-gray-text-secondary">
                 这些信息将帮助我们为您提供更精准的健康数据分析。
               </p>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-small text-gray-secondary mb-1">昵称</label>
+                <label className="block text-small text-gray-text-secondary mb-1">昵称</label>
                 <input
                   type="text"
                   value={profile.name}
@@ -225,7 +225,7 @@ export default function Onboarding() {
               </div>
 
               <div>
-                <label className="block text-small text-gray-secondary mb-1">性别</label>
+                <label className="block text-small text-gray-text-secondary mb-1">性别</label>
                 <div className="flex gap-4">
                   <button
                     type="button"
@@ -233,7 +233,7 @@ export default function Onboarding() {
                     className={`flex-1 py-2 rounded-lg border ${
                       profile.gender === 'male'
                         ? 'border-primary bg-primary-light text-primary'
-                        : 'border-gray-border text-gray-secondary'
+                        : 'border-gray-border text-gray-text-secondary'
                     }`}
                   >
                     男
@@ -244,7 +244,7 @@ export default function Onboarding() {
                     className={`flex-1 py-2 rounded-lg border ${
                       profile.gender === 'female'
                         ? 'border-primary bg-primary-light text-primary'
-                        : 'border-gray-border text-gray-secondary'
+                        : 'border-gray-border text-gray-text-secondary'
                     }`}
                   >
                     女
@@ -253,7 +253,7 @@ export default function Onboarding() {
               </div>
 
               <div>
-                <label className="block text-small text-gray-secondary mb-1">出生日期</label>
+                <label className="block text-small text-gray-text-secondary mb-1">出生日期</label>
                 <input
                   type="date"
                   value={profile.birthDate}
@@ -264,7 +264,7 @@ export default function Onboarding() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-small text-gray-secondary mb-1">身高 (cm)</label>
+                  <label className="block text-small text-gray-text-secondary mb-1">身高 (cm)</label>
                   <input
                     type="number"
                     value={profile.height}
@@ -274,7 +274,7 @@ export default function Onboarding() {
                   />
                 </div>
                 <div>
-                  <label className="block text-small text-gray-secondary mb-1">当前体重 (kg)</label>
+                  <label className="block text-small text-gray-text-secondary mb-1">当前体重 (kg)</label>
                   <input
                     type="number"
                     value={profile.currentWeight}
@@ -286,7 +286,7 @@ export default function Onboarding() {
               </div>
 
               <div>
-                <label className="block text-small text-gray-secondary mb-1">确诊日期</label>
+                <label className="block text-small text-gray-text-secondary mb-1">确诊日期</label>
                 <input
                   type="date"
                   value={profile.diagnosisDate}
@@ -298,7 +298,7 @@ export default function Onboarding() {
               {selectedType === 'kidney_transplant' && (
                 <>
                   <div>
-                    <label className="block text-small text-gray-secondary mb-1">移植时间</label>
+                    <label className="block text-small text-gray-text-secondary mb-1">移植时间</label>
                     <input
                       type="date"
                       value={profile.transplantDate}
@@ -307,7 +307,7 @@ export default function Onboarding() {
                     />
                   </div>
                   <div>
-                    <label className="block text-small text-gray-secondary mb-1">稳定期基线肌酐 (μmol/L)</label>
+                    <label className="block text-small text-gray-text-secondary mb-1">稳定期基线肌酐 (μmol/L)</label>
                     <input
                       type="number"
                       step="0.1"

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { ChevronLeft, Save } from 'lucide-react'
+import { Save } from 'lucide-react'
+import BackButton from '../components/ui/BackButton'
+import Spinner from '../components/ui/Spinner'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../stores/authStore'
 import { userApi } from '../services/api'
@@ -87,7 +89,7 @@ export default function ProfileEdit() {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <Spinner />
       </div>
     )
   }
@@ -98,9 +100,7 @@ export default function ProfileEdit() {
     <div className="space-y-4">
       {/* 头部 */}
       <div className="flex items-center gap-4">
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2">
-          <ChevronLeft size={24} className="text-gray-text-primary" />
-        </button>
+        <BackButton />
         <h1 className="text-page-title font-semibold text-gray-text-primary">个人档案</h1>
       </div>
 
@@ -110,7 +110,7 @@ export default function ProfileEdit() {
           <h2 className="text-card-title font-medium text-gray-text-primary mb-4">基本信息</h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-small text-gray-secondary mb-1">昵称</label>
+              <label className="block text-small text-gray-text-secondary mb-1">昵称</label>
               <input
                 type="text"
                 value={formData.name || ''}
@@ -120,7 +120,7 @@ export default function ProfileEdit() {
               />
             </div>
             <div>
-              <label className="block text-small text-gray-secondary mb-1">性别</label>
+              <label className="block text-small text-gray-text-secondary mb-1">性别</label>
               <div className="flex gap-4">
                 <button
                   type="button"
@@ -128,7 +128,7 @@ export default function ProfileEdit() {
                   className={`flex-1 py-2 rounded-lg border ${
                     formData.gender === 'male'
                       ? 'border-primary bg-primary-light text-primary'
-                      : 'border-gray-border text-gray-secondary'
+                      : 'border-gray-border text-gray-text-secondary'
                   }`}
                 >
                   男
@@ -139,7 +139,7 @@ export default function ProfileEdit() {
                   className={`flex-1 py-2 rounded-lg border ${
                     formData.gender === 'female'
                       ? 'border-primary bg-primary-light text-primary'
-                      : 'border-gray-border text-gray-secondary'
+                      : 'border-gray-border text-gray-text-secondary'
                   }`}
                 >
                   女
@@ -147,7 +147,7 @@ export default function ProfileEdit() {
               </div>
             </div>
             <div>
-              <label className="block text-small text-gray-secondary mb-1">出生日期</label>
+              <label className="block text-small text-gray-text-secondary mb-1">出生日期</label>
               <input
                 type="date"
                 value={formData.birthDate || ''}
@@ -163,7 +163,7 @@ export default function ProfileEdit() {
           <h2 className="text-card-title font-medium text-gray-text-primary mb-4">身体数据</h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-small text-gray-secondary mb-1">身高 (cm)</label>
+              <label className="block text-small text-gray-text-secondary mb-1">身高 (cm)</label>
               <input
                 type="number"
                 value={formData.height || ''}
@@ -173,7 +173,7 @@ export default function ProfileEdit() {
               />
             </div>
             <div>
-              <label className="block text-small text-gray-secondary mb-1">当前体重 (kg)</label>
+              <label className="block text-small text-gray-text-secondary mb-1">当前体重 (kg)</label>
               <input
                 type="number"
                 value={formData.currentWeight || ''}
@@ -183,7 +183,7 @@ export default function ProfileEdit() {
               />
             </div>
             <div>
-              <label className="block text-small text-gray-secondary mb-1">干体重 (kg)</label>
+              <label className="block text-small text-gray-text-secondary mb-1">干体重 (kg)</label>
               <input
                 type="number"
                 value={formData.dryWeight || ''}
@@ -206,7 +206,7 @@ export default function ProfileEdit() {
           )}
           <div className="space-y-4">
             <div>
-              <label className="block text-small text-gray-secondary mb-1">透析类型</label>
+              <label className="block text-small text-gray-text-secondary mb-1">透析类型</label>
               <select
                 value={formData.dialysisType || 'none'}
                 onChange={(e) => handleChange('dialysisType', e.target.value)}
@@ -218,7 +218,7 @@ export default function ProfileEdit() {
               </select>
             </div>
             <div>
-              <label className="block text-small text-gray-secondary mb-1">确诊日期</label>
+              <label className="block text-small text-gray-text-secondary mb-1">确诊日期</label>
               <input
                 type="date"
                 value={formData.diagnosisDate || ''}
@@ -227,7 +227,7 @@ export default function ProfileEdit() {
               />
             </div>
             <div>
-              <label className="block text-small text-gray-secondary mb-1">原发疾病</label>
+              <label className="block text-small text-gray-text-secondary mb-1">原发疾病</label>
               <select
                 value={formData.primaryDisease || ''}
                 onChange={(e) => handleChange('primaryDisease', e.target.value)}
@@ -241,7 +241,7 @@ export default function ProfileEdit() {
               </select>
             </div>
             <div>
-              <label className="block text-small text-gray-secondary mb-1">是否经过移植手术</label>
+              <label className="block text-small text-gray-text-secondary mb-1">是否经过移植手术</label>
               <div className="flex gap-4">
                 <button
                   type="button"
@@ -249,7 +249,7 @@ export default function ProfileEdit() {
                   className={`flex-1 py-2 rounded-lg border ${
                     formData.hasTransplant
                       ? 'border-primary bg-primary-light text-primary'
-                      : 'border-gray-border text-gray-secondary'
+                      : 'border-gray-border text-gray-text-secondary'
                   }`}
                 >
                   是
@@ -260,7 +260,7 @@ export default function ProfileEdit() {
                   className={`flex-1 py-2 rounded-lg border ${
                     !formData.hasTransplant
                       ? 'border-primary bg-primary-light text-primary'
-                      : 'border-gray-border text-gray-secondary'
+                      : 'border-gray-border text-gray-text-secondary'
                   }`}
                 >
                   否
@@ -270,7 +270,7 @@ export default function ProfileEdit() {
             {formData.hasTransplant && (
               <>
                 <div>
-                  <label className="block text-small text-gray-secondary mb-1">移植时间</label>
+                  <label className="block text-small text-gray-text-secondary mb-1">移植时间</label>
                   <input
                     type="date"
                     value={formData.transplantDate || ''}
@@ -279,7 +279,7 @@ export default function ProfileEdit() {
                   />
                 </div>
                 <div>
-                  <label className="block text-small text-gray-secondary mb-1">稳定期基线肌酐 (μmol/L)</label>
+                  <label className="block text-small text-gray-text-secondary mb-1">稳定期基线肌酐 (μmol/L)</label>
                   <input
                     type="number"
                     step="0.1"
@@ -293,7 +293,7 @@ export default function ProfileEdit() {
                   </p>
                 </div>
                 <div>
-                  <label className="block text-small text-gray-secondary mb-1">他克莫司目标范围 (ng/mL)</label>
+                  <label className="block text-small text-gray-text-secondary mb-1">他克莫司目标范围 (ng/mL)</label>
                   <div className="grid grid-cols-2 gap-3">
                     <input
                       type="number"

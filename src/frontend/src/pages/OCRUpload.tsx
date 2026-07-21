@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, CheckCircle, Trash2, AlertTriangle, Upload, Loader2 } from 'lucide-react'
+import { CheckCircle, Trash2, AlertTriangle, Upload, Loader2 } from 'lucide-react'
+import BackButton from '../components/ui/BackButton'
 import { ocrApi } from '../services/api'
 import { getAppDateString } from '../utils/appDate'
 import toast from 'react-hot-toast'
@@ -264,7 +265,7 @@ export default function OCRUpload() {
   const getStatusInfo = (status: ImageItem['status']) => {
     switch (status) {
       case 'pending':
-        return { text: '等待中', color: 'text-gray-secondary' }
+        return { text: '等待中', color: 'text-gray-text-secondary' }
       case 'uploading':
         return { text: '上传中...', color: 'text-primary' }
       case 'recognizing':
@@ -315,22 +316,20 @@ export default function OCRUpload() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4">
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2">
-          <ChevronLeft size={24} className="text-gray-text-primary" />
-        </button>
+        <BackButton />
         <h1 className="text-page-title font-semibold text-gray-text-primary">拍照识别</h1>
       </div>
 
       {/* 日期选择器 */}
       <div className="card">
-        <label className="block text-helper text-gray-secondary mb-2">报告日期</label>
+        <label className="block text-helper text-gray-text-secondary mb-2">报告日期</label>
         <input
           type="date"
           value={recordDate}
           onChange={(e) => setRecordDate(e.target.value)}
           className="input-field w-full"
         />
-        <p className="text-xs text-gray-helper mt-1">
+        <p className="text-xs text-gray-text-helper mt-1">
           所有识别的指标将保存到该日期下，如与报告日期不一致会有提示
         </p>
       </div>
@@ -341,9 +340,9 @@ export default function OCRUpload() {
         className="card border-2 border-dashed border-gray-border hover:border-primary cursor-pointer transition-colors"
       >
         <div className="text-center py-8">
-          <Upload size={36} className="text-gray-secondary mx-auto mb-3" />
+          <Upload size={36} className="text-gray-text-secondary mx-auto mb-3" />
           <p className="text-body text-gray-text-primary">点击上传化验单照片</p>
-          <p className="text-small text-gray-secondary mt-1">支持 JPG、PNG 格式，可同时选择多张</p>
+          <p className="text-small text-gray-text-secondary mt-1">支持 JPG、PNG 格式，可同时选择多张</p>
         </div>
         <input
           ref={fileInputRef}
@@ -394,7 +393,7 @@ export default function OCRUpload() {
                       {statusInfo.text}
                     </span>
                     {item.result && Object.keys(item.result.extracted).length > 0 && (
-                      <span className="text-xs text-gray-helper">
+                      <span className="text-xs text-gray-text-helper">
                         提取到 {Object.keys(item.result.extracted).length} 个指标
                       </span>
                     )}
@@ -402,7 +401,7 @@ export default function OCRUpload() {
 
                   {item.result?.recordDate && (
                     <div className="flex items-center gap-1 mt-1">
-                      <span className="text-xs text-gray-helper">
+                      <span className="text-xs text-gray-text-helper">
                         识别日期: {item.result.recordDate}
                       </span>
                       {mismatch && (
@@ -422,7 +421,7 @@ export default function OCRUpload() {
                 {/* 删除按钮 */}
                 <button
                   onClick={() => handleRemoveImage(item.tempId)}
-                  className="p-1.5 self-start text-gray-secondary hover:text-danger transition-colors"
+                  className="p-1.5 self-start text-gray-text-secondary hover:text-danger transition-colors"
                 >
                   <Trash2 size={16} />
                 </button>
@@ -449,7 +448,7 @@ export default function OCRUpload() {
 
               return (
                 <div key={key}>
-                  <label className="block text-small text-gray-secondary mb-1">
+                  <label className="block text-small text-gray-text-secondary mb-1">
                     {label}
                     {hasValue && confidence > 0 && (
                       <span

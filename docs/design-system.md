@@ -1,8 +1,10 @@
 # 设计规范文档
 
-**版本**: v1.0.0
-**日期**: 2026-03-29
-**作者**: 产品设计师 Agent
+**版本**: v2.0.0
+**日期**: 2026-07-20
+**作者**: 产品设计师 Agent（v1.0.0）；2026-07-20 按代码实现回写（v2.0.0）
+
+> **重要**：本文档已与 2026-07 的前端实现对齐。如文档与代码再次不一致，以 `src/frontend/src/index.css` 和 `src/frontend/tailwind.config.js` 为准，并及时回写本文档。
 
 ---
 
@@ -21,7 +23,7 @@
 ### 1.2 设计目标
 
 - **易用性**: 减少操作步骤，一页只做一件事
-- **可读性**: 大字体、高对比度、清晰的信息层级
+- **可读性**: 大字体、高对比度（WCAG AA ≥ 4.5:1）、清晰的信息层级
 - **安全感**: 温和的语言，避免制造焦虑
 - **及时反馈**: 每个操作都有明确的响应
 
@@ -29,46 +31,53 @@
 
 ## 2. 色彩系统
 
+> 实现位置：`tailwind.config.js`（功能色/主色）+ `index.css` `:root`/`.dark`（中性色 CSS 变量）。
+
 ### 2.1 主色调
 
 | 颜色名称 | 色值 | 用途 |
 |----------|------|------|
-| **医疗蓝** | `#1890FF` | 主品牌色、主要按钮、链接、导航激活态 |
-| **深医疗蓝** | `#096DD9` | 按钮悬停态、强调 |
-| **浅医疗蓝** | `#E6F7FF` | 背景高亮、选中态背景 |
+| **主蓝 primary** | `#3E63DD` | 主品牌色、主要按钮、链接、导航激活态 |
+| **深主蓝 primary-dark** | `#2F4FB8` | 按钮悬停态 |
+| **浅主蓝 primary-light** | `#E8EEFF` | 选中态背景、信息预警卡片背景 |
+| **柔主蓝 primary-soft** | `#F4F7FF` | 大面积浅背景 |
 
 ### 2.2 功能色
 
-| 颜色名称 | 色值 | 用途 |
-|----------|------|------|
-| **成功/正常** | `#52C41A` | 正常指标、成功状态、已服药标记 |
-| **警告** | `#FAAD14` | 需要注意、轻微异常 |
-| **危险/异常** | `#F5222D` | 紧急预警、严重异常、错误提示 |
-| **用药提醒紫** | `#722ED1` | 用药提醒专属色、与医疗蓝区分 |
-| **浅紫色** | `#F9F0FF` | 用药提醒卡片背景 |
-
-### 2.3 中性色
+> 2026-07-20 起 warning/success 已调深以满足白底小字 WCAG AA（≥4.5:1）。
 
 | 颜色名称 | 色值 | 用途 |
 |----------|------|------|
-| **背景灰** | `#F5F5F5` | 页面背景 |
-| **卡片白** | `#FFFFFF` | 卡片背景 |
-| **文字主色** | `#262626` | 主要文字 |
-| **文字次要** | `#595959` | 次要文字、标签 |
-| **文字辅助** | `#8C8C8C` | 时间、提示 |
-| **边框** | `#D9D9D9` | 输入框边框、分割线 |
-| **禁用灰** | `#BFBFBF` | 禁用状态、已跳过标记 |
+| **成功/正常 success** | `#1F7A4D` | 正常指标、成功状态、已服药标记（白底约 5.3:1） |
+| **警告 warning** | `#A06200` | 需要注意、轻微异常（白底约 5.0:1） |
+| **危险/异常 danger** | `#D9485F` | 紧急预警、严重异常、错误提示 |
+| **用药紫 medication** | `#6F5BD3` | 用药相关专属色、与主蓝区分 |
+| **浅用药紫 medication-light** | `#F1EEFF` | 用药卡片渐变背景 |
 
-### 2.4 医疗指标颜色规范
+### 2.3 中性色（CSS 变量，深色模式自动切换）
 
-| 指标类型 | 正常 | 警告 | 危险 |
-|----------|------|------|------|
-| **肌酐** | `#52C41A` | `#FAAD14` (>133) | `#F5222D` (>500) |
-| **血钾** | `#52C41A` | `#FAAD14` (>5.5) | `#F5222D` (>6.0) |
-| **尿酸** | `#52C41A` | `#FAAD14` (>420) | - |
-| **血压** | `#52C41A` | `#FAAD14` (>140/90) | `#F5222D` (>180/110) |
-| **血糖** | `#52C41A` | `#FAAD14` (>7.0) | `#F5222D` (>11.1) |
-| **血药浓度** | `#52C41A` | `#FAAD14` (超出范围) | - |
+| 变量 | 浅色 | 深色 | 用途 |
+|------|------|------|------|
+| `--color-bg` | `#F4F6FB` | `#0F1728` | 页面背景（叠加径向渐变） |
+| `--color-card` | `rgba(255,255,255,0.82)` | `rgba(18,28,48,0.82)` | 卡片背景（玻璃拟态，配 backdrop-blur） |
+| `--color-text-primary` | `#1F2A44` | `#EEF3FF` | 主要文字 |
+| `--color-text-secondary` | `#5E6B85` | `#B5C0D8` | 次要文字、标签 |
+| `--color-text-helper` | `#5B6478` | `#7F8AA7` | 时间、提示（浅色白底约 5.9:1，2026-07-20 由 `#8A94AB` 调深） |
+| `--color-border` | `rgba(145,161,196,0.26)` | `rgba(139,160,206,0.18)` | 边框、分割线 |
+| `--color-disabled` | `#B2BCCF` | `#54627F` | 禁用状态 |
+
+**铁律**：禁止硬编码 `bg-white`/`text-black` 等；使用 `bg-gray-bg`、`bg-gray-card`、`text-gray-text-primary`、`text-gray-text-secondary`、`text-gray-text-helper`、`border-gray-border` 等映射类。类名是嵌套结构——`text-gray-secondary` / `text-gray-helper` / `text-gray-hint` 都不存在，写了不会生成任何 CSS（2026-07-20 已全仓清理）。
+
+### 2.4 深色模式
+
+- Tailwind `darkMode: 'class'`，`themeStore` 在 `<html>` 上切换 `.dark` 类
+- 中性色全部由 CSS 变量驱动（见 2.3），组件无需感知主题
+- **例外**：Recharts 图表的坐标轴、tooltip 颜色是 JS 写死的，不走 CSS 变量，统一使用 `src/frontend/src/utils/chartTheme.ts`（轴 13px，浅色 `#5B6478` / 深色 `#B3B3B3`；tooltip 深色为 `#1F1F1F` 卡片 + `#434343` 边框 + `#E6E6E6` 文字）
+- 页面背景为多层径向渐变 + 线性渐变（`index.css` body/`.dark body`），卡片用半透明 + `backdrop-blur-xl` 的玻璃拟态风格
+
+### 2.5 医疗指标颜色规范
+
+指标状态色统一使用 2.2 的 success/warning/danger。阈值定义以 `docs/medical-spec.md` 为准。注意：他克莫司（血药浓度）**没有通用固定参考范围**，界面只提示"以医生设定目标范围为准/按医嘱处理"，禁止展示 `5-15 ng/mL` 之类的通用正常区间。
 
 ---
 
@@ -80,211 +89,107 @@
 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
 ```
 
-### 3.2 字号规范
+### 3.2 字号规范（tailwind.config.js `fontSize` token）
 
-| 层级 | 字号 | 字重 | 行高 | 用途 |
-|------|------|------|------|------|
-| **大标题** | 24px | 600 | 1.4 | 页面主标题 |
-| **页面标题** | 20px | 600 | 1.4 | 页面标题栏 |
-| **卡片标题** | 18px | 500 | 1.5 | 卡片标题 |
-| **正文** | 16px | 400 | 1.6 | 正文内容 |
-| **辅助文字** | 14px | 400 | 1.5 | 标签、说明 |
-| **小字** | 12px | 400 | 1.5 | 时间、次要信息 |
+| Token | 字号 | 字重 | 行高 | 用途 |
+|-------|------|------|------|------|
+| `text-title` | 30px | 700 | 1.2 | 页面大标题 |
+| `text-page-title` | 22px | 650 | 1.3 | 次级页面标题 |
+| `text-card-title` | 18px | 600 | 1.45 | 卡片标题 |
+| `text-body` | 16px | 400 | 1.65 | 正文 |
+| `text-helper` | 14px | 400 | 1.55 | 标签、说明、医疗提示/免责声明下限 |
+| `text-small` | 12px | 400 | 1.5 | 时间戳、单位等次要信息（**医疗安全相关文案禁止使用 12px**，最低 14px） |
+| `text-metric` | 30px | 700 | 1.15 | 指标大数值 |
 
 ### 3.3 特殊文字
 
 | 类型 | 样式 |
 |------|------|
-| **指标数值** | 28px, 600, 颜色根据状态变化 |
+| **指标数值** | `text-metric`（30px/700），颜色随状态变化（success/warning/danger） |
 | **预警标题** | 16px, 500, 对应预警级别颜色 |
 | **按钮文字** | 16px, 500 |
-| **导航文字** | 12px, 400 |
+| **导航文字** | 11-12px（底部胶囊导航） |
 
 ---
 
-## 4. 间距系统
+## 4. 间距与布局
 
 ### 4.1 基础间距
 
-| 名称 | 值 | 用途 |
-|------|-----|------|
-| **xs** | 4px | 图标与文字间距、紧凑内联间距 |
-| **sm** | 8px | 小元素间距、紧凑卡片内边距 |
-| **md** | 12px | 表单元素间距 |
-| **lg** | 16px | 标准卡片内边距、页面左右边距 |
-| **xl** | 24px | 模块间距 |
-| **2xl** | 32px | 大模块间距 |
-| **3xl** | 48px | 页面顶部间距 |
+实际代码使用 Tailwind 原生间距刻度（`p-4`/`mt-3`/`gap-2` 等）。推荐语义对应：4px 图标间距、8-12px 元素间距、16px 卡片内边距与页面左右边距、20-24px 模块间距。
 
 ### 4.2 页面布局
 
-- **最大宽度**: 480px（移动端优先）
-- **页面边距**: 16px（左右）
-- **模块间距**: 16px
-- **卡片内边距**: 16px
+- **移动端（<768px）**：内容容器 `max-w-6xl px-4 py-5`，主体 `pb-24` 给悬浮胶囊底栏让位
+- **桌面端（≥768px）**：左侧固定边栏 240px（`md:pl-[240px]`），`#root` 最大宽 1440px，主内容 `max-w-6xl` 居中；Dashboard 在 `lg`/`xl` 断点使用双栏 grid
+- **卡片内边距**：`.card` 为 `p-4 md:p-5`
 
 ---
 
 ## 5. 组件规范
 
-### 5.1 按钮 (Button)
+> 实现分两层：`index.css` `@layer components` 的 CSS 类（`.card`、`.btn-primary` 等）+ `src/frontend/src/components/ui/` 的 React 组件（BackButton、SegmentedControl、Spinner、ConfirmDialog）。新页面优先复用这两层，禁止复制粘贴样式串。
 
-#### 主按钮 (Primary)
-- 高度: 48px
-- 圆角: 8px
-- 背景: `#1890FF`
-- 文字: 白色, 16px, 500
-- 悬停: `#096DD9`
-- 禁用: `#BFBFBF`
+### 5.1 按钮
 
-#### 次按钮 (Secondary)
-- 高度: 48px
-- 圆角: 8px
-- 背景: 白色
-- 边框: 1px solid `#1890FF`
-- 文字: `#1890FF`, 16px, 500
+#### 主按钮 `.btn-primary`
+- 高度 48px（`h-12`），圆角 16px（`rounded-button`），白字 16px/500
+- 背景 primary `#3E63DD`，阴影 `0 10px 24px rgba(62,99,221,0.22)`，hover 上浮 + `primary-dark`
 
-#### 文字按钮 (Text)
-- 高度: auto
-- 背景: 透明
-- 文字: `#1890FF`, 16px
-- 悬停: 文字下划线
+#### 次按钮 `.btn-secondary`
+- 同高同圆角，`border-gray-border` + `bg-gray-card` 玻璃拟态，hover 上浮
 
-#### 危险按钮 (Danger)
-- 同主按钮样式
-- 背景: `#F5222D`
-- 悬停: `#CF1322`
+#### 用药按钮 `.btn-medication`
+- 同主按钮规格，背景 medication `#6F5BD3`，阴影 `rgba(111,91,211,0.25)`
 
-#### 用药提醒按钮
-- 同主按钮样式
-- 背景: `#722ED1`
-- 悬停: `#531DAB`
+#### 危险操作
+- 破坏性操作（删除等）统一走 `ConfirmDialog` 确认弹窗（`components/ui/ConfirmDialog.tsx`），**禁止使用 `window.confirm` / `alert()`**
+- 图标式危险按钮触摸目标 ≥44px，必须带 `aria-label`
 
-### 5.2 输入框 (Input)
+#### React 组件
+- `BackButton`：44px 圆形返回按钮，`aria-label="返回"`，全站唯一返回样式
+- `Spinner`：加载指示器，sm/md/lg 三档，替换手写 `animate-spin` 块
 
-- 高度: 48px
-- 圆角: 8px
-- 边框: 1px solid `#D9D9D9`
-- 背景: 白色
-- 文字: 16px
-- 内边距: 12px 16px
-- 聚焦: 边框 `#1890FF`, 阴影 `0 0 0 2px rgba(24,144,255,0.2)`
-- 错误: 边框 `#F5222D`, 下方红色提示文字
-- 占位符: `#8C8C8C`
+### 5.2 输入框 `.input-field`
 
-### 5.3 卡片 (Card)
+- 高度 48px，圆角 18px（`rounded-input`），16px 文字
+- 边框 `border-gray-border`，聚焦 `border-primary` + 阴影 `0 0 0 4px rgba(62,99,221,0.14)`
+- 占位符 `text-gray-text-helper`
+- iOS 日期输入框已在 `index.css` 用 `-webkit-appearance: none` + `line-height: 1.5` 重置
 
-#### 标准卡片
-- 背景: 白色
-- 圆角: 12px
-- 内边距: 16px
-- 阴影: `0 2px 8px rgba(0,0,0,0.08)`
-- 边框: 无
+### 5.3 卡片
 
-#### 指标卡片
-- 继承标准卡片
-- 宽度: 自适应（网格布局）
-- 指标数值: 28px, 600
-- 指标名称: 14px, `#595959`
-- 状态标签: 12px, 带颜色圆点
+#### 标准卡片 `.card`
+- 圆角 24px（`rounded-card`），`border-gray-border`，`bg-gray-card` + `backdrop-blur-xl`
+- 阴影 `0 18px 45px rgba(25,36,68,0.08)`（`shadow-card`）
 
-#### 用药提醒卡片
-- 继承标准卡片
-- 左边框: 4px solid `#722ED1`
-- 背景渐变: `linear-gradient(to right, #F9F0FF, #FFFFFF)`
-- 状态图标:
-  - 已服药: 绿色勾选 `#52C41A`
-  - 待服药: 时钟图标 `#722ED1`
-  - 已跳过: 灰色划线 `#BFBFBF`
+#### 变体
+- `.card-muted`：弱化面板
+- `.card-medication`：用药卡片，medication 紫渐变（深色模式有专门覆写）
+- `.card-alert-critical/warning/info`：预警卡片，按级别着色（danger/warning/primary 的 20% 边框 + 浅色底）
+- `.metric-panel`：指标面板，圆角 22px
 
-#### 预警卡片
-- 继承标准卡片
-- 左边框根据级别:
-  - Critical: 4px solid `#F5222D`
-  - Warning: 4px solid `#FAAD14`
-  - Info: 4px solid `#1890FF`
-- 背景色:
-  - Critical: `#FFF2F0`
-  - Warning: `#FFFBE6`
-  - Info: `#E6F7FF`
+### 5.4 选择器与弹层
 
-### 5.4 表单 (Form)
+- **SegmentedControl**（`components/ui/`）：分段选择器，受控组件，Dashboard/Charts 共用
+- **BottomSelector**（底部弹层选择器，目前在 `MedicationForm.tsx` 内）：层级 `z-[60]`（高于底栏 `z-50`）、`max-h-[60vh]` + `pb-20` 防截断、`animate-slide-up` 动画
+- **chip `.chip` / `.chip-active`**：筛选小胶囊，32px 高（次要操作，主操作不得用此规格）
 
-#### 表单项
-- 标签: 14px, `#262626`, 底部间距 8px
-- 必填标记: 红色星号 `*`
-- 帮助文字: 12px, `#8C8C8C`, 顶部间距 4px
-- 错误提示: 12px, `#F5222D`, 顶部间距 4px
+### 5.5 导航
 
-#### 选择器 (Select)
-- 同输入框样式
-- 下拉箭头: 右侧 16px
-- 选项悬停: `#E6F7FF`
+#### 移动端底部导航（BottomNav）
+- 悬浮胶囊样式：`fixed bottom-3 left-3 right-3`，圆角 28px，4 项 grid
+- 图标 20px + 11px 文字，`safe-bottom` 安全区适配
+- 激活态 `.nav-item.active`：白底（深色 10% 白）+ primary 文字 + 柔和阴影
 
-#### 单选/复选框
-- 尺寸: 20px x 20px
-- 选中: `#1890FF` 填充
-- 边框: 2px
-
-### 5.5 导航 (Navigation)
-
-#### 底部导航栏
-- 高度: 64px
-- 背景: 白色
-- 阴影: `0 -2px 8px rgba(0,0,0,0.05)`
-- 图标尺寸: 24px
-- 文字: 12px
-- 激活态: `#1890FF`
-- 默认态: `#8C8C8C`
-
-#### 顶部导航栏
-- 高度: 56px
-- 背景: 白色
-- 标题: 18px, 居中
-- 返回按钮: 左侧 16px
-
-### 5.6 列表 (List)
-
-- 项高度: 56px
-- 分隔线: 1px solid `#F0F0F0`
-- 左侧图标: 24px, `#595959`
-- 右侧箭头: 20px, `#8C8C8C`
-
-### 5.7 标签 (Tag)
-
-| 类型 | 背景 | 文字 | 边框 |
-|------|------|------|------|
-| **正常** | `#F6FFED` | `#52C41A` | 1px solid `#B7EB8F` |
-| **警告** | `#FFFBE6` | `#FAAD14` | 1px solid `#FFE58F` |
-| **危险** | `#FFF2F0` | `#F5222D` | 1px solid `#FFA39E` |
-| **用药** | `#F9F0FF` | `#722ED1` | 1px solid `#D3ADF7` |
-| **信息** | `#E6F7FF` | `#1890FF` | 1px solid `#91D5FF` |
+#### 桌面端左侧边栏
+- 固定 240px 宽，含品牌卡 + 导航项，与移动端共用 BottomNav 组件
 
 ---
 
 ## 6. 页面清单
 
-| 序号 | 页面名称 | 路径 | 说明 |
-|------|----------|------|------|
-| 1 | 登录页 | `/login` | 手机号+验证码登录 |
-| 2 | 注册页 | `/register` | 手机号注册、设置密码 |
-| 3 | 首页仪表盘 | `/dashboard` | 今日打卡、用药提醒、最近指标、预警 |
-| 4 | 指标录入 | `/records/new` | 表单录入各项指标 |
-| 5 | 指标列表 | `/records` | 历史指标记录列表 |
-| 6 | 指标详情 | `/records/:id` | 单条记录详情 |
-| 7 | 趋势图表 | `/charts` | 指标趋势折线图 |
-| 8 | 用药管理 | `/medications` | 用药设置、用药记录 |
-| 9 | 添加用药 | `/medications/new` | 设置新的用药提醒 |
-| 10 | 用药记录 | `/medications/logs` | 历史服药记录 |
-| 11 | 血药浓度录入 | `/records/drug-concentration` | 专项录入页面 |
-| 12 | 血药浓度趋势 | `/charts/drug-concentration` | 血药浓度趋势图 |
-| 13 | OCR上传 | `/ocr` | 拍照识别化验单 |
-| 14 | OCR结果核对 | `/ocr/verify` | 核对识别结果 |
-| 15 | 预警中心 | `/alerts` | 所有预警列表 |
-| 16 | 预警详情 | `/alerts/:id` | 单条预警详情 |
-| 17 | AI助手 | `/ai-chat` | 智能问答助手 |
-| 18 | 个人中心 | `/profile` | 个人档案、设置 |
-| 19 | 编辑档案 | `/profile/edit` | 修改个人信息 |
+以 `src/frontend/src/App.tsx` 路由定义为唯一事实来源。核心路由：`/login`、`/register`、`/forgot-password`、`/privacy-policy`（公开）；`/onboarding`（登录后引导）；`/`（Dashboard）、`/records`、`/records/new`、`/records/:id`、`/charts`、`/medications`、`/medications/new`、`/alerts`、`/profile`、`/settings`、`/reminder-settings`、`/privacy-security`、`/help-center`、`/insights`（需登录+完成引导）。
 
 ---
 
@@ -292,22 +197,20 @@ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica N
 
 ### 7.1 视觉无障碍
 
-- **最小字号**: 16px（正文）
-- **重要信息**: 18px+
-- **颜色对比度**: >= 4.5:1
-- **不单独依赖颜色**: 使用图标+文字双重提示
+- **最小字号**: 16px（正文）；医疗安全提示/免责声明 ≥14px
+- **颜色对比度**: ≥ 4.5:1（helper/warning/success 已于 2026-07-20 调深达标）
+- **不单独依赖颜色**: 图标+文字双重提示；图表图例文字+色块双编码
 
 ### 7.2 交互无障碍
 
-- **按钮点击区域**: >= 48x48px
+- **主操作点击区域**: ≥ 48x48px；**次级/图标按钮**: ≥ 44x44px
 - **支持键盘操作**: Tab 导航、Enter 确认
 - **焦点可见**: 清晰的焦点样式
-- **触摸反馈**: 按钮点击有视觉反馈
+- **图标按钮必须带 `aria-label`**；表单 label 用 `htmlFor` 关联 input
 
 ### 7.3 内容无障碍
 
 - **图片必须包含 alt 文本**
-- **表单标签关联**: label 与 input 正确关联
 - **错误提示明确**: 说明错误原因和修正方法
 - **避免闪烁**: 不使用闪烁或自动播放内容
 
@@ -320,22 +223,18 @@ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica N
 | 类型 | 时长 | 用途 |
 |------|------|------|
 | **快速** | 150ms | 按钮悬停、小状态变化 |
-| **标准** | 200ms | 卡片展开、菜单显示 |
-| **慢速** | 300ms | 页面切换、模态框 |
+| **标准** | 200ms | 卡片展开、菜单显示（`.btn-*` hover 用 `duration-200`） |
+| **慢速** | 250-300ms | 页面切换、模态框、BottomSelector（`slide-up 0.25s ease-out`） |
 
 ### 8.2 缓动函数
 
-- **标准**: `ease-in-out`
-- **进入**: `ease-out`
-- **退出**: `ease-in`
+- **标准**: `ease-in-out`；**进入**: `ease-out`；**退出**: `ease-in`
 
 ### 8.3 常用动画
 
-- **按钮悬停**: 背景色变化 150ms
-- **卡片悬停**: 轻微上移 + 阴影加深 200ms
-- **页面进入**: 从右滑入 300ms
-- **模态框**: 淡入 + 缩放 300ms
-- **加载**: 旋转动画 1s linear infinite
+- **按钮悬停**: 上浮 `-translate-y-0.5` + 阴影加深 200ms
+- **加载**: Spinner 旋转 `animate-spin`
+- **底部弹层**: `animate-slide-up`
 
 ---
 
@@ -345,7 +244,7 @@ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica N
 
 | 用途 | 尺寸 |
 |------|------|
-| **导航图标** | 24px |
+| **底部导航图标** | 20px |
 | **按钮图标** | 20px |
 | **列表图标** | 24px |
 | **状态图标** | 16px |
@@ -353,12 +252,10 @@ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica N
 
 ### 9.2 图标颜色
 
-- **默认**: `#595959`
-- **激活**: `#1890FF`
-- **成功**: `#52C41A`
-- **警告**: `#FAAD14`
-| **危险**: `#F5222D`
-- **用药**: `#722ED1`
+- **默认**: `text-gray-text-secondary`
+- **激活**: primary `#3E63DD`
+- **成功/警告/危险**: success `#1F7A4D` / warning `#A06200` / danger `#D9485F`
+- **用药**: medication `#6F5BD3`
 
 ### 9.3 推荐图标
 
@@ -377,31 +274,30 @@ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica N
 | 警告 | alert-triangle |
 | 成功 | check-circle |
 | 关闭 | x |
-| 返回 | chevron-left |
+| 返回 | chevron-left / arrow-left（BackButton 统一） |
 | 更多 | more-horizontal |
 
 ---
 
 ## 10. 响应式断点
 
-本项目采用**移动端优先**策略，主要适配手机端。
+移动端优先，单一断点策略：
 
-| 断点 | 宽度 | 说明 |
+| 断点 | 宽度 | 布局 |
 |------|------|------|
-| **Mobile** | < 480px | 主要目标设备 |
-| **Tablet** | 480px - 768px | 平板适配 |
-| **Desktop** | > 768px | 居中显示，最大宽度 480px |
+| **Mobile** | < 768px | 单列 + 悬浮胶囊底栏 |
+| **Desktop** | ≥ 768px（`md`） | 左侧边栏 240px + 内容区（`#root` 最大 1440px，主内容 `max-w-6xl`）；`lg`/`xl` 起 Dashboard 双栏 |
 
 ---
 
 ## 11. 设计原则总结
 
-1. **老年友好**: 大字体、大按钮、高对比度、简洁布局
+1. **老年友好**: 大字体、大按钮、高对比度（≥4.5:1）、简洁布局
 2. **简洁清晰**: 一页只做一件事，减少认知负担
 3. **及时反馈**: 每个操作都有明确响应，避免用户困惑
 4. **积极安抚**: 使用温和积极的语言，避免制造焦虑
-5. **医疗严谨**: 指标展示准确，颜色区分明确
-6. **用药突出**: 紫色标识用药相关功能，与医疗蓝区分
+5. **医疗严谨**: 指标展示准确，颜色区分明确；医疗提示 ≥14px 且对比度达标；血药浓度无通用固定范围
+6. **用药突出**: 紫色标识用药相关功能，与主蓝区分
 
 ---
 

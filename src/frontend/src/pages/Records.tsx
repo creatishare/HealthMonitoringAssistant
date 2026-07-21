@@ -11,6 +11,7 @@ import {
   Upload,
 } from 'lucide-react'
 import HealthRecordForm from '../components/health/HealthRecordForm'
+import Spinner from '../components/ui/Spinner'
 import { healthRecordApi } from '../services/api'
 import {
   getRecordSummary,
@@ -143,7 +144,7 @@ export default function Records() {
 
         {loading ? (
           <div className="flex justify-center py-10">
-            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
+            <Spinner />
           </div>
         ) : visibleRecords.length === 0 ? (
           <div className="py-10 text-center text-helper text-gray-text-secondary">
@@ -161,9 +162,6 @@ export default function Records() {
                     <button onClick={() => navigate(`/records/${record.id}`)} className="min-w-0 flex-1 text-left">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-page-title text-gray-text-primary">{formatShortDate(record.recordDate)}</span>
-                        <span className="text-helper text-gray-text-secondary">
-                          {recordType === '化验' ? '14:20' : '08:30'}
-                        </span>
                         <span className={`rounded-full px-2.5 py-1 text-small font-semibold ${recordType === '化验' ? 'bg-success/10 text-success' : 'bg-primary/10 text-primary'}`}>
                           {recordType}
                         </span>
